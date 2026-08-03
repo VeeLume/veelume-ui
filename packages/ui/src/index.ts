@@ -14,6 +14,24 @@
  * Next: the Catalog archetype (derive + overlay) in apps/demo.
  */
 
+// ── L2: record form ────────────────────────────────────────────────────────
+// What archetype E actually reuses — connect-neo's wording is "the same
+// EDITOR", not the same surface. A solo record is this with nothing around it.
+export { RecordForm, NumberInput, createRecordForm, sectionsOf } from './form/index.js';
+export {
+	formatLocaleNumber,
+	localeSeparators,
+	parseLocaleNumber
+} from './form/index.js';
+export type {
+	FieldKind,
+	FieldSpec,
+	FormSection,
+	RecordFormIO,
+	RecordFormState,
+	SelectOption
+} from './form/index.js';
+
 // ── L2: surface parts ──────────────────────────────────────────────────────
 export { Surface, createSurface } from './surface/index.js';
 export type {
