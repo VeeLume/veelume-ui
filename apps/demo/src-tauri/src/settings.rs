@@ -10,17 +10,13 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+/// Derived rather than hand-written: with every field at its type default a
+/// manual `impl Default` trips `clippy::derivable_impls`, which the pre-push
+/// gate treats as an error. Swap back to a manual impl the moment a field needs
+/// a non-default starting value.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct AppSettings {
     /// Whether first-launch onboarding has been completed or skipped.
     pub onboarding_completed: bool,
-}
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            onboarding_completed: false,
-        }
-    }
 }
