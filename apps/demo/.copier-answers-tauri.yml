@@ -1,6 +1,6 @@
 # Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
 _commit: v0.1.1
-_src_path: E:/vscode/veelume-template-tauri
+_src_path: gh:VeeLume/template-tauri
 android: false
 author: Valerie
 description: Demo and validation harness for the veelume-ui kit
