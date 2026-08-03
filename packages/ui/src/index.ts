@@ -11,8 +11,24 @@
  *   L2  compound components   — parts with snippet escape hatches
  *   L3  arrangements          — opinionated shells
  *
- * Next, in order: collection.ts (scoped cache) → browse.ts (URL-backed state).
+ * Next: browse.ts (URL-backed browse state).
  */
+
+// ── L1: collections ────────────────────────────────────────────────────────
+export { createCollection } from './collection/index.svelte.js';
+export type {
+	Collection,
+	CollectionIO,
+	CollectionOptions,
+	ChangeInfo,
+	Entry,
+	KitError,
+	ScopedView,
+	Status,
+	Unsubscribe,
+	WriteIO,
+	WriteSemantics
+} from './collection/index.svelte.js';
 
 // ── L1: context ────────────────────────────────────────────────────────────
 export {

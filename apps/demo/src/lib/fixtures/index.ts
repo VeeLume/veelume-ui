@@ -25,6 +25,7 @@
 
 import { mockIPC } from '@tauri-apps/api/mocks';
 import { settingsFixtures } from './settings.js';
+import { probeFixtures } from './probes.js';
 import type { FixtureModule } from './types.js';
 
 export type { FixtureHandler, FixtureModule } from './types.js';
@@ -90,6 +91,7 @@ export function installFixtureBackend(): boolean {
 	if (inTauri) return false;
 
 	registerFixtures(settingsFixtures);
+	registerFixtures(probeFixtures);
 	installed = true;
 	latencyMs = readLatency();
 	mockIPC((cmd, payload) => dispatch(cmd, payload as Record<string, unknown>), {
