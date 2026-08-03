@@ -1,0 +1,21 @@
+# Virtual workspace root — lets cargo, just and the git hooks run from the repo
+# root while the only Rust crate lives at apps/demo/src-tauri.
+#
+# Hand-written rather than generated: template-tauri was scaffolded into
+# apps/demo with `workspace=false` precisely so it would NOT create a second
+# workspace root there. Same shape as stibu-workspace.
+[workspace]
+resolver = "2"
+members = ["apps/demo/src-tauri"]
+
+# Profiles must live at the workspace root — profiles in a member manifest are
+# ignored (with a warning).
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

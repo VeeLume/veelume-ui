@@ -1,0 +1,5 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"home_title": "Veelume UI Demo",
+	"home_subtitle": "Scaffolded from VeeLume template-tauri. Replace this page."
+}

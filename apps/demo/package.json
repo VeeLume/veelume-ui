@@ -1,0 +1,43 @@
+{
+  "name": "veelume-ui-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Demo and validation harness for the veelume-ui kit",
+  "scripts": {
+    "dev": "vite dev --port 1420",
+    "build": "vite build",
+    "preview": "vite preview",
+    "paraglide": "paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide",
+    "prepare": "pnpm paraglide && svelte-kit sync || echo ''",
+    "check": "pnpm paraglide && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@veelume/ui": "workspace:*",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2",
+    "@tauri-apps/plugin-updater": "^2",
+    "bits-ui": "^2.16.5",
+    "clsx": "^2.1.1",
+    "lucide-svelte": "^1.0.1",
+    "shadcn-svelte": "^1.2.5",
+    "tailwind-merge": "^3.5.0",
+    "tailwind-variants": "^3.2.2"
+  },
+  "devDependencies": {
+    "@inlang/paraglide-js": "^2.18.0",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.50.2",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@tailwindcss/vite": "^4.2.2",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^26.1.0",
+    "svelte": "^5.54.0",
+    "svelte-check": "^4.4.2",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

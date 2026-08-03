@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.1.0
+_src_path: E:/vscode/veelume-template-tauri
+android: false
+author: Valerie
+description: Demo and validation harness for the veelume-ui kit
+i18n: true
+identifier: icu.veelume.veelumeuidemo
+locales: en,de
+modules: false
+project_name: Veelume UI Demo
+project_slug: veelume-ui-demo
+theme_seed: mono
+tray: false
+workspace: false

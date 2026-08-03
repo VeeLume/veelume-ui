@@ -1,0 +1,25 @@
+# Rust
+/target
+
+# Node / SvelteKit
+node_modules/
+/.svelte-kit
+/build
+.env
+.env.*
+!.env.example
+
+# Tauri
+/src-tauri/target
+/src-tauri/gen/schemas
+# Updater signing key — NEVER commit. The public half lives in tauri.conf.json.
+*.key
+*.jks
+
+# Paraglide output (compiled from messages/ at build time)
+/src/lib/paraglide
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
