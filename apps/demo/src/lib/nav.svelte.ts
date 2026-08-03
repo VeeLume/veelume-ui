@@ -1,7 +1,7 @@
 // Navigation model. Components read `nav.groups` / `nav.bottomItems` and never
 // build routes themselves, so adding a destination is one edit here.
 import type { ComponentType } from 'svelte';
-import { House, Settings } from 'lucide-svelte';
+import { House, Library, FlaskConical, Settings } from 'lucide-svelte';
 
 // lucide-svelte still ships Svelte-4-style class components, so this is the
 // legacy `ComponentType` rather than the runes-era `Component`.
@@ -20,7 +20,13 @@ export interface NavGroup {
 }
 
 /** Destinations that exist regardless of configuration. */
-const coreItems: NavItem[] = [{ label: 'Home', icon: House, path: '/home' }];
+const coreItems: NavItem[] = [
+	{ label: 'Home', icon: House, path: '/home' },
+	// The Catalog archetype — derive + overlay, the demo's real domain.
+	{ label: 'Catalog', icon: Library, path: '/catalog' },
+	// A test rig, not domain. Delete once the real surfaces cover the same ground.
+	{ label: 'Probes', icon: FlaskConical, path: '/probes' }
+];
 
 const settingsItem: NavItem = {
 	label: 'Settings',
