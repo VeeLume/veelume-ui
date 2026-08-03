@@ -9,6 +9,25 @@
  * standard, and tweakcn themes paste in unmodified), but nothing here depends
  * on shadcn-svelte: the kit builds on bits-ui directly.
  */
+
+/*
+ * ⚑ Tailwind must be told to scan the kit.
+ *
+ * @veelume/ui ships SOURCE and is workspace-linked, so it reaches the app via a
+ * symlink under node_modules — which Tailwind v4's automatic source detection
+ * skips. Every class used ONLY inside the kit is then missing from the dev
+ * server's stylesheet: `md:w-72`, `md:flex`, `md:block`, `md:shrink-0`.
+ *
+ * The failure mode is not an error. It looks like a broken flex rule — opening
+ * a record hides the list and nothing brings it back, because `hidden md:flex`
+ * keeps the `hidden` and loses the override.
+ *
+ * It lives in theme.css rather than app.css because app.css is template-managed
+ * and `copier update` would take it away. That is a template-tauri gap: the
+ * scaffold assumes every Tailwind source sits inside the app.
+ */
+@source "../../../packages/ui/src";
+
 /* mono — neutral greys, black/white accent (stibu). */
 :root {
 	--background: oklch(1 0 0);
