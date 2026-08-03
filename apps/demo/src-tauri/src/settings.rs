@@ -10,10 +10,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Derived rather than hand-written: with every field at its type default a
-/// manual `impl Default` trips `clippy::derivable_impls`, which the pre-push
-/// gate treats as an error. Swap back to a manual impl the moment a field needs
-/// a non-default starting value.
+// `Default` is derived rather than hand-written: with every field at its type
+// default, a manual `impl Default` trips `clippy::derivable_impls`, and
+// template-rust's pre-push hook runs clippy with `-D warnings` — so a freshly
+// scaffolded repo could not be pushed. The `tray` variant keeps a manual impl,
+// because `close_to_tray` defaults to true. Swap back to a manual impl the
+// moment any field needs a non-default starting value.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, specta::Type)]
 #[serde(default)]
 pub struct AppSettings {

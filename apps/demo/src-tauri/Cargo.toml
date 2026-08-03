@@ -5,9 +5,10 @@ description = "Demo and validation harness for the veelume-ui kit"
 authors = ["Valerie"]
 edition = "2021"
 # Required because a second [[bin]] (export-bindings) is declared below: without
-# it `cargo run` refuses to pick a target, which breaks `tauri dev` — its
-# DevCommand is a bare `cargo run`. Gating that bin behind `required-features`
-# is not enough; cargo still sees two declared targets.
+# it `cargo run` cannot choose a target, and `tauri dev`'s DevCommand is a bare
+# `cargo run` — so `just dev` dies with exit 101 on an untouched scaffold.
+# Gating that bin behind `required-features` does not help; cargo counts
+# declared targets, not buildable ones.
 default-run = "veelume-ui-demo"
 
 [[bin]]
