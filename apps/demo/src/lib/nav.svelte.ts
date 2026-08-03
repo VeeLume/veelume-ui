@@ -1,7 +1,7 @@
 // Navigation model. Components read `nav.groups` / `nav.bottomItems` and never
 // build routes themselves, so adding a destination is one edit here.
 import type { ComponentType } from 'svelte';
-import { House, Library, BookUp, FlaskConical, Settings } from 'lucide-svelte';
+import { House, Library, BookUp, SlidersHorizontal, FlaskConical, Settings } from 'lucide-svelte';
 
 // lucide-svelte still ships Svelte-4-style class components, so this is the
 // legacy `ComponentType` rather than the runes-era `Component`.
@@ -26,6 +26,8 @@ const coreItems: NavItem[] = [
 	{ label: 'Catalog', icon: Library, path: '/catalog' },
 	// Archetype B — scoped by year, the counterpart to the unscoped catalog.
 	{ label: 'Loans', icon: BookUp, path: '/loans' },
+	// Archetype E — one record, no list. Root minus two children.
+	{ label: 'Preferences', icon: SlidersHorizontal, path: '/preferences' },
 	// A test rig, not domain. Delete once the real surfaces cover the same ground.
 	{ label: 'Probes', icon: FlaskConical, path: '/probes' }
 ];

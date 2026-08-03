@@ -28,6 +28,7 @@ import { settingsFixtures } from './settings.js';
 import { probeFixtures } from './probes.js';
 import { libraryFixtures } from './library.js';
 import { loanFixtures } from './loans.js';
+import { prefsFixtures } from './prefs.js';
 import type { FixtureModule } from './types.js';
 
 export type { FixtureHandler, FixtureModule } from './types.js';
@@ -96,6 +97,7 @@ export function installFixtureBackend(): boolean {
 	registerFixtures(probeFixtures);
 	registerFixtures(libraryFixtures);
 	registerFixtures(loanFixtures);
+	registerFixtures(prefsFixtures);
 	installed = true;
 	latencyMs = readLatency();
 	mockIPC((cmd, payload) => dispatch(cmd, payload as Record<string, unknown>), {
