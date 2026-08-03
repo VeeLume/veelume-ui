@@ -23,10 +23,19 @@ import type { FacetDef, Row, SortDef, SurfaceBrowse, SurfaceDescriptor } from '.
  */
 export function createSurface<Src, R extends Row>(
 	getDescriptor: () => SurfaceDescriptor<Src, R>,
-	getBrowse: () => SurfaceBrowse
+	getBrowse: () => SurfaceBrowse,
+	/**
+	 * Which row is open, or null. Carried rather than computed — no pipeline step
+	 * reads it — because it is the one piece of state THREE parts each need and
+	 * were each being handed separately: the list highlights it, the split decides
+	 * which pane a narrow screen shows, and the toolbar steps aside with the list.
+	 * Three props for one fact is three chances to disagree.
+	 */
+	getSelected: () => string | null = () => null
 ) {
 	const descriptor = $derived(getDescriptor());
 	const browse = $derived(getBrowse());
+	const selected = $derived(getSelected());
 
 	const facets = $derived(descriptor.facets ?? []);
 	const sorts = $derived(descriptor.sorts ?? []);
@@ -37,13 +46,17 @@ export function createSurface<Src, R extends Row>(
 	const query = $derived(String(browse.values.q ?? '').trim().toLowerCase());
 
 	/** Step 2 — free-text search, kept separate from filters because the
-	 *  contextual counts below must be computed against a searched population. */
+	 *  contextual counts below must be computed against a searched population.
+	 *
+	 *  `searchIn` is optional: a surface with nothing worth searching declares no
+	 *  search function and gets no search field. That is the same neutral-absence
+	 *  rule the facets follow — capability is declared by the descriptor, so the
+	 *  header never has to be told what to hide. */
 	const searched = $derived.by(() => {
-		if (!query) return rows;
+		const searchIn = descriptor.searchIn;
+		if (!query || !searchIn) return rows;
 		return rows.filter((r) =>
-			descriptor
-				.searchIn(r)
-				.some((v) => v != null && String(v).toLowerCase().includes(query))
+			searchIn(r).some((v) => v != null && String(v).toLowerCase().includes(query))
 		);
 	});
 
@@ -118,6 +131,21 @@ export function createSurface<Src, R extends Row>(
 		},
 		get query() {
 			return String(browse.values.q ?? '');
+		},
+		/** Whether the descriptor gave us anything to search. Drives the field. */
+		get searchable() {
+			return !!descriptor.searchIn;
+		},
+		/**
+		 * Whether the user has narrowed the list at all — the condition under which
+		 * a result count is worth its vertical space. Unnarrowed, "34 results" only
+		 * restates the list; narrowed, it answers the question just asked.
+		 */
+		get narrowing() {
+			return !!query || browse.activeCount > 0;
+		},
+		get selected() {
+			return selected;
 		},
 		get total() {
 			return rows.length;

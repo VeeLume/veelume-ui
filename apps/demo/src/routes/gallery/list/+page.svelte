@@ -10,6 +10,12 @@
 <div class="grid max-w-3xl gap-6">
 	<h1 class="text-lg font-semibold">Surface.List</h1>
 
+	<p class="-mt-4 text-sm text-muted-foreground">
+		The list owns its own header — search and filters act on the list, so they ride inside it. See
+		<a class="underline" href="/gallery/list-header">Surface.ListHeader</a> for that band's own
+		states.
+	</p>
+
 	<Case
 		title="ready"
 		note="Row anatomy: title, subtitle, trailing, badge. The last row is deliberately overlong — it must truncate, never wrap or widen the pane."
@@ -21,8 +27,8 @@
 	</Case>
 
 	<Case title="selected" note="Selection is passed in, not owned — it comes from the URL." frame={false}>
-		<Surface.Root {descriptor} browse={staticBrowse()}>
-			<Surface.List status="ready" selected="b" />
+		<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
+			<Surface.List status="ready" />
 		</Surface.Root>
 	</Case>
 
@@ -64,7 +70,7 @@
 
 	<Case
 		title="filtered to nothing"
-		note="Same empty rendering, different cause: {rows.length} rows exist, the facet excludes them all."
+		note="Same empty rendering, different cause: {rows.length} rows exist, the search excludes them all. Note the count strip — it appears ONLY while narrowing, so it costs nothing on a surface nobody has filtered, and when it does appear it answers the question just asked and carries the way out."
 		frame={false}
 	>
 		<Surface.Root {descriptor} browse={staticBrowse({ q: 'zzzz' })}>

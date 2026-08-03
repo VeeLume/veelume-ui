@@ -36,6 +36,7 @@
 	const entries = [
 		{ path: '/gallery', label: 'Overview' },
 		{ path: '/gallery/list', label: 'Surface.List' },
+		{ path: '/gallery/list-header', label: 'Surface.ListHeader' },
 		{ path: '/gallery/toolbar', label: 'Surface.Toolbar' },
 		{ path: '/gallery/split', label: 'Surface.Split' },
 		{ path: '/gallery/form', label: 'RecordForm' },

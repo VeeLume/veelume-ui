@@ -127,6 +127,19 @@ async loansArchive(id: string, year: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The create path. Archetype B is "list + detail + form", and a demo built only
+ * from seeded data never exercises the third of those — nor the list header's
+ * one forward action, which is what create is reached by.
+ */
+async loansCreate(year: string) : Promise<Result<Loan, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_create", { year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async loansReset() : Promise<void> {
     await TAURI_INVOKE("loans_reset");
 },

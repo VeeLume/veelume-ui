@@ -223,6 +223,31 @@ pub fn loans_archive(state: State<'_, DemoState>, id: String, year: String) -> R
     Ok(())
 }
 
+/// The create path. Archetype B is "list + detail + form", and a demo built only
+/// from seeded data never exercises the third of those — nor the list header's
+/// one forward action, which is what create is reached by.
+#[tauri::command]
+#[specta::specta]
+pub fn loans_create(state: State<'_, DemoState>, year: String) -> Result<Loan, String> {
+    let mut data = state.0.lock().unwrap();
+    let list = data.loans_mut(&year).ok_or("unknown year")?;
+    let loan = Loan {
+        // Seeded ids are `loan-<year>-<n>`; a `new` segment keeps a created record
+        // from colliding with one a reset would re-seed.
+        id: format!("loan-{year}-new-{}", list.len() + 1),
+        title: "Untitled loan".into(),
+        borrower: String::new(),
+        lent_on: format!("{year}-01-01"),
+        due_on: format!("{year}-01-31"),
+        status: "draft".into(),
+        replaced_by: None,
+        fine_cents: 0,
+        note: String::new(),
+    };
+    list.push(loan.clone());
+    Ok(loan)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn loans_reset(state: State<'_, DemoState>) {

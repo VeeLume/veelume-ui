@@ -28,9 +28,11 @@
 
 	<Case title="list + detail — selected" frame={false}>
 		<div class="h-56">
-			<Surface.Root {descriptor} browse={staticBrowse()}>
-				<Surface.Split selected>
-					{#snippet list()}<Surface.List status="ready" selected="b" />{/snippet}
+			<!-- `selected` lives on Root: which pane a narrow screen shows and which
+			     row the list highlights are one fact, not two props. -->
+			<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
+				<Surface.Split>
+					{#snippet list()}<Surface.List status="ready" />{/snippet}
 					{#snippet detail()}
 						<div class="h-full rounded-lg border border-border bg-card p-3 text-sm">
 							Use of Weapons

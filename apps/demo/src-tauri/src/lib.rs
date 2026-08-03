@@ -49,6 +49,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         demo_commands::loans_cancel,
         demo_commands::loans_mark_lost,
         demo_commands::loans_archive,
+        demo_commands::loans_create,
         demo_commands::loans_reset,
         demo_commands::prefs_list,
         demo_commands::prefs_save,

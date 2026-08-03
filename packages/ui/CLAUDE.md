@@ -16,9 +16,9 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `context/` | L1 | Label bag + **two locales** (message, formatting) + memoised `Intl` + derived `hourCycle`. No runes — reactivity comes from the app's getters. |
 | `collection/` | L1 | Scoped cache, optional write layer. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.Toolbar/.List/.Split`. |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
-| `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `DetailHeader`. |
+| `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `shell/` | L3 | `AppShell`, `NavRail`, `BottomNav`, `breakpoints`. |
 
 Everything is exercised by a real surface in `apps/demo` — Catalog (derive +
@@ -139,7 +139,8 @@ deliberately rather than discovered.
 ### L2/L3 — components
 
 - **Composable by omission, never rearrangement.** `<Surface.Root>` owns state, parts read it
-  from context. Omitting `<Surface.Toolbar>` is supported; moving it below the list is not.
+  from context. Omitting `<Surface.Toolbar>` is not merely supported, it is the
+  default; moving it below the list is not supported at all.
 - **Absence must be neutral.** Root's defaults are "no filter, no sort override, no mode", so a
   missing part means nothing is applied — never a filter active with no UI to reach it.
 - **i18n via a context label bag** with English defaults. Paraglide is app-level and
@@ -167,15 +168,55 @@ deliberately rather than discovered.
   arrangement: `① primary` (filled, at most one) → `② secondary` (outline) →
   `③ overflow` (`⋮`, rare/destructive, rendered only when non-empty), left to
   right in a right-aligned cluster.
-- **`Surface.Toolbar` and `DetailHeader` are peers**: 56px bar, `px-3`, 36px
-  controls, action cluster at the same right inset. That equality is half the
-  promise — a fixed slot means nothing if the bar changes between a list and a
-  record. It was measurably false once (13px of drift); keep it true.
+- **⚑ Three owners of chrome, and the control's owner decides its bar.** This is
+  the placement test — apply it per control, not per screen:
+
+  | Owner | Examples | Bar |
+  |---|---|---|
+  | the **list** | search, filters, sort, "New …" | `Surface.ListHeader` — *inside* `Surface.List` |
+  | the **record** | back, title, save, overflow | `DetailHeader` — inside the detail pane |
+  | the **surface** (neither pane) | scope switcher, list↔table, import/export | `Surface.Toolbar` |
+
+  **The default is two bars, not three.** Most surfaces have an empty third
+  bucket, omit `Surface.Toolbar`, and spend the 56px on rows. A toolbar is an
+  escalation you can justify control-by-control, never a frame you start from.
+  A "New …" is *not* surface chrome — it creates a row, so it is the list's.
+- **Search and filters live inside the list, and the containment is the design.**
+  A page-level bar produced three defects at once: the controls sat at the page's
+  left edge while the list they filtered started further in; they survived into
+  the detail view on a narrow screen; and the bar needed a title to justify its
+  width, duplicating the nav rail's label. A child of the list is aligned with
+  it, hidden with it, and has no page to name — none of the three is reachable.
+- **`Surface.Toolbar` has no `title`.** The nav rail already names the surface.
+- **All three bars are `<Bar>`** — one class string, so 56px / `px-3` / 36px
+  controls cannot disagree between a list and a record. This was three copies
+  held together by a comment and it drifted by 13px; a comment is not an
+  enforcement mechanism.
 - **`DetailHeader`'s leading slot is always occupied** — back button, or an empty
   36px spacer. Removing the spacer is the obvious simplification that
   reintroduces the title jump.
 - **`Button` sizes encode the density rule**: `field` follows
   `--density-target`, `chrome` is a fixed 36px.
+- **A collapsing label needs an icon.** Hiding the text below a breakpoint so a
+  neighbour keeps its width renders an *empty button* when the action has no
+  icon. Collapse conditionally, never unconditionally.
+
+### L2 — what renders is declared by the descriptor
+
+Chrome is not switched on by flags on the component; it follows from what the
+surface says it can do. `searchIn` present → a search field. Facets or sorts →
+a filter button. An `action` → a button. **None of them → `ListHeader` does not
+render at all and the list keeps the 56px.** "Avoid a bar unless it earns its
+space" is therefore a mechanism, not a rule someone has to remember.
+
+Same principle for the count strip: it appears **only while narrowing**. Against
+an unfiltered list "34 results" restates the list and costs vertical space on
+every surface forever; against a narrowed one it answers the question just asked,
+so it also carries the reset.
+
+`selected` lives on `Surface.Root`, not on three parts. Which pane a narrow
+screen shows, which row the list highlights, and whether the toolbar steps aside
+are one fact — passing it three times is three chances to disagree.
 
 ## Gotchas that cost real time
 

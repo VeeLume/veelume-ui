@@ -37,6 +37,17 @@ export const loans = createCollection<Loan, string, string>(
 	{ scope: () => currentYear }
 );
 
+/**
+ * Create. Not a `write.save` — the collection's write layer updates a record it
+ * already holds, and this one does not exist yet. Same shape as the four
+ * closers: a command, then `refresh()`.
+ */
+export async function createLoan(): Promise<string> {
+	const loan = await invoke<Loan>('loans_create', { year: currentYear });
+	await loans.refresh();
+	return loan.id;
+}
+
 /** 1 — soft delete: status change, returns the record. */
 export async function returnLoan(id: string): Promise<void> {
 	await invoke('loans_return', { id, year: currentYear });

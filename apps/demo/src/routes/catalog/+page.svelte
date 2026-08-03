@@ -85,10 +85,14 @@
 	const nextLabel = { owned: 'Mark as wanted', want: 'Remove from shelf', none: 'Mark as owned' };
 </script>
 
+<!--
+	Configuration A — no toolbar. The catalog has no chrome that belongs to
+	neither pane, so it has no page bar: search and filters ride in the list's own
+	header, and the 56px a toolbar would have cost goes to rows instead. This is
+	the default shape, and most surfaces should look like this.
+-->
 <div class="flex h-full min-h-0 flex-col">
 	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1 gap-0">
-		<Surface.Toolbar title="Catalog" />
-
 		<Surface.List {status} class="m-3">
 			{#snippet row(r: WorkRow)}
 				{@const open = expanded.has(r.key)}

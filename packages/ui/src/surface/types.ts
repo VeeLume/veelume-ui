@@ -46,8 +46,12 @@ export type SurfaceDescriptor<Src, R extends Row> = {
 	sources: () => Src;
 	/** Records to rows. The ONLY structural difference between archetypes. */
 	derive: (src: Src) => R[];
-	/** Everything free-text search looks at. */
-	searchIn: (row: R) => (string | number | null | undefined)[];
+	/**
+	 * Everything free-text search looks at. **Omit it and the list gets no search
+	 * field** — capability is declared here, so no part has to be told to hide a
+	 * control it should never have drawn.
+	 */
+	searchIn?: (row: R) => (string | number | null | undefined)[];
 	facets?: FacetDef<R>[];
 	sorts?: SortDef<R>[];
 };

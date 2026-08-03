@@ -13,6 +13,7 @@
 	 */
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { Plus } from 'lucide-svelte';
 	import {
 		Actions,
 		DetailHeader,
@@ -26,6 +27,7 @@
 		loans,
 		setLoanYear,
 		loanYear,
+		createLoan,
 		returnLoan,
 		cancelLoan,
 		markLost,
@@ -161,6 +163,17 @@
 			: []
 	);
 
+	/** Create, then open it — a new record you cannot see is not a create. */
+	async function newLoan() {
+		message = null;
+		try {
+			const id = await createLoan();
+			await goto(withParams({ id }));
+		} catch (e) {
+			message = `Create failed: ${(e as { message?: string }).message ?? 'error'}`;
+		}
+	}
+
 	async function saveNote() {
 		if (!selectedId) return;
 		await act('Saved', () => loans.save(selectedId, { note }));
@@ -168,9 +181,17 @@
 	}
 </script>
 
+<!--
+	Configuration B — the escalation. The year selector is surface chrome: it
+	changes what BOTH panes are looking at, so it belongs to neither and cannot
+	ride in the list header. That, and only that, is what earns this surface a
+	toolbar — note what the toolbar does NOT hold: no title (the nav rail already
+	says "Loans"), no search, no filters, no count. Those went into the list,
+	where the thing they act on lives.
+-->
 <div class="flex h-full min-h-0 flex-col">
-	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1 gap-0">
-		<Surface.Toolbar title="Loans">
+	<Surface.Root {descriptor} {browse} selected={selectedId} class="min-h-0 flex-1 gap-0">
+		<Surface.Toolbar>
 			{#snippet leading()}
 				<div class="flex shrink-0 rounded-md border border-input p-0.5 text-xs">
 					{#each YEARS as y (y)}
@@ -184,9 +205,15 @@
 			{/snippet}
 		</Surface.Toolbar>
 
-		<Surface.Split selected={!!selectedId} class="p-3">
+		<Surface.Split class="p-3">
 			{#snippet list()}
-				<Surface.List status={loans.status} selected={selectedId} />
+				<!-- Tier ① for the LIST: the one thing you came to the list to start.
+				     It is not a surface action — it creates a row — so it rides here
+				     rather than in the toolbar above. -->
+				<Surface.List
+					status={loans.status}
+					action={{ label: 'New loan', icon: Plus, onclick: newLoan }}
+				/>
 			{/snippet}
 
 			{#snippet detail()}

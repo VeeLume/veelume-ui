@@ -114,7 +114,7 @@
 		<span class="text-xs text-muted-foreground">status: {probes.status}</span>
 	</header>
 
-	<Surface.Root {descriptor} {browse} class="flex-1">
+	<Surface.Root {descriptor} {browse} selected={selectedId} class="flex-1">
 		<Surface.Toolbar>
 			{#snippet actions()}
 				<button
@@ -125,9 +125,9 @@
 			{/snippet}
 		</Surface.Toolbar>
 
-		<Surface.Split selected={!!selectedId}>
+		<Surface.Split>
 			{#snippet list()}
-				<Surface.List status={probes.status} selected={selectedId} />
+				<Surface.List status={probes.status} />
 			{/snippet}
 
 			{#snippet detail()}

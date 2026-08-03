@@ -2,10 +2,10 @@
 	/**
 	 * The header bar for a record or a form: back · title · actions.
 	 *
-	 * Same 56px bar and same 36px controls as a list's toolbar, so nothing shifts
-	 * when you navigate between them — which is the other half of "consistent
-	 * button position". A cluster in a fixed place is only half the promise if the
-	 * bar it sits in changes height.
+	 * The detail pane's half of the two-header layout. Its peer is
+	 * `Surface.ListHeader`, and both are `<Bar>` — same height, same inset, same
+	 * control size — so nothing shifts when you navigate between them. A cluster
+	 * in a fixed place is only half the promise if the bar it sits in changes.
 	 *
 	 * ⚑ The leading slot is ALWAYS occupied — a back button, or an empty spacer of
 	 * the same width. Lifted verbatim from stibu, where the reasoning is: it
@@ -14,6 +14,7 @@
 	 * the spacer is the obvious "simplification" that reintroduces the jump.
 	 */
 	import type { Snippet } from 'svelte';
+	import Bar from './Bar.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { breakpoints } from '../shell/breakpoints.svelte.js';
 
@@ -41,9 +42,7 @@
 	const reserveSpacer = $derived(!!onback && !showBack);
 </script>
 
-<header
-	class="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 {klass}"
->
+<Bar class={klass}>
 	{#if showBack}
 		<button
 			type="button"
@@ -65,4 +64,4 @@
 	<h2 class="min-w-0 flex-1 truncate text-base font-semibold">{title}</h2>
 
 	{#if actions}{@render actions()}{/if}
-</header>
+</Bar>

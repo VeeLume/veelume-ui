@@ -15,11 +15,17 @@
 	let {
 		descriptor,
 		browse,
+		selected = null,
 		class: klass = '',
 		children
 	}: {
 		descriptor: SurfaceDescriptor<Src, R>;
 		browse: SurfaceBrowse;
+		/**
+		 * The open row's key, usually straight from the URL. One source of truth
+		 * for three parts — see the note on `createSurface`'s third argument.
+		 */
+		selected?: string | null;
 		class?: string;
 		children: Snippet;
 	} = $props();
@@ -29,7 +35,8 @@
 	setSurfaceContext(
 		createSurface(
 			() => descriptor,
-			() => browse
+			() => browse,
+			() => selected
 		)
 	);
 </script>

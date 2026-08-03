@@ -125,6 +125,25 @@ export const loanFixtures: FixtureModule = {
 		return null;
 	},
 
+	/** The create path — what the list header's one forward action reaches. */
+	loans_create: (payload) => {
+		const year = String(payload.year);
+		const list = (byYear[year] ??= []);
+		const loan: Loan = {
+			id: `loan-${year}-new-${list.length + 1}`,
+			title: 'Untitled loan',
+			borrower: '',
+			lent_on: `${year}-01-01`,
+			due_on: `${year}-01-31`,
+			status: 'draft',
+			replaced_by: null,
+			fine_cents: 0,
+			note: ''
+		};
+		list.push(loan);
+		return { ...loan };
+	},
+
 	loans_reset: () => {
 		byYear = build();
 		return null;
