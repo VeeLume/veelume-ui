@@ -1,17 +1,19 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { setKitContext } from '@veelume/ui';
+	import { AppShell, setKitContext } from '@veelume/ui';
+	import { Settings } from 'lucide-svelte';
+	import { page } from '$app/state';
 	import { m, getLocale } from '$lib/i18n';
+	import { nav } from '$lib/nav.svelte';
 	import { appearance } from '$lib/stores/appearance.svelte';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { updater } from '$lib/stores/updater.svelte';
-	import { breakpoint } from '$lib/breakpoint.svelte';
-	import NavRail from '$lib/components/NavRail.svelte';
-	import BottomNav from '$lib/components/BottomNav.svelte';
 	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
 
 	let { children } = $props();
+
+	const settingsActive = $derived(page.url.pathname.startsWith('/settings'));
 
 	/**
 	 * The kit's only channel into app state. Two locales on purpose:
@@ -50,25 +52,30 @@
 		></div>
 	</div>
 {:else}
-	<div class="flex h-svh overflow-hidden bg-background">
-		{#if breakpoint.showRail}
-			<NavRail showLabels={breakpoint.showLabels} />
-		{/if}
-
-		<div class="flex flex-1 flex-col overflow-hidden">
-			<!-- Status bar / notch inset (0 on desktop). Non-scrolling, so sticky
-			     headers below it can never slide under the system bar. -->
-			<div class="shrink-0 bg-background" style="height: env(safe-area-inset-top)"></div>
-
+	<AppShell groups={nav.groups} bottomItems={nav.bottomItems}>
+		{#snippet banner()}
 			<UpdateBanner />
+		{/snippet}
 
-			<main class="flex-1 overflow-auto">
-				{@render children()}
-			</main>
+		<!-- The account block is the app's: the kit settles that it sits at the
+		     bottom below a divider, not what goes in it. -->
+		{#snippet railFooter({ showLabels })}
+			<a
+				href="/settings"
+				class="flex items-center gap-3 rounded-full px-3 text-sm font-medium transition-colors
+				       {settingsActive
+					? 'bg-accent text-accent-foreground'
+					: 'text-muted-foreground hover:bg-accent'}"
+				class:w-full={showLabels}
+				class:justify-center={!showLabels}
+				style="height: var(--density-target)"
+				title={!showLabels ? 'Settings' : undefined}
+			>
+				<Settings size={20} class="shrink-0" />
+				{#if showLabels}<span class="truncate">Settings</span>{/if}
+			</a>
+		{/snippet}
 
-			{#if breakpoint.showBottomNav}
-				<BottomNav />
-			{/if}
-		</div>
-	</div>
+		{@render children()}
+	</AppShell>
 {/if}

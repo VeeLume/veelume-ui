@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { breakpoint } from '$lib/breakpoint.svelte';
+	import { breakpoints } from '@veelume/ui';
 	import { m } from '$lib/i18n';
 </script>
 
@@ -10,7 +10,7 @@
 
 	<!-- Handy while wiring layout; delete once the real UI lands. -->
 	<p class="mt-6 font-mono text-xs text-muted-foreground">
-		{breakpoint.width}px · rail: {breakpoint.showRail} · labels: {breakpoint.showLabels} · bottom
-		nav: {breakpoint.showBottomNav}
+		{breakpoints.width}px · rail: {breakpoints.showRail} · labels: {breakpoints.showLabels} · bottom
+		nav: {breakpoints.showBottomNav}
 	</p>
 </div>

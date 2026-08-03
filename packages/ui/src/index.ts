@@ -14,6 +14,14 @@
  * Next: the Catalog archetype (derive + overlay) in apps/demo.
  */
 
+// ── L3: app shell ──────────────────────────────────────────────────────────
+// Rail + bottom bar + the responsive rules between them. The rail's collapse
+// behaviour and its bottom account block are settled (stibu and Starlume
+// derived both independently); the mobile strategy is the deliberate variation
+// point.
+export { AppShell, NavRail, BottomNav, breakpoints, activeNavPath } from './shell/index.js';
+export type { NavGroup, NavIcon, NavItem, NavStrategy } from './shell/index.js';
+
 // ── L2: record form ────────────────────────────────────────────────────────
 // What archetype E actually reuses — connect-neo's wording is "the same
 // EDITOR", not the same surface. A solo record is this with nothing around it.
