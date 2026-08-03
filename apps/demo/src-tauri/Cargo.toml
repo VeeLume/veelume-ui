@@ -4,6 +4,11 @@ version = "0.1.0"
 description = "Demo and validation harness for the veelume-ui kit"
 authors = ["Valerie"]
 edition = "2021"
+# Required because a second [[bin]] (export-bindings) is declared below: without
+# it `cargo run` refuses to pick a target, which breaks `tauri dev` — its
+# DevCommand is a bare `cargo run`. Gating that bin behind `required-features`
+# is not enough; cargo still sees two declared targets.
+default-run = "veelume-ui-demo"
 
 [[bin]]
 name = "veelume-ui-demo"

@@ -3,11 +3,13 @@
  * touched again — copier will not overwrite this file. Edit freely, or paste a
  * whole theme from https://tweakcn.com over the two blocks below.
  *
- * The token *names* are the contract (app.css maps them into Tailwind via
- * `@theme inline`, shadcn-svelte components expect exactly this set). Values
- * are yours.
+ * The token *names* are the contract — app.css maps them into Tailwind via
+ * `@theme inline`, and @veelume/ui styles against exactly this set. Values are
+ * yours. The naming follows the shadcn convention deliberately (de facto
+ * standard, and tweakcn themes paste in unmodified), but nothing here depends
+ * on shadcn-svelte: the kit builds on bits-ui directly.
  */
-/* mono — neutral greys, black/white accent (stibu; shadcn-svelte "neutral"). */
+/* mono — neutral greys, black/white accent (stibu). */
 :root {
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.145 0 0);
