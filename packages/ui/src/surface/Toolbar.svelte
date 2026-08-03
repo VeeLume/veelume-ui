@@ -7,20 +7,29 @@
 	 * takes a snippet override, so an app changes contents without forking the
 	 * component.
 	 *
-	 * Note the search input is pinned to `h-9` rather than the density target.
-	 * At comfortable density a full-height field grows to exactly the toolbar's
-	 * own height and fills it edge to edge while its neighbours sit inset —
-	 * density scales FORM fields, chrome stays fixed.
+	 * ⚑ Same 56px bar, same 36px controls, same `px-3` as `DetailHeader` — that
+	 * equality IS the feature. A cluster in a fixed place is only half the
+	 * promise if the bar it sits in changes height or inset between a list and a
+	 * record; the title and the search field must land on the same x so nothing
+	 * jumps on navigation. Measured before this was true: 13px of drift.
+	 *
+	 * The search input is pinned to `h-9` rather than the density target. At
+	 * comfortable density a full-height field grows to exactly the bar's own
+	 * height and fills it edge to edge while its neighbours sit inset — density
+	 * scales FORM fields, chrome stays fixed.
 	 */
 	import type { Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 
 	let {
+		title = undefined,
 		actions,
 		leading,
 		class: klass = ''
 	}: {
+		/** Shown before the controls, matching a DetailHeader's title. */
+		title?: string;
 		/** Right-hand region — the one forward action belongs here. */
 		actions?: Snippet;
 		/** Before the search field. */
@@ -36,7 +45,10 @@
 	const activeCount = $derived(s.browse.activeCount);
 </script>
 
-<div class="flex flex-wrap items-center gap-2 {klass}">
+<header
+	class="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 {klass}"
+>
+	{#if title}<h2 class="mr-1 shrink-0 truncate text-base font-semibold">{title}</h2>{/if}
 	{#if leading}{@render leading()}{/if}
 
 	<div class="relative flex shrink-0 items-center gap-2 md:w-72">
@@ -130,7 +142,9 @@
 		{kit.labels.resultCount({ count: s.shown })}
 	</span>
 
-	{#if actions}
-		<div class="ml-auto flex shrink-0 items-center gap-2">{@render actions()}</div>
-	{/if}
-</div>
+	<!-- ml-auto on the wrapper, not the cluster, so the forward action is pinned
+	     to the right edge whether or not the count and search are present. -->
+	<div class="ml-auto flex shrink-0 items-center gap-2">
+		{#if actions}{@render actions()}{/if}
+	</div>
+</header>

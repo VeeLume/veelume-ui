@@ -52,6 +52,10 @@ export type LabelBag = {
 	save: () => string;
 	cancel: () => string;
 
+	/** Accessible name for the `⋮` overflow trigger. */
+	moreActions: () => string;
+	back: () => string;
+
 	// ── rows ─────────────────────────────────────────────────────────────────
 	expandRow: () => string;
 	collapseRow: () => string;
@@ -82,6 +86,9 @@ export const defaultLabels: LabelBag = {
 	create: () => 'New',
 	save: () => 'Save',
 	cancel: () => 'Cancel',
+
+	moreActions: () => 'More actions',
+	back: () => 'Back',
 
 	expandRow: () => 'Expand',
 	collapseRow: () => 'Collapse'

@@ -13,7 +13,15 @@
 	 */
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Surface, createBrowseState, getKitContext, type Row } from '@veelume/ui';
+	import {
+		Actions,
+		DetailHeader,
+		Surface,
+		createBrowseState,
+		getKitContext,
+		type Action,
+		type Row
+	} from '@veelume/ui';
 	import {
 		loans,
 		setLoanYear,
@@ -123,6 +131,36 @@
 		}
 	}
 
+	/**
+	 * The four closers are tier ③, not a row of buttons: they are rare, two are
+	 * destructive, and none of them is the forward action. Putting them behind
+	 * the `⋮` is what leaves the top-right slot free for the one thing a user
+	 * came to do.
+	 */
+	const closers = $derived<Action[]>(
+		selected
+			? [
+					{ label: 'Return', onclick: () => act('Returned', () => returnLoan(selected.id)) },
+					{
+						label: 'Cancel draft',
+						destructive: true,
+						disabled: selected.status !== 'draft',
+						onclick: () =>
+							act('Cancelled', async () => {
+								await cancelLoan(selected.id);
+								await goto(withParams({ id: null }));
+							})
+					},
+					{
+						label: 'Mark lost',
+						destructive: true,
+						onclick: () => act('Marked lost', () => markLost(selected.id))
+					},
+					{ label: 'Archive', onclick: () => act('Archived', () => archiveLoan(selected.id)) }
+				]
+			: []
+	);
+
 	async function saveNote() {
 		if (!selectedId) return;
 		await act('Saved', () => loans.save(selectedId, { note }));
@@ -130,114 +168,82 @@
 	}
 </script>
 
-<div class="flex h-full flex-col gap-3 p-4">
-	<header class="flex flex-wrap items-center gap-3">
-		<h1 class="text-lg font-semibold">Loans</h1>
-		<div class="flex rounded-md border border-input p-0.5 text-sm">
-			{#each YEARS as y (y)}
-				<a
-					href={withParams({ year: y, id: null })}
-					class="rounded px-2 py-1 {loanYear() === y ? 'bg-accent text-accent-foreground' : ''}"
-					>{y}</a
-				>
-			{/each}
-		</div>
-		<span class="text-xs text-muted-foreground">
-			scope {loanYear()} · status {loans.status} · {kit.formattingLocale} formatting
-		</span>
-	</header>
+<div class="flex h-full min-h-0 flex-col">
+	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1 gap-0">
+		<Surface.Toolbar title="Loans">
+			{#snippet leading()}
+				<div class="flex shrink-0 rounded-md border border-input p-0.5 text-xs">
+					{#each YEARS as y (y)}
+						<a
+							href={withParams({ year: y, id: null })}
+							class="rounded px-2 py-1 {loanYear() === y ? 'bg-accent text-accent-foreground' : ''}"
+							>{y}</a
+						>
+					{/each}
+				</div>
+			{/snippet}
+		</Surface.Toolbar>
 
-	<Surface.Root {descriptor} {browse} class="flex-1">
-		<Surface.Toolbar />
-
-		<Surface.Split selected={!!selectedId}>
+		<Surface.Split selected={!!selectedId} class="p-3">
 			{#snippet list()}
 				<Surface.List status={loans.status} selected={selectedId} />
 			{/snippet}
 
 			{#snippet detail()}
-				<div class="h-full overflow-auto rounded-lg border border-border bg-card p-4">
+				<div class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
 					{#if selected}
-						<h2 class="font-medium">{selected.title}</h2>
-						<dl class="mt-3 grid grid-cols-[8rem_1fr] gap-y-1 text-sm">
-							<dt class="text-muted-foreground">Borrower</dt>
-							<dd>{selected.borrower}</dd>
-							<dt class="text-muted-foreground">Lent</dt>
-							<dd>{kit.format.date(selected.lent_on, { dateStyle: 'long' })}</dd>
-							<dt class="text-muted-foreground">Due</dt>
-							<dd>{kit.format.date(selected.due_on, { dateStyle: 'long' })}</dd>
-							<dt class="text-muted-foreground">Fine</dt>
-							<dd class="tabular-nums">
-								{kit.format.number(selected.fine_cents / 100, {
-									style: 'currency',
-									currency: 'EUR'
-								})}
-							</dd>
-							<dt class="text-muted-foreground">Status</dt>
-							<dd>{selected.status}</dd>
-							{#if selected.replaced_by}
-								<dt class="text-muted-foreground">Replaced by</dt>
-								<dd>
-									<a class="underline" href={withParams({ id: selected.replaced_by })}
-										>{selected.replaced_by}</a
-									>
+						<!-- Same 56px bar and 36px controls as the toolbar above the list,
+						     so nothing shifts when you move between them. -->
+						<DetailHeader title={selected.title} onback={() => goto(withParams({ id: null }))}>
+							{#snippet actions()}
+								<Actions
+									primary={{ label: kit.labels.save(), onclick: saveNote }}
+									overflow={closers}
+								/>
+							{/snippet}
+						</DetailHeader>
+
+						<div class="min-h-0 flex-1 overflow-auto p-4">
+							<dl class="grid grid-cols-[8rem_1fr] gap-y-1 text-sm">
+								<dt class="text-muted-foreground">Borrower</dt>
+								<dd>{selected.borrower}</dd>
+								<dt class="text-muted-foreground">Lent</dt>
+								<dd>{kit.format.date(selected.lent_on, { dateStyle: 'long' })}</dd>
+								<dt class="text-muted-foreground">Due</dt>
+								<dd>{kit.format.date(selected.due_on, { dateStyle: 'long' })}</dd>
+								<dt class="text-muted-foreground">Fine</dt>
+								<dd class="tabular-nums">
+									{kit.format.number(selected.fine_cents / 100, {
+										style: 'currency',
+										currency: 'EUR'
+									})}
 								</dd>
-							{/if}
-						</dl>
+								<dt class="text-muted-foreground">Status</dt>
+								<dd>{selected.status}</dd>
+								{#if selected.replaced_by}
+									<dt class="text-muted-foreground">Replaced by</dt>
+									<dd>
+										<a class="underline" href={withParams({ id: selected.replaced_by })}
+											>{selected.replaced_by}</a
+										>
+									</dd>
+								{/if}
+							</dl>
 
-						<label class="mt-4 block text-xs text-muted-foreground" for="note">Note</label>
-						<input
-							id="note"
-							class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-							value={note}
-							oninput={(e) => (noteDraft = e.currentTarget.value)}
-						/>
-						<button
-							type="button"
-							class="mt-2 h-9 rounded-md bg-primary px-3 text-sm text-primary-foreground"
-							onclick={saveNote}>{kit.labels.save()}</button
-						>
+							<label class="mt-4 block text-xs text-muted-foreground" for="note">Note</label>
+							<input
+								id="note"
+								class="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+								value={note}
+								oninput={(e) => (noteDraft = e.currentTarget.value)}
+							/>
 
-						<!-- The four closing operations. Four commands, not one with a
-						     flag: they differ in what they return and what they leave
-						     behind, which is why the write layer does not own them. -->
-						<div class="mt-4 border-t border-border pt-3">
-							<p class="mb-2 text-xs text-muted-foreground">Closing operations</p>
-							<div class="flex flex-wrap gap-2">
-								<button
-									type="button"
-									class="h-8 rounded-md border border-input px-2 text-xs hover:bg-muted"
-									onclick={() => act('Returned', () => returnLoan(selected.id))}>Return (soft)</button
-								>
-								<button
-									type="button"
-									class="h-8 rounded-md border border-input px-2 text-xs hover:bg-muted
-									       disabled:opacity-40"
-									disabled={selected.status !== 'draft'}
-									onclick={() =>
-										act('Cancelled', async () => {
-											await cancelLoan(selected.id);
-											await goto(withParams({ id: null }));
-										})}>Cancel (hard)</button
-								>
-								<button
-									type="button"
-									class="h-8 rounded-md border border-input px-2 text-xs hover:bg-muted"
-									onclick={() => act('Marked lost', () => markLost(selected.id))}
-									>Mark lost (counter-doc)</button
-								>
-								<button
-									type="button"
-									class="h-8 rounded-md border border-input px-2 text-xs hover:bg-muted"
-									onclick={() => act('Archived', () => archiveLoan(selected.id))}>Archive</button
-								>
-							</div>
 							{#if message}
-								<p class="mt-2 rounded bg-muted p-2 text-xs">{message}</p>
+								<p class="mt-3 rounded bg-muted p-2 text-xs">{message}</p>
 							{/if}
 						</div>
 					{:else}
-						<p class="text-sm text-muted-foreground">Pick a loan.</p>
+						<p class="p-4 text-sm text-muted-foreground">Pick a loan.</p>
 					{/if}
 				</div>
 			{/snippet}

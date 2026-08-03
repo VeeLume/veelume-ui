@@ -14,6 +14,12 @@
  * Next: the Catalog archetype (derive + overlay) in apps/demo.
  */
 
+// ── L2: actions ────────────────────────────────────────────────────────────
+// The three-tier system. The invariant is POSITION: the one forward action sits
+// top-right on every surface, so a user never hunts for it.
+export { Actions, ActionMenu, Button, DetailHeader } from './actions/index.js';
+export type { Action, ActionIcon, ButtonSize, ButtonVariant } from './actions/index.js';
+
 // ── L3: app shell ──────────────────────────────────────────────────────────
 // Rail + bottom bar + the responsive rules between them. The rail's collapse
 // behaviour and its bottom account block are settled (stibu and Starlume

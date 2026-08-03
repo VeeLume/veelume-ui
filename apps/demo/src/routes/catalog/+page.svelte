@@ -85,18 +85,11 @@
 	const nextLabel = { owned: 'Mark as wanted', want: 'Remove from shelf', none: 'Mark as owned' };
 </script>
 
-<div class="flex h-full flex-col gap-3 p-4">
-	<header class="flex items-baseline gap-3">
-		<h1 class="text-lg font-semibold">Catalog</h1>
-		<span class="text-xs text-muted-foreground">
-			works derived from editions · shelf joined at render · {kit.formattingLocale} formatting
-		</span>
-	</header>
+<div class="flex h-full min-h-0 flex-col">
+	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1 gap-0">
+		<Surface.Toolbar title="Catalog" />
 
-	<Surface.Root {descriptor} {browse} class="flex-1">
-		<Surface.Toolbar />
-
-		<Surface.List {status}>
+		<Surface.List {status} class="m-3">
 			{#snippet row(r: WorkRow)}
 				{@const open = expanded.has(r.key)}
 				<div class="border-b border-border last:border-b-0">
