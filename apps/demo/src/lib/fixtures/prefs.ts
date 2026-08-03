@@ -8,15 +8,11 @@
 
 import type { FixtureModule } from './types.js';
 
-export type Preferences = {
-	id: 'me';
-	display_name: string;
-	default_loan_days: number;
-	/** Cents per day. German formatting makes this `1,50 €`. */
-	fine_per_day_cents: number;
-	preferred_format: 'hardcover' | 'paperback' | 'ebook';
-	notes: string;
-};
+// Re-exported from the generated bindings rather than redeclared: a fixture
+// that drifts from the Rust contract is worse than no fixture, because it
+// passes while the real backend fails.
+export type { Preferences } from '$lib/bindings';
+import type { Preferences } from '$lib/bindings';
 
 const initial: Preferences = {
 	id: 'me',

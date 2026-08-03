@@ -18,6 +18,129 @@ async settingsSave(settings: AppSettings) : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async probesList(scope: string) : Promise<Probe[]> {
+    return await TAURI_INVOKE("probes_list", { scope });
+},
+async probesGet(id: string, scope: string) : Promise<Result<Probe, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("probes_get", { id, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Full-replace semantics, matching stibu's `UpdateCustomerInput`.
+ */
+async probesSave(body: Probe, scope: string) : Promise<Result<Probe, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("probes_save", { body, scope }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Test control: make the next save return something else.
+ */
+async probesHijack(patch: ProbePatch) : Promise<void> {
+    await TAURI_INVOKE("probes_hijack", { patch });
+},
+async probesReset() : Promise<void> {
+    await TAURI_INVOKE("probes_reset");
+},
+async editionsList() : Promise<Edition[]> {
+    return await TAURI_INVOKE("editions_list");
+},
+async shelfList() : Promise<ShelfEntry[]> {
+    return await TAURI_INVOKE("shelf_list");
+},
+/**
+ * Three-state cycle: none → owned → want → none. Not a record-shaped update,
+ * which is why the frontend calls it directly and then refreshes rather than
+ * routing it through the collection's write layer.
+ */
+async shelfToggle(id: string) : Promise<void> {
+    await TAURI_INVOKE("shelf_toggle", { id });
+},
+async libraryReset() : Promise<void> {
+    await TAURI_INVOKE("library_reset");
+},
+async loansList(year: string) : Promise<Loan[]> {
+    return await TAURI_INVOKE("loans_list", { year });
+},
+/**
+ * The record-shaped edit — the only loan operation that belongs to the
+ * collection's write layer.
+ */
+async loansSave(body: Loan, year: string) : Promise<Result<Loan, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_save", { body, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 1 — soft delete. Returns the record.
+ */
+async loansReturn(id: string, year: string) : Promise<Result<Loan, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_return", { id, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 2 — hard delete. Drafts only, returns nothing.
+ */
+async loansCancel(id: string, year: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_cancel", { id, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 3 — counter-document. Closes the original and issues a REPLACEMENT, which is
+ * what makes this impossible to model as a deletion.
+ */
+async loansMarkLost(id: string, year: string) : Promise<Result<Loan, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_mark_lost", { id, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * 4 — soft, terminal. Returns nothing.
+ */
+async loansArchive(id: string, year: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_archive", { id, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async loansReset() : Promise<void> {
+    await TAURI_INVOKE("loans_reset");
+},
+/**
+ * A collection of exactly one — archetype E's data.
+ */
+async prefsList() : Promise<Preferences[]> {
+    return await TAURI_INVOKE("prefs_list");
+},
+async prefsSave(body: Preferences) : Promise<Preferences> {
+    return await TAURI_INVOKE("prefs_save", { body });
+},
+async prefsReset() : Promise<void> {
+    await TAURI_INVOKE("prefs_reset");
 }
 }
 
@@ -36,6 +159,17 @@ export type AppSettings = {
  * Whether first-launch onboarding has been completed or skipped.
  */
 onboarding_completed: boolean }
+export type Edition = { id: string; work_id: string; work_title: string; author: string; year: number; format: string }
+/**
+ * `i32`, not `i64`: specta forbids `i64` at the IPC boundary because a JS
+ * number cannot represent its full range. Any real backend with a BIGINT money
+ * or id column hits the same wall — the fix there is a string, not a wider int.
+ */
+export type Loan = { id: string; title: string; borrower: string; lent_on: string; due_on: string; status: string; replaced_by: string | null; fine_cents: number; note: string }
+export type Preferences = { id: string; display_name: string; default_loan_days: number; fine_per_day_cents: number; preferred_format: string; notes: string }
+export type Probe = { id: string; name: string; note: string }
+export type ProbePatch = { note: string | null }
+export type ShelfEntry = { edition_id: string; state: string }
 
 /** tauri-specta globals **/
 

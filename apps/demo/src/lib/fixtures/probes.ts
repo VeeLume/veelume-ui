@@ -16,11 +16,10 @@
 
 import type { FixtureModule } from './types.js';
 
-export type Probe = {
-	id: string;
-	name: string;
-	note: string;
-};
+// Re-exported, never redeclared: a fixture that drifts from the Rust contract
+// is worse than no fixture, because it passes while the real backend fails.
+export type { Probe } from '$lib/bindings';
+import type { Probe } from '$lib/bindings';
 
 function seed(scope: string): Probe[] {
 	return Array.from({ length: 3 }, (_, i) => ({

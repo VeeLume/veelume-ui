@@ -16,19 +16,9 @@
 
 import type { FixtureModule } from './types.js';
 
-export type Edition = {
-	id: string;
-	work_id: string;
-	work_title: string;
-	author: string;
-	year: number;
-	format: 'hardcover' | 'paperback' | 'ebook';
-};
-
-export type ShelfEntry = {
-	edition_id: string;
-	state: 'owned' | 'want';
-};
+// Re-exported from the generated bindings rather than redeclared.
+export type { Edition, ShelfEntry } from '$lib/bindings';
+import type { Edition, ShelfEntry } from '$lib/bindings';
 
 const AUTHORS = [
 	'Ursula K. Le Guin',
@@ -96,7 +86,7 @@ export const libraryFixtures: FixtureModule = {
 	 * exactly stibu's "write through the API, reload after" pattern.
 	 */
 	shelf_toggle: (payload) => {
-		const id = String(payload.edition_id);
+		const id = String(payload.id);
 		const existing = shelf.find((s) => s.edition_id === id);
 		if (!existing) shelf = [...shelf, { edition_id: id, state: 'owned' }];
 		else if (existing.state === 'owned')

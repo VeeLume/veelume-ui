@@ -85,6 +85,6 @@ export function deriveWorks(src: { editions: Edition[]; shelf: ShelfEntry[] }): 
 /** The overlay's write. Not a collection `save()` — a three-state toggle is not
  *  a record-shaped update; see the fixture's note. */
 export async function toggleShelf(editionId: string): Promise<void> {
-	await invoke('shelf_toggle', { edition_id: editionId });
+	await invoke('shelf_toggle', { id: editionId });
 	await shelf.refresh();
 }

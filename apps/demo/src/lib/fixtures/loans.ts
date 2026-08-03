@@ -20,19 +20,11 @@ import type { FixtureModule } from './types.js';
 
 export type LoanStatus = 'draft' | 'out' | 'returned' | 'lost' | 'archived';
 
-export type Loan = {
-	id: string;
-	title: string;
-	borrower: string;
-	lent_on: string;
-	due_on: string;
-	status: LoanStatus;
-	/** Set on the original when a replacement is issued — the counter-document link. */
-	replaced_by: string | null;
-	/** Cents. German formatting turns this into `1.234,56`, which is the point. */
-	fine_cents: number;
-	note: string;
-};
+// `Loan` comes from the generated bindings rather than being redeclared, so it
+// cannot drift from the Rust contract. `LoanStatus` stays local: Rust models
+// status as a plain String and the UI wants the narrower union.
+export type { Loan } from '$lib/bindings';
+import type { Loan } from '$lib/bindings';
 
 const BORROWERS = ['Petra', 'Norbert', 'Dr. Nagel', 'Markus', 'Anja'];
 const TITLES = [
