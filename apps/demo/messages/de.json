@@ -1,5 +1,8 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"home_title": "Veelume UI Demo",
-	"home_subtitle": "Erzeugt aus VeeLume template-tauri. Diese Seite ersetzen."
+	"home_subtitle": "Erzeugt aus VeeLume template-tauri. Diese Seite ersetzen.",
+	"kit_search": "Suchen…",
+	"kit_empty": "Keine Treffer",
+	"kit_loading": "Wird geladen…"
 }
