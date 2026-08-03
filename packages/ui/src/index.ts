@@ -11,8 +11,20 @@
  *   L2  compound components   — parts with snippet escape hatches
  *   L3  arrangements          — opinionated shells
  *
- * Next: L2 — the compound surface parts.
+ * Next: the Catalog archetype (derive + overlay) in apps/demo.
  */
+
+// ── L2: surface parts ──────────────────────────────────────────────────────
+export { Surface, createSurface } from './surface/index.js';
+export type {
+	FacetDef,
+	FacetOption,
+	Row,
+	SortDef,
+	SurfaceBrowse,
+	SurfaceDescriptor,
+	SurfaceState
+} from './surface/index.js';
 
 // ── L1: browse state ───────────────────────────────────────────────────────
 export { createBrowseState } from './browse/index.js';
