@@ -11,8 +11,18 @@
  *   L2  compound components   — parts with snippet escape hatches
  *   L3  arrangements          — opinionated shells
  *
- * Next: browse.ts (URL-backed browse state).
+ * Next: L2 — the compound surface parts.
  */
+
+// ── L1: browse state ───────────────────────────────────────────────────────
+export { createBrowseState } from './browse/index.js';
+export type {
+	BrowseField,
+	BrowseSpec,
+	BrowseState,
+	BrowseValues,
+	HistoryMode
+} from './browse/index.js';
 
 // ── L1: collections ────────────────────────────────────────────────────────
 export { createCollection } from './collection/index.svelte.js';
