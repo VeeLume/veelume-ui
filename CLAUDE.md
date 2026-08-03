@@ -26,6 +26,18 @@ The *why* behind every rule, the evidence, and the running casebook live in the 
 `Programmieren/Projects/veelume-ui.md`. That note is the design record; the CLAUDE.md files
 are the rules.
 
+## State
+
+The kit has all three L1 primitives (context, collections, browse state), the L2
+surfaces, form and action system, and the L3 shell. Every piece is exercised by
+a real surface in `apps/demo`, and `/gallery` shows each component in every
+state. Two transports are wired — fixtures in the browser, Rust over Tauri IPC —
+which is what keeps the frontend honest about not being coupled to either.
+
+What is NOT built, deliberately: TrailBase as a third transport, fetch paging,
+and a `Picker`/`StatusBadge`. See `Deliberately not built` below and the vault
+note's Next list.
+
 ## Running it
 
 ```

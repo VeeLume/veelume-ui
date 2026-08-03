@@ -9,6 +9,22 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 
 ---
 
+## What exists
+
+| Module | Layer | What it is |
+|---|---|---|
+| `context/` | L1 | Label bag + **two locales** (message, formatting) + memoised `Intl` + derived `hourCycle`. No runes — reactivity comes from the app's getters. |
+| `collection/` | L1 | Scoped cache, optional write layer. `.svelte.ts`. |
+| `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.Toolbar/.List/.Split`. |
+| `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
+| `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `DetailHeader`. |
+| `shell/` | L3 | `AppShell`, `NavRail`, `BottomNav`, `breakpoints`. |
+
+Everything is exercised by a real surface in `apps/demo` — Catalog (derive +
+overlay), Loans (scoped, four closers), Preferences (solo record), and
+`/gallery` for every component state.
+
 ## Layers
 
 Every piece belongs to exactly one, decided by: **is there one right answer?**
@@ -143,6 +159,41 @@ deliberately rather than discovered.
   contract; palettes are not. Support is mandatory, exposing a toggle is not.
 
 ---
+
+### L2 — actions and bars
+
+- **The invariant is POSITION.** The one forward action sits top-right on every
+  surface. Tiers are **data, not snippets**, so no screen can invent its own
+  arrangement: `① primary` (filled, at most one) → `② secondary` (outline) →
+  `③ overflow` (`⋮`, rare/destructive, rendered only when non-empty), left to
+  right in a right-aligned cluster.
+- **`Surface.Toolbar` and `DetailHeader` are peers**: 56px bar, `px-3`, 36px
+  controls, action cluster at the same right inset. That equality is half the
+  promise — a fixed slot means nothing if the bar changes between a list and a
+  record. It was measurably false once (13px of drift); keep it true.
+- **`DetailHeader`'s leading slot is always occupied** — back button, or an empty
+  36px spacer. Removing the spacer is the obvious simplification that
+  reintroduces the title jump.
+- **`Button` sizes encode the density rule**: `field` follows
+  `--density-target`, `chrome` is a fixed 36px.
+
+## Gotchas that cost real time
+
+Each of these type-checks clean and fails at runtime, or fails silently:
+
+- **Runes need `.svelte.ts`.** `$state` in a plain `.ts` passes `svelte-check`
+  and throws `rune_outside_svelte` when it runs. No static check catches it.
+- **The consumer must tell Tailwind about this package.** It arrives through a
+  symlink under `node_modules`, which Tailwind v4's auto-detection skips, so
+  kit-only classes silently vanish from the stylesheet and layouts break in ways
+  that look like bad flex rules. Consumers need
+  `@source "…/packages/ui/src"`. The tell: kit components HMR via `/@fs/` paths.
+- **Icon props need the `IconOf` cast in markup.** `NavIcon`/`ActionIcon` are a
+  union so both Svelte component eras work; a union is not constructable in a
+  template. Do not cast to `never`.
+- **Verify against the artefact that fails.** A production build and the dev
+  server scan sources differently — checking the wrong one "disproved" a correct
+  fix once.
 
 ## Vocabulary
 
