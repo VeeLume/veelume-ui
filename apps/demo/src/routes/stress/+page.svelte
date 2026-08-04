@@ -57,19 +57,41 @@
 
 	const key = $derived(JSON.stringify(applied) + `|${cap}`);
 
+	/**
+	 * ⚑ `prefetch`, NOT `refresh`.
+	 *
+	 * This measured a forced refetch on every change, so it never once exercised
+	 * the cache — switching asc↔desc and back refetched, which looked exactly
+	 * like a broken cache and was actually a broken instrument. An instrument
+	 * that cannot show the fast path is not measuring the thing it claims to.
+	 */
+	let cached = $state(false);
+
 	$effect(() => {
 		if (key === lastKey) return;
 		lastKey = key;
 		const t0 = performance.now();
 		queryMs = null;
 		paintMs = null;
-		// The set is fetched by reading it; time from the read to the first frame
-		// after the rows land is what a user actually waits.
-		void entries.refresh(undefined, query).then(() => {
-			queryMs = Math.round(performance.now() - t0);
-			requestAnimationFrame(() =>
-				requestAnimationFrame(() => (paintMs = Math.round(performance.now() - t0)))
-			);
+		// Was this set already held at the depth we want? Read before the call,
+		// because the call is what changes the answer.
+		const before = entries.query(query);
+		cached = before.status === 'ready' && (before.complete || before.all.length >= cap);
+
+		entries.prefetch(undefined, query);
+		queueMicrotask(() => {
+			const settle = () => {
+				const v = entries.query(query);
+				if (v.status === 'loading' || v.status === 'refreshing') {
+					setTimeout(settle, 16);
+					return;
+				}
+				queryMs = Math.round(performance.now() - t0);
+				requestAnimationFrame(() =>
+					requestAnimationFrame(() => (paintMs = Math.round(performance.now() - t0)))
+				);
+			};
+			settle();
 		});
 	});
 
@@ -140,7 +162,10 @@
 			<dd class={view.complete ? '' : 'text-destructive'}>{view.complete}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">status</dt><dd>{view.status}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">query</dt>
-			<dd class="tabular-nums">{queryMs ?? '…'} ms</dd></div>
+			<dd class="tabular-nums">
+				{queryMs ?? '…'} ms{#if cached}<span class="text-xs text-muted-foreground"> · cached</span
+					>{/if}
+			</dd></div>
 		<div><dt class="text-xs text-muted-foreground">to paint</dt>
 			<dd class="tabular-nums">{paintMs ?? '…'} ms</dd></div>
 		<div><dt class="text-xs text-muted-foreground">cached records</dt>

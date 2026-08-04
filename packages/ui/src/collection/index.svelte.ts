@@ -210,6 +210,7 @@ export function createCollection<
 				return;
 			}
 
+			let pages = 0;
 			let exhausted = false;
 			// Distinct from `exhausted`: we stopped, but NOT because the source said
 			// so. Conflating them would report `complete` on a set we merely gave up
@@ -223,6 +224,7 @@ export function createCollection<
 					cursor
 				});
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
+				pages += 1;
 
 				cache(page.records);
 				const before = keys.length;
@@ -248,16 +250,26 @@ export function createCollection<
 				// which would turn our bug into a silent truncation.
 				stalled = !exhausted && gained === 0;
 
-				// Publish each page as it lands, so a long accumulation paints
-				// progressively instead of blocking on the whole thing.
-				patchSet(k, {
-					keys: [...keys],
-					fetchedCount: fetched,
-					total,
-					cursor,
-					complete: exhausted,
-					status: mode === 'loading' ? 'refreshing' : mode
-				});
+				// ⚑ Publish the FIRST page only, then go quiet until the end.
+				//
+				// Publishing every page looks like progressive painting and is
+				// quadratic: each publish rebuilds the whole key→record array
+				// downstream, so 40 pages of 500 cost ~800k record lookups and 40
+				// array builds. Measured at 5.6s for a 20 000-row accumulation whose
+				// actual IPC cost was 13ms — the client was the entire bill.
+				//
+				// One early publish still gets rows on screen fast, which is the only
+				// part the user could perceive anyway.
+				if (pages === 1) {
+					patchSet(k, {
+						keys: [...keys],
+						fetchedCount: fetched,
+						total,
+						cursor,
+						complete: exhausted,
+						status: 'refreshing'
+					});
+				}
 			}
 
 			patchSet(k, {
@@ -296,7 +308,19 @@ export function createCollection<
 		const k = setKeyFor(scope, query);
 		const existing = inflight.get(k);
 		if (existing) return existing;
-		if (!force && !append && sets[k] && sets[k].status !== 'idle') return Promise.resolve();
+
+		const held = sets[k];
+		if (!force && !append && held && held.status !== 'idle') {
+			// The set exists — but "exists" is not "deep enough". The cap is depth,
+			// not identity, so raising it must extend THIS set rather than being
+			// ignored. Without this the cap control silently does nothing and the
+			// only way to see more is a forced refetch, which throws away the rows
+			// already held.
+			const wanted = targetCap ?? query.cap ?? cap;
+			if (held.complete || held.keys.length >= wanted) return Promise.resolve();
+			append = true;
+			targetCap = wanted;
+		}
 
 		ensureSubscribed();
 		declarations.set(k, { scope, query });
@@ -548,8 +572,11 @@ export function createCollection<
 
 		/** Eager fetch. Same `ensure()` a read triggers, so a prefetch and a mount
 		 *  share one request rather than racing. */
-		prefetch(scope?: S, query: SetQuery = {}): void {
-			void ensure(arguments.length ? (scope as S) : scopeOf(), query);
+		/** Returns the in-flight promise, so a caller that wants to await the
+		 *  warm-up can — and so a measurement of it is not accidentally timing
+		 *  the call instead of the fetch. */
+		prefetch(scope?: S, query: SetQuery = {}): Promise<void> {
+			return ensure(arguments.length ? (scope as S) : scopeOf(), query);
 		},
 
 		/** Force a refetch of a set, keeping its data visible meanwhile. */
