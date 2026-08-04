@@ -337,10 +337,22 @@ export function createCollection<
 	function view(scope: S, query: SetQuery = {}): ScopedView<T, K> {
 		const k = setKeyFor(scope, query);
 		const set = () => sets[k];
+		/**
+		 * ⚑ The cap is ONE number: how many rows the caller wants. The fetch tops
+		 * up when the set is short of it, and the view slices when the set is
+		 * deeper than it.
+		 *
+		 * It was only the former, so dropping 20 000 back to 2 000 kept rendering
+		 * 20 000 — the set had them and nothing trimmed. Slicing here also makes
+		 * lowering free and perfectly reversible: the extra keys stay held, so
+		 * going back up is instant rather than a refetch.
+		 */
+		const limit = query.cap ?? cap;
 		return {
 			get all() {
 				void ensure(scope, query);
-				return hydrate(set()?.keys ?? []);
+				const ks = set()?.keys ?? [];
+				return hydrate(ks.length > limit ? ks.slice(0, limit) : ks);
 			},
 			get status() {
 				void ensure(scope, query);
@@ -363,9 +375,15 @@ export function createCollection<
 			get total() {
 				return set()?.total;
 			},
+			/**
+			 * More to show, from either direction: the server has rows we have not
+			 * fetched, OR we hold rows the cap is currently hiding. Both are "raise
+			 * the cap", and only one of them costs a request.
+			 */
 			get hasMore() {
 				const s = set();
-				return !!s && !s.complete && s.status !== 'loading';
+				if (!s || s.status === 'loading') return false;
+				return !s.complete || s.keys.length > limit;
 			},
 			/**
 			 * Reads the CACHE, not the set. A record reached from a deep link or a

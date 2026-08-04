@@ -27,6 +27,7 @@
 	let kind = $state('');
 	let order = $state('date');
 	let desc = $state(false);
+	const CAPS = [200, 1000, 2000, 5000, 20000, 100000];
 	let cap = $state(2000);
 
 	/** Debounced, because it is server-stage and fires per keystroke. */
@@ -138,7 +139,7 @@
 				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 				bind:value={cap}
 			>
-				{#each [200, 1000, 2000, 5000, 20000, 100000] as n (n)}<option value={n}>{n}</option>{/each}
+				{#each CAPS as n (n)}<option value={n}>{n}</option>{/each}
 			</select>
 		</label>
 	</div>
@@ -182,11 +183,17 @@
 				{ORDERS.find((o) => o.value === applied.order)?.label.toLowerCase()}
 				{applied.desc ? 'descending' : 'ascending'} first
 			</span>
+			<!--
+				Raises the CAP rather than calling loadMore. The cap is now the single
+				number — how many rows are wanted — so "load more" and the dropdown are
+				the same control, and stepping back down is free because the extra rows
+				stay held.
+			-->
 			<Button
 				class="ml-auto"
 				variant="outline"
-				onclick={() => entries.loadMore(query, 2000)}
-				disabled={!view.hasMore}>Load 2 000 more</Button
+				onclick={() => (cap = CAPS.find((n) => n > cap) ?? cap)}
+				disabled={!view.hasMore || cap >= CAPS[CAPS.length - 1]}>Show more</Button
 			>
 		</div>
 	{/if}
