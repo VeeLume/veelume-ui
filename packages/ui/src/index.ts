@@ -58,6 +58,13 @@ export type {
 	SurfaceState
 } from './surface/index.js';
 
+// ── L1: reveal ─────────────────────────────────────────────────────────────
+// Render to a paint BUDGET, not a row count. A fixed step is a guess about row
+// cost and it is wrong in both directions — 100k simple rows paint fine, a few
+// thousand expensive ones do not.
+export { createReveal } from './reveal/index.svelte.js';
+export type { Reveal, RevealOptions } from './reveal/index.svelte.js';
+
 // ── L1: browse state ───────────────────────────────────────────────────────
 export { createBrowseState } from './browse/index.js';
 export type {
