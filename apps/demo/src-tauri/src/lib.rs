@@ -4,6 +4,8 @@ mod demo_commands;
 mod settings;
 mod state;
 mod store;
+mod stress;
+mod stress_commands;
 
 pub use demo::DemoState;
 pub use state::AppState;
@@ -56,6 +58,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         demo_commands::prefs_list,
         demo_commands::prefs_save,
         demo_commands::prefs_reset,
+        stress_commands::stress_page,
+        stress_commands::stress_get,
+        stress_commands::stress_warm,
     ])
 }
 

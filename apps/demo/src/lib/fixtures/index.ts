@@ -29,6 +29,7 @@ import { probeFixtures } from './probes.js';
 import { libraryFixtures } from './library.js';
 import { loanFixtures } from './loans.js';
 import { prefsFixtures } from './prefs.js';
+import { stressFixtures } from './stress.js';
 import type { FixtureModule } from './types.js';
 
 export type { FixtureHandler, FixtureModule } from './types.js';
@@ -98,6 +99,9 @@ export function installFixtureBackend(): boolean {
 	registerFixtures(libraryFixtures);
 	registerFixtures(loanFixtures);
 	registerFixtures(prefsFixtures);
+	// The 1.5M dataset builds lazily on its first command, so registering it
+	// costs nothing until /stress is opened.
+	registerFixtures(stressFixtures);
 	installed = true;
 	latencyMs = readLatency();
 	mockIPC((cmd, payload) => dispatch(cmd, payload as Record<string, unknown>), {

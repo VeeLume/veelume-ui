@@ -71,6 +71,32 @@ async loansList(year: string) : Promise<Loan[]> {
     return await TAURI_INVOKE("loans_list", { year });
 },
 /**
+ * Keyset paging — the shape you write over SQLite, TrailBase or Postgres.
+ * The cursor is the last row's id and the next page starts *after* it, so a row
+ * inserted mid-accumulation cannot shift a window or be re-emitted, which is
+ * exactly what offset paging gets wrong.
+ */
+async loansPage(year: string, limit: number, cursor: string | null) : Promise<Result<LoanPage, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_page", { year, limit, cursor }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * One record by key — what a deep link or a server-side search hit needs, since
+ * neither belongs to a working set the client already holds.
+ */
+async loansGet(id: string, year: string) : Promise<Result<Loan, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("loans_get", { id, year }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The record-shaped edit — the only loan operation that belongs to the
  * collection's write layer.
  */
@@ -154,6 +180,24 @@ async prefsSave(body: Preferences) : Promise<Preferences> {
 },
 async prefsReset() : Promise<void> {
     await TAURI_INVOKE("prefs_reset");
+},
+async stressPage(search: string, kind: string, order: string, desc: boolean, limit: number, cursor: string | null) : Promise<EntryPage> {
+    return await TAURI_INVOKE("stress_page", { search, kind, order, desc, limit, cursor });
+},
+async stressGet(id: number) : Promise<Result<Entry, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stress_get", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Build the dataset without asking for a page — lets the UI show the one-off
+ * generation cost rather than blaming it on the first query.
+ */
+async stressWarm() : Promise<number> {
+    return await TAURI_INVOKE("stress_warm");
 }
 }
 
@@ -174,11 +218,29 @@ export type AppSettings = {
 onboarding_completed: boolean }
 export type Edition = { id: string; work_id: string; work_title: string; author: string; year: number; format: string }
 /**
+ * A stored row. Owns its strings — see the module note.
+ */
+export type Entry = { 
+/**
+ * i32, not i64 — specta refuses i64 at the IPC boundary
+ * (`BigIntForbidden`), a JS number cannot represent its range.
+ */
+id: number; date: string; party: string; kind: string; cents: number }
+/**
+ * One accumulation step, mirroring the kit's `FetchPage`.
+ */
+export type EntryPage = { records: Entry[]; cursor: string | null; total: number; done: boolean }
+/**
  * `i32`, not `i64`: specta forbids `i64` at the IPC boundary because a JS
  * number cannot represent its full range. Any real backend with a BIGINT money
  * or id column hits the same wall — the fix there is a string, not a wider int.
  */
 export type Loan = { id: string; title: string; borrower: string; lent_on: string; due_on: string; status: string; replaced_by: string | null; fine_cents: number; note: string }
+/**
+ * One accumulation step. Mirrors the kit's `FetchPage`: rows, a continuation
+ * token, the matching total, and an explicit end-of-data flag.
+ */
+export type LoanPage = { records: Loan[]; cursor: string | null; total: number; done: boolean }
 export type Preferences = { id: string; display_name: string; default_loan_days: number; fine_per_day_cents: number; preferred_format: string; notes: string }
 export type Probe = { id: string; name: string; note: string }
 export type ProbePatch = { note: string | null }
