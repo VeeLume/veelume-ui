@@ -25,16 +25,30 @@ export function loanYear(): string {
 	return currentYear;
 }
 
+/**
+ * A cap this small is deliberate. The seeded years hold 6–8 loans, so `cap: 5`
+ * puts a real surface into the truncated state permanently — which is the state
+ * that has to be *visible*, and the one a demo seeded with comfortable data
+ * would never reach. `?cap=` overrides it for the complete case.
+ */
+const capFromUrl =
+	typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('cap')) : 0;
+
 export const loans = createCollection<Loan, string, string>(
 	{
 		keyOf: (l) => l.id,
+		// Both paths are declared: `fetchPage` is used when present, and `fetchAll`
+		// stays as the degradation target an adapter that cannot page would rely on.
 		fetchAll: (year) => invoke('loans_list', { year }),
+		fetchPage: ({ scope: year, limit, cursor }) =>
+			invoke('loans_page', { year, limit, cursor: cursor ?? null }),
+		fetchOne: (id, year) => invoke('loans_get', { id, year }),
 		write: {
 			semantics: 'replace',
 			save: (_id, body, year) => invoke('loans_save', { body, year })
 		}
 	},
-	{ scope: () => currentYear }
+	{ scope: () => currentYear, cap: capFromUrl || 5, pageSize: 3 }
 );
 
 /**

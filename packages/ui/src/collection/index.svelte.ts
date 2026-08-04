@@ -17,15 +17,44 @@ import type {
 	ChangeInfo,
 	CollectionIO,
 	CollectionOptions,
-	Entry,
+	FetchPage,
 	KitError,
 	ScopedView,
-	Unsubscribe
+	SetQuery,
+	Unsubscribe,
+	WorkingSet
 } from './types.js';
 
 export * from './types.js';
 
 const DEFAULT_KEY = '__single__';
+const DEFAULT_CAP = 2000;
+const DEFAULT_PAGE = 500;
+
+/**
+ * Canonical encoding of a set's declaration.
+ *
+ * Canonical is mandatory, for the same reason it is in the URL: without sorted
+ * keys and sorted multi-values, the same query yields different strings, and
+ * the cache fills with entries that are duplicates of each other under a
+ * different name.
+ */
+function queryKey(q: SetQuery): string {
+	const parts: string[] = [];
+	if (q.search) parts.push(`q=${q.search}`);
+	if (q.order) parts.push(`o=${q.order.by}:${q.order.dir ?? 'asc'}`);
+	// ⚑ `cap` is deliberately NOT in the key. Identity is what the set MATCHES —
+	// scope, predicates, order. The cap is how far we have read into it, which is
+	// state, not identity: "newest 2 000" and "newest 5 000" are one query at two
+	// depths and the shallower is a prefix of the deeper. Keying on it made
+	// `loadMore` silently build a second set while the view kept reading the
+	// first, which is how this was found.
+	for (const k of Object.keys(q.where ?? {}).sort()) {
+		const v = q.where![k];
+		parts.push(`${k}=${(Array.isArray(v) ? [...v].sort() : [v]).join(',')}`);
+	}
+	return parts.join('&');
+}
 
 function toKitError(e: unknown, classify?: (e: unknown) => KitError | undefined): KitError {
 	const classified = classify?.(e);
@@ -40,8 +69,28 @@ export function createCollection<
 	S = void,
 	B extends Record<string, unknown> = Partial<T> & Record<string, unknown>
 >(io: CollectionIO<T, K, S, B>, options: CollectionOptions<S> = {}) {
-	/** Tracked: the cache itself. */
-	let entries = $state<Record<string, Entry<T>>>({});
+	/**
+	 * ⚑ TWO tracked objects, and separating them is the whole design.
+	 *
+	 * `records` is the CACHE — every record we got, however we got it:
+	 * accumulation, a server-side search, `fetchOne` from a deep link. It is
+	 * path-dependent and that is fine, because nothing user-visible is computed
+	 * from it.
+	 *
+	 * `sets` are WORKING SETS — declared queries (scope + predicates + order +
+	 * cap) holding key lists. They are deterministic given their declaration,
+	 * and everything user-visible (the rendered list, the counts, completeness)
+	 * comes from them.
+	 *
+	 * Fusing the two is what made a server search "contaminate" the cache and a
+	 * scroll silently change a facet count: both were mutating the thing the
+	 * counts were computed from. Split, records may arrive however they arrive.
+	 */
+	let records = $state<Record<string, T>>({});
+	let sets = $state<Record<string, WorkingSet<K>>>({});
+
+	const cap = options.cap ?? DEFAULT_CAP;
+	const pageSize = options.pageSize ?? DEFAULT_PAGE;
 
 	/**
 	 * Untracked bookkeeping. Deliberately a plain Map, not `$state`: `ensure()`
@@ -69,10 +118,24 @@ export function createCollection<
 	const keyFor = (scope: S): string =>
 		options.scopeKey ? options.scopeKey(scope) : scope === undefined ? DEFAULT_KEY : String(scope);
 
-	function patchEntry(k: string, patch: Partial<Entry<T>>): void {
-		const base: Entry<T> = entries[k] ?? { data: [], status: 'idle' };
-		entries[k] = { ...base, ...patch };
+	const EMPTY_SET: WorkingSet<K> = {
+		keys: [],
+		fetchedCount: 0,
+		complete: false,
+		status: 'idle'
+	};
+
+	function patchSet(k: string, patch: Partial<WorkingSet<K>>): void {
+		sets[k] = { ...(sets[k] ?? EMPTY_SET), ...patch };
 	}
+
+	/** Put records in the cache. The one way anything enters it. */
+	function cache(list: T[]): void {
+		for (const r of list) records[String(io.keyOf(r))] = r;
+	}
+
+	const hydrate = (keys: K[]): T[] =>
+		keys.map((key) => records[String(key)]).filter((r): r is T => r !== undefined);
 
 	/**
 	 * Attach the invalidation listener once, on first use. There is no explicit
@@ -91,19 +154,125 @@ export function createCollection<
 			});
 	}
 
-	async function run(k: string, scope: S, mode: 'loading' | 'refreshing'): Promise<void> {
-		patchEntry(k, { status: mode, error: undefined });
+	/**
+	 * Accumulate a working set: page until the source is exhausted or the cap is
+	 * reached. The two are different outcomes and the difference is the point —
+	 * exhausted means `complete`, capped does not.
+	 *
+	 * `append: true` continues an existing set (an explicit "load more"); the
+	 * default rebuilds it from scratch.
+	 */
+	async function run(
+		k: string,
+		scope: S,
+		query: SetQuery,
+		mode: 'loading' | 'refreshing',
+		append = false,
+		targetCap?: number
+	): Promise<void> {
+		const prev = sets[k];
+		patchSet(k, { status: mode, error: undefined });
 		const epoch = writeEpoch;
+
+		// Dedupe by key while preserving arrival order. Keyset paging against our
+		// own backends does not re-emit rows, so this is not the load-bearing
+		// defence it would be against a third-party cursor — it is here because a
+		// row inserted mid-accumulation can otherwise appear twice, and a Set
+		// lookup is cheaper than reasoning about when that happens.
+		const keys: K[] = append ? [...(prev?.keys ?? [])] : [];
+		const seen = new Set<string>(keys.map(String));
+		let fetched = append ? (prev?.fetchedCount ?? 0) : 0;
+		let total = append ? prev?.total : undefined;
+		let cursor = append ? prev?.cursor : undefined;
+
+		// How deep to read. `targetCap` is what "load more" raises; it stays out of
+		// the set key on purpose (see queryKey).
+		const limit = targetCap ?? query.cap ?? cap;
+
 		try {
-			const data = await io.fetchAll(scope);
-			if (epoch !== writeEpoch) {
-				// A write landed while this was in flight, so its result predates
-				// state we already hold. Discard and re-run rather than clobber.
-				return run(k, scope, 'refreshing');
+			// No paging offered: one call, everything, always complete. An adapter
+			// that cannot page must still be usable — a 400-row table should not
+			// have to implement cursors to work here.
+			if (!io.fetchPage) {
+				if (!io.fetchAll) throw new Error('collection: io needs fetchAll or fetchPage');
+				const data = await io.fetchAll(scope);
+				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
+				cache(data);
+				patchSet(k, {
+					keys: data.map(io.keyOf),
+					fetchedCount: data.length,
+					total: data.length,
+					complete: true,
+					cursor: undefined,
+					status: 'ready',
+					error: undefined
+				});
+				return;
 			}
-			patchEntry(k, { data, status: 'ready', error: undefined });
+
+			let exhausted = false;
+			// Distinct from `exhausted`: we stopped, but NOT because the source said
+			// so. Conflating them would report `complete` on a set we merely gave up
+			// on — the silent truncation this whole model exists to prevent.
+			let stalled = false;
+			while (keys.length < limit && !exhausted && !stalled) {
+				const page: FetchPage<T> = await io.fetchPage({
+					scope,
+					query,
+					limit: Math.min(pageSize, limit - keys.length),
+					cursor
+				});
+				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
+
+				cache(page.records);
+				const before = keys.length;
+				for (const r of page.records) {
+					const key = io.keyOf(r);
+					if (seen.has(String(key))) continue;
+					seen.add(String(key));
+					keys.push(key);
+				}
+				const gained = keys.length - before;
+				fetched += page.records.length;
+				if (page.total !== undefined) total = page.total;
+				cursor = page.cursor;
+
+				// Three independent ways to learn the source is spent. `done` when the
+				// adapter says so; no cursor when it implies it; a short page for the
+				// APIs that offer neither — which is what both SC donors rely on.
+				exhausted = page.done === true || !page.cursor || page.records.length === 0;
+
+				// A page that adds nothing means the adapter is not advancing. Against
+				// our own backends that is a bug in our own code, so the useful
+				// behaviour is to stop rather than hang — but NOT to call it complete,
+				// which would turn our bug into a silent truncation.
+				stalled = !exhausted && gained === 0;
+
+				// Publish each page as it lands, so a long accumulation paints
+				// progressively instead of blocking on the whole thing.
+				patchSet(k, {
+					keys: [...keys],
+					fetchedCount: fetched,
+					total,
+					cursor,
+					complete: exhausted,
+					status: mode === 'loading' ? 'refreshing' : mode
+				});
+			}
+
+			patchSet(k, {
+				keys,
+				fetchedCount: fetched,
+				total,
+				cursor,
+				// Exhausted, or the total says we hold it all. Hitting the cap is NOT
+				// completeness — that is the case the whole model exists to surface.
+				complete: exhausted || (total !== undefined && fetched >= total),
+				status: 'ready',
+				error: undefined
+			});
 		} catch (e) {
-			patchEntry(k, { status: 'error', error: toKitError(e, io.classifyError) });
+			patchSet(k, { status: 'error', error: toKitError(e, io.classifyError) });
 		}
 	}
 
@@ -111,16 +280,29 @@ export function createCollection<
 	 * Start a fetch if one is warranted. Safe to call from a getter during
 	 * render: every `$state` write happens in a microtask, never synchronously.
 	 */
-	function ensure(scope: S, force = false): Promise<void> {
-		const k = keyFor(scope);
+	/** A set's cache key: scope and declaration together, since both are identity. */
+	const setKeyFor = (scope: S, query: SetQuery): string => {
+		const q = queryKey(query);
+		return q ? `${keyFor(scope)} ${q}` : keyFor(scope);
+	};
+
+	function ensure(
+		scope: S,
+		query: SetQuery,
+		force = false,
+		append = false,
+		targetCap?: number
+	): Promise<void> {
+		const k = setKeyFor(scope, query);
 		const existing = inflight.get(k);
 		if (existing) return existing;
-		if (!force && entries[k] && entries[k].status !== 'idle') return Promise.resolve();
+		if (!force && !append && sets[k] && sets[k].status !== 'idle') return Promise.resolve();
 
 		ensureSubscribed();
-		const mode = entries[k]?.status === 'ready' ? 'refreshing' : 'loading';
+		declarations.set(k, { scope, query });
+		const mode = sets[k]?.status === 'ready' ? 'refreshing' : 'loading';
 		const p = Promise.resolve()
-			.then(() => run(k, scope, mode))
+			.then(() => run(k, scope, query, mode, append, targetCap))
 			.finally(() => {
 				inflight.delete(k);
 			});
@@ -128,62 +310,95 @@ export function createCollection<
 		return p;
 	}
 
-	function view(scope: S): ScopedView<T, K> {
-		const k = keyFor(scope);
+	function view(scope: S, query: SetQuery = {}): ScopedView<T, K> {
+		const k = setKeyFor(scope, query);
+		const set = () => sets[k];
 		return {
 			get all() {
-				void ensure(scope);
-				return entries[k]?.data ?? [];
+				void ensure(scope, query);
+				return hydrate(set()?.keys ?? []);
 			},
 			get status() {
-				void ensure(scope);
-				return entries[k]?.status ?? 'idle';
+				void ensure(scope, query);
+				return set()?.status ?? 'idle';
 			},
 			get error() {
-				return entries[k]?.error;
+				return set()?.error;
 			},
 			get hasData() {
-				const s = entries[k]?.status;
+				const s = set()?.status;
 				return s === 'ready' || s === 'refreshing';
 			},
+			get complete() {
+				void ensure(scope, query);
+				return set()?.complete ?? false;
+			},
+			get fetchedCount() {
+				return set()?.fetchedCount ?? 0;
+			},
+			get total() {
+				return set()?.total;
+			},
+			get hasMore() {
+				const s = set();
+				return !!s && !s.complete && s.status !== 'loading';
+			},
+			/**
+			 * Reads the CACHE, not the set. A record reached from a deep link or a
+			 * server search belongs to no set, and refusing to render it because it
+			 * is not in the current one would be the split failing at its whole job.
+			 */
 			byKey(key: K) {
-				void ensure(scope);
-				return entries[k]?.data.find((r) => io.keyOf(r) === key);
+				void ensure(scope, query);
+				return records[String(key)];
 			}
 		};
 	}
 
-	function upsert(scope: S, record: T): void {
-		const k = keyFor(scope);
-		const current = entries[k]?.data ?? [];
+	/**
+	 * Fold a record into the cache and into any set that already lists it.
+	 *
+	 * Note what it does NOT do: add the key to sets that do not have it. Whether
+	 * a new record belongs to a set carrying pushed-down predicates is a question
+	 * only the server can answer — see the note's open item.
+	 */
+	function upsert(record: T): void {
 		const key = io.keyOf(record);
-		const i = current.findIndex((r) => io.keyOf(r) === key);
-		const next = i >= 0 ? current.with(i, record) : [...current, record];
-		patchEntry(k, { data: next, status: 'ready' });
+		records[String(key)] = record;
+	}
+
+	/** Append a record to a set it is known to belong to (a local create). */
+	function joinSet(k: string, key: K): void {
+		const set = sets[k];
+		if (!set || set.keys.some((x) => x === key)) return;
+		patchSet(k, {
+			keys: [...set.keys, key],
+			fetchedCount: set.fetchedCount + 1,
+			// Both counters move together, as the archived Flutter PaginatedList
+			// does, or the completeness invariant drifts under live mutation.
+			total: set.total === undefined ? undefined : set.total + 1
+		});
 	}
 
 	// ── invalidation ───────────────────────────────────────────────────────────
 
-	function reload(info?: ChangeInfo<K, S> | null): void {
-		const targets =
-			info?.scope !== undefined ? [keyFor(info.scope)] : Object.keys(entries).filter((k) => k);
-		for (const k of targets) {
-			// Only scopes we actually hold; a scope nobody looked at stays unfetched.
-			if (!entries[k]) continue;
-			const scope = info?.scope !== undefined ? info.scope : scopeFromKey(k);
-			void ensure(scope, true);
-		}
-	}
-
 	/**
-	 * Recovering a scope VALUE from its key is only possible when the key is the
-	 * value. With a custom `scopeKey` the mapping is one-way, so a keyless
-	 * invalidation can only refresh the current scope — documented rather than
-	 * silently wrong.
+	 * Every set is remembered with the declaration that built it, so an
+	 * invalidation can re-run it exactly. Untracked — it is bookkeeping, and
+	 * writing it during a getter must stay legal.
 	 */
-	function scopeFromKey(k: string): S {
-		if (options.scopeKey) return scopeOf();
-		return (k === DEFAULT_KEY ? undefined : k) as S;
+	const declarations = new Map<string, { scope: S; query: SetQuery }>();
+
+	function reload(info?: ChangeInfo<K, S> | null): void {
+		const prefix = info?.scope !== undefined ? keyFor(info.scope) : null;
+		for (const k of Object.keys(sets)) {
+			const d = declarations.get(k);
+			if (!d) continue;
+			// A scope-tagged event only touches that scope's sets; an untagged one
+			// (stibu's events carry neither id nor scope) touches all of them.
+			if (prefix !== null && k !== prefix && !k.startsWith(`${prefix} `)) continue;
+			void ensure(d.scope, d.query, true);
+		}
 	}
 
 	function onInvalidated(info?: ChangeInfo<K, S>): void {
@@ -240,7 +455,7 @@ export function createCollection<
 		writesInFlight += 1;
 		try {
 			const saved = await w.save(key, payload, scope);
-			upsert(scope, saved);
+			upsert(saved);
 
 			// The server is authoritative, so the cache now holds the truth — but the
 			// caller's intent was not honoured, and staying silent about that is the
@@ -270,7 +485,10 @@ export function createCollection<
 		writesInFlight += 1;
 		try {
 			const made = await w.create(body, scope);
-			upsert(scope, made);
+			upsert(made);
+			// Safe only for the unfiltered set: whether a new record satisfies a
+			// pushed-down predicate is the server's answer, not ours.
+			joinSet(setKeyFor(scope, {}), io.keyOf(made));
 			return made;
 		} catch (e) {
 			throw toKitError(e, io.classifyError);
@@ -300,40 +518,92 @@ export function createCollection<
 			return view(scopeOf()).byKey(key);
 		},
 
-		/** Read a scope that is not the current one — cross-scope views (diff
-		 *  pages) and non-reactive callers. */
-		at: (scope: S) => view(scope),
+		get complete() {
+			return view(scopeOf()).complete;
+		},
+		get total() {
+			return view(scopeOf()).total;
+		},
+		get fetchedCount() {
+			return view(scopeOf()).fetchedCount;
+		},
+		get hasMore() {
+			return view(scopeOf()).hasMore;
+		},
+
+		/**
+		 * A working set other than the ambient one — a different scope, a
+		 * pushed-down filter, a different order. `at(scope)` with no query is the
+		 * plain cross-scope read it always was.
+		 */
+		at: (scope: S, query: SetQuery = {}) => view(scope, query),
+		/** The ambient scope, narrowed by a pushed-down declaration. */
+		query: (query: SetQuery) => view(scopeOf(), query),
+
+		/** Whether this collection can page at all — a surface needs to know
+		 *  whether an incomplete set is even reachable. */
+		get paged() {
+			return !!io.fetchPage;
+		},
 
 		/** Eager fetch. Same `ensure()` a read triggers, so a prefetch and a mount
 		 *  share one request rather than racing. */
-		prefetch(scope?: S): void {
-			void ensure(arguments.length ? (scope as S) : scopeOf());
+		prefetch(scope?: S, query: SetQuery = {}): void {
+			void ensure(arguments.length ? (scope as S) : scopeOf(), query);
 		},
 
-		/** Force a refetch of a scope, keeping its data visible meanwhile. */
-		refresh(scope?: S): Promise<void> {
-			return ensure(arguments.length ? (scope as S) : scopeOf(), true);
+		/** Force a refetch of a set, keeping its data visible meanwhile. */
+		refresh(scope?: S, query: SetQuery = {}): Promise<void> {
+			return ensure(arguments.length ? (scope as S) : scopeOf(), query, true);
 		},
 
-		/** Fetch one record and fold it in. */
+		/**
+		 * Raise the ceiling: accumulate one more run of pages onto an existing set.
+		 * Explicit rather than automatic, because an automatic infinite fetch means
+		 * the counts keep shifting under the user and there is no bottom.
+		 */
+		loadMore(query: SetQuery = {}, by?: number): Promise<void> {
+			const scope = scopeOf();
+			const set = sets[setKeyFor(scope, query)];
+			if (!set || set.complete) return Promise.resolve();
+			// Raise the depth on the SAME set — the cap is not part of its key, so
+			// this extends rather than forking a parallel one.
+			return ensure(scope, query, true, true, set.keys.length + (by ?? query.cap ?? cap));
+		},
+
+		/** Fetch one record into the cache — a deep link, or a hit from a
+		 *  server-side search that belongs to no set we hold. */
 		async refreshOne(key: K): Promise<T> {
 			if (!io.fetchOne) throw new Error('collection: fetchOne not supplied');
-			const scope = scopeOf();
-			const fresh = await io.fetchOne(key, scope);
-			upsert(scope, fresh);
+			const fresh = await io.fetchOne(key, scopeOf());
+			upsert(fresh);
 			return fresh;
 		},
 
 		save,
 		create,
 
-		/** Explicit only — no LRU, no TTL. Scope cardinality is low by design. */
+		/**
+		 * Drop working sets. Records stay cached — they are shared, and a set is
+		 * only a list of keys, so dropping one costs nothing to rebuild from the
+		 * cache if its records are still there.
+		 */
 		evict(scope?: S): void {
-			const k = keyFor(arguments.length ? (scope as S) : scopeOf());
-			delete entries[k];
+			const prefix = keyFor(arguments.length ? (scope as S) : scopeOf());
+			for (const k of Object.keys(sets)) {
+				if (k === prefix || k.startsWith(`${prefix} `)) {
+					delete sets[k];
+					declarations.delete(k);
+				}
+			}
 		},
 		evictAll(): void {
-			entries = {};
+			sets = {};
+			declarations.clear();
+		},
+		/** Drop cached records too. Separate because the two are separate. */
+		clearCache(): void {
+			records = {};
 		},
 
 		/** Drop the invalidation subscription. */
@@ -344,7 +614,12 @@ export function createCollection<
 
 		/** Introspection for tests and the gallery. */
 		get debug() {
-			return { writesInFlight, writeEpoch, scopes: Object.keys(entries) };
+			return {
+				writesInFlight,
+				writeEpoch,
+				sets: Object.keys(sets),
+				cached: Object.keys(records).length
+			};
 		}
 	};
 }

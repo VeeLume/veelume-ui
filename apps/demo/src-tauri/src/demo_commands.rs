@@ -11,7 +11,7 @@
 
 use tauri::State;
 
-use crate::demo::{DemoState, Edition, Loan, Preferences, Probe, ProbePatch, ShelfEntry};
+use crate::demo::{DemoState, Edition, Loan, LoanPage, Preferences, Probe, ProbePatch, ShelfEntry};
 
 // ── probes ─────────────────────────────────────────────────────────────────
 
@@ -221,6 +221,55 @@ pub fn loans_archive(state: State<'_, DemoState>, id: String, year: String) -> R
         .ok_or("loan not found")?;
     loan.status = "archived".into();
     Ok(())
+}
+
+/// Keyset paging — the shape you write over SQLite, TrailBase or Postgres.
+/// The cursor is the last row's id and the next page starts *after* it, so a row
+/// inserted mid-accumulation cannot shift a window or be re-emitted, which is
+/// exactly what offset paging gets wrong.
+#[tauri::command]
+#[specta::specta]
+pub fn loans_page(
+    state: State<'_, DemoState>,
+    year: String,
+    limit: i32,
+    cursor: Option<String>,
+) -> Result<LoanPage, String> {
+    let mut data = state.0.lock().unwrap();
+    let list = data.loans_mut(&year).ok_or("unknown year")?;
+
+    let after = match cursor {
+        Some(c) => list.iter().position(|l| l.id == c).map_or(0, |i| i + 1),
+        None => 0,
+    };
+    let take = limit.max(0) as usize;
+    let slice: Vec<Loan> = list.iter().skip(after).take(take).cloned().collect();
+    let more = after + slice.len() < list.len();
+
+    Ok(LoanPage {
+        cursor: if more {
+            slice.last().map(|l| l.id.clone())
+        } else {
+            None
+        },
+        // Cheap here, and cheap in reality: a COUNT(*) over an indexed predicate.
+        total: list.len() as i32,
+        done: !more,
+        records: slice,
+    })
+}
+
+/// One record by key — what a deep link or a server-side search hit needs, since
+/// neither belongs to a working set the client already holds.
+#[tauri::command]
+#[specta::specta]
+pub fn loans_get(state: State<'_, DemoState>, id: String, year: String) -> Result<Loan, String> {
+    let mut data = state.0.lock().unwrap();
+    let list = data.loans_mut(&year).ok_or("unknown year")?;
+    list.iter()
+        .find(|l| l.id == id)
+        .cloned()
+        .ok_or_else(|| "loan not found".into())
 }
 
 /// The create path. Archetype B is "list + detail + form", and a demo built only

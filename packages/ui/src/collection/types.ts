@@ -78,9 +78,86 @@ export type WriteIO<T, K extends string | number, S, B> = {
 	isDiverged?: (field: string, requested: unknown, returned: unknown) => boolean;
 };
 
+/**
+ * A working set's declaration. Together with the scope this IS the set's
+ * identity — two sets with equal declarations are the same set, and any change
+ * makes a different one.
+ *
+ * ⚑ `order` is in here deliberately, and it is the non-obvious member. Switching
+ * sort on an INCOMPLETE set is not a re-ordering, it is a different query: you
+ * want *the 2 000 largest fines*, not "the newest 2 000, re-sorted by fine". The
+ * cheap alternative silently answers "biggest fines" with "biggest fines among
+ * recent orders", which is the truncated-count lie wearing a different hat.
+ */
+export type SetQuery = {
+	/** Pushed-down predicates. Canonicalised into the set key. */
+	where?: Record<string, string | string[]>;
+	/** Free text. Separate from `where` because it debounces differently. */
+	search?: string;
+	/** Part of the set's identity — see above. */
+	order?: { by: string; dir?: 'asc' | 'desc' };
+	/** Overrides the collection's default cap for this set. */
+	cap?: number;
+};
+
+/**
+ * One accumulation step.
+ *
+ * `cursor` is opaque and the kit only round-trips it. In practice it is the last
+ * row's sort key — **keyset paging**, which is what you write against SQLite,
+ * TrailBase or Postgres and what stibu's `TrailBaseRepo::fetch_all_keyset`
+ * already does. Not offset paging, which drifts when rows are inserted mid-
+ * accumulation.
+ */
+export type FetchRequest<S> = {
+	scope: S;
+	query: SetQuery;
+	/** How many more records this call should return. */
+	limit: number;
+	/** Whatever the previous page returned; absent on the first call. */
+	cursor?: string;
+};
+
+export type FetchPage<T> = {
+	records: T[];
+	/** Continuation token. Absent means the source is exhausted. */
+	cursor?: string;
+	/**
+	 * Rows matching the query on the server.
+	 *
+	 * Normally present: `COUNT(*)` over an indexed predicate is cheap on SQLite,
+	 * TrailBase and Postgres, and TrailBase/Appwrite-shaped APIs return it with
+	 * the page anyway. Optional only for the rare source where counting is
+	 * genuinely expensive (connect-neo's Snowflake), where completeness falls
+	 * back to the source reporting exhaustion.
+	 */
+	total?: number;
+	/** Explicit end-of-data, for sources that say so rather than implying it. */
+	done?: boolean;
+};
+
 export type CollectionIO<T, K extends string | number, S = void, B = Partial<T>> = {
 	keyOf: (record: T) => K;
-	fetchAll: (scope: S) => Promise<T[]>;
+	/**
+	 * The simple path: everything, one call, always complete. Sufficient for
+	 * every collection in the fleet today, and the only thing an adapter must
+	 * supply if it cannot page.
+	 */
+	fetchAll?: (scope: S) => Promise<T[]>;
+	/**
+	 * The paged path. Called repeatedly until the source is exhausted or the cap
+	 * is reached — **accumulation, not pagination**: the client still ends up
+	 * holding the set, so client-side filtering and contextual counts survive.
+	 *
+	 * An adapter supplying this is expected to honour the whole request. There is
+	 * no capability negotiation, because every backend here is one we write —
+	 * Tauri or Litestar over SQLite, TrailBase or Postgres. Whether a predicate
+	 * can be pushed down is knowledge the *app* has, and it belongs in the
+	 * surface descriptor that declares the predicate, not in a handshake.
+	 */
+	fetchPage?: (req: FetchRequest<S>) => Promise<FetchPage<T>>;
+	/** One record by key — a deep link, or a hit from a server-side search that
+	 *  belongs to no working set the client holds. */
 	fetchOne?: (key: K, scope: S) => Promise<T>;
 
 	/** Omit for a read-only collection — catalogs never write. */
@@ -110,22 +187,73 @@ export type CollectionOptions<S> = {
 	scope?: () => S;
 	/** Required when scope is not already a usable key (compound scopes). */
 	scopeKey?: (scope: S) => string;
+	/**
+	 * How many records to accumulate before stopping and reporting the set
+	 * incomplete. A **row count, not a time budget** — a time budget makes the
+	 * set non-deterministic (same query, different contents depending on the
+	 * connection), which breaks the property the whole model rests on.
+	 *
+	 * It bounds fetch time and memory, NOT the DOM — progressive reveal handles
+	 * rendering, and the two budgets are independent.
+	 */
+	cap?: number;
+	/** Records per accumulation call. */
+	pageSize?: number;
 };
 
-/** One scope's slot in the cache. */
+/**
+ * A working set: a declared query plus what we know about answering it.
+ *
+ * ⚑ It holds KEYS, not records. Records live once in the collection's cache, so
+ * visiting many predicate combinations costs a few arrays of strings rather
+ * than N copies of the data — which is what makes a combination space
+ * affordable, and what retracts the earlier worry about explicit-only eviction.
+ */
+export type WorkingSet<K> = {
+	/** In the set's order. That order is part of its identity. */
+	readonly keys: K[];
+	/**
+	 * Rows the server has handed us for this set.
+	 *
+	 * ⚑ NOT `keys.length`, and the difference is load-bearing twice over: a
+	 * cursor source re-emits rows at page boundaries so dedupe makes keys fewer,
+	 * and completeness must be measured against what was FETCHED rather than
+	 * what is rendered — deriving it downstream would make every client-side
+	 * filter read as "there is more on the server".
+	 */
+	readonly fetchedCount: number;
+	/** Matching records on the server, when the adapter supplies one. A snapshot
+	 *  from query time, deliberately not maintained as pages arrive. */
+	readonly total?: number;
+	/** Whether this set holds everything matching its query. */
+	readonly complete: boolean;
+	readonly status: Status;
+	readonly error?: KitError;
+	/** Continuation for the next accumulation step, when there is one. */
+	readonly cursor?: string;
+};
+
+/** @deprecated The pre-working-set shape. Kept so the name still resolves while
+ *  consumers migrate; `WorkingSet` plus the record cache replaces it. */
 export type Entry<T> = {
 	readonly data: T[];
 	readonly status: Status;
 	readonly error?: KitError;
 };
 
-/** The read surface for one scope — what `at()` returns, and what the ambient
- *  accessors delegate to. */
+/** The read surface for one working set — what `at()` returns, and what the
+ *  ambient accessors delegate to. */
 export type ScopedView<T, K extends string | number> = {
 	readonly all: T[];
 	readonly status: Status;
 	readonly error: KitError | undefined;
 	/** `ready` or `refreshing` — i.e. "there is data worth rendering". */
 	readonly hasData: boolean;
+	/** False while the set is capped short of everything matching its query. */
+	readonly complete: boolean;
+	readonly fetchedCount: number;
+	readonly total: number | undefined;
+	/** Whether another accumulation step would yield more. */
+	readonly hasMore: boolean;
 	byKey(key: K): T | undefined;
 };

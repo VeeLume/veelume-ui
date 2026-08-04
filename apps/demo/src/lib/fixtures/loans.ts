@@ -72,6 +72,36 @@ function find(year: string, id: string): Loan {
 export const loanFixtures: FixtureModule = {
 	loans_list: (payload) => (byYear[String(payload.year)] ?? []).map((l) => ({ ...l })),
 
+	/**
+	 * The paged read — accumulation, not pagination. The client calls this until
+	 * the source is exhausted or its cap is reached, and still ends up holding the
+	 * set, so client-side filtering and contextual counts survive.
+	 *
+	 * **Keyset, exclusive**: the cursor is the last row's id and the next page
+	 * starts *after* it. That is what you write over SQLite, TrailBase or
+	 * Postgres — no offset drift when a row is inserted mid-accumulation, and no
+	 * boundary row re-emitted. `total` comes back with every page, as it does
+	 * from a `COUNT(*)` on an indexed predicate.
+	 */
+	loans_page: (payload) => {
+		const year = String(payload.year);
+		const list = byYear[year] ?? [];
+		const limit = Number(payload.limit) || 10;
+		const cursor = payload.cursor == null ? null : String(payload.cursor);
+
+		const after = cursor ? list.findIndex((l) => l.id === cursor) + 1 : 0;
+		const slice = list.slice(after, after + limit);
+		const last = slice.at(-1);
+		const more = after + slice.length < list.length;
+
+		return {
+			records: slice.map((l) => ({ ...l })),
+			cursor: more && last ? last.id : null,
+			total: list.length,
+			done: !more
+		};
+	},
+
 	/** Record-shaped edit — this one DOES belong to the collection's write layer. */
 	loans_save: (payload) => {
 		const year = String(payload.year);
@@ -124,6 +154,10 @@ export const loanFixtures: FixtureModule = {
 		loan.status = 'archived';
 		return null;
 	},
+
+	/** One record by id — what a deep link or a server-search hit needs, since
+	 *  neither belongs to any working set the client holds. */
+	loans_get: (payload) => ({ ...find(String(payload.year), String(payload.id)) }),
 
 	/** The create path — what the list header's one forward action reaches. */
 	loans_create: (payload) => {

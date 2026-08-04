@@ -136,6 +136,16 @@ pub struct Loan {
     pub note: String,
 }
 
+/// One accumulation step. Mirrors the kit's `FetchPage`: rows, a continuation
+/// token, the matching total, and an explicit end-of-data flag.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct LoanPage {
+    pub records: Vec<Loan>,
+    pub cursor: Option<String>,
+    pub total: i32,
+    pub done: bool,
+}
+
 const BORROWERS: [&str; 5] = ["Petra", "Norbert", "Dr. Nagel", "Markus", "Anja"];
 const STATUSES: [&str; 6] = ["draft", "out", "out", "returned", "lost", "archived"];
 

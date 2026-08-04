@@ -44,6 +44,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         demo_commands::shelf_toggle,
         demo_commands::library_reset,
         demo_commands::loans_list,
+        demo_commands::loans_page,
+        demo_commands::loans_get,
         demo_commands::loans_save,
         demo_commands::loans_return,
         demo_commands::loans_cancel,
