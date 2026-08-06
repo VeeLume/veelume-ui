@@ -89,8 +89,30 @@ export function createCollection<
 	 * scroll silently change a facet count: both were mutating the thing the
 	 * counts were computed from. Split, records may arrive however they arrive.
 	 */
-	let records = $state<Record<string, T>>({});
-	let sets = $state<Record<string, WorkingSet<K>>>({});
+	/**
+	 * ⚑ A plain Map plus a VERSION counter, not a `$state` object.
+	 *
+	 * A deep `$state` proxy over a hundred thousand records is itself the
+	 * bottleneck, and both halves scale with cache size: every record written
+	 * during accumulation is a reactive write, and every hydrate creates one
+	 * fine-grained dependency per key read. Observed as the whole UI freezing
+	 * while "cached records" ticked upward — the counter moving WAS the render
+	 * loop, one flush per record.
+	 *
+	 * A version bumped once per batch gives readers exactly the dependency they
+	 * need ("the cache changed") and nothing they do not.
+	 */
+	const records = new Map<string, T>();
+	let recordsVersion = $state(0);
+	/**
+	 * ⚑ `$state.raw`, because a set holds a key array up to the cap.
+	 *
+	 * Plain `$state` deep-proxies it, so slicing 100 000 keys becomes 100 000
+	 * proxy reads — the same per-element tax the record cache above was paying.
+	 * Sets are always REPLACED wholesale, never mutated in place, which is
+	 * exactly the shape `.raw` is for.
+	 */
+	let sets = $state.raw<Record<string, WorkingSet<K>>>({});
 
 	const cap = options.cap ?? DEFAULT_CAP;
 	const pageSize = options.pageSize ?? DEFAULT_PAGE;
@@ -140,19 +162,11 @@ export function createCollection<
 	};
 
 	function patchSet(k: string, patch: Partial<WorkingSet<K>>): void {
-		sets[k] = { ...(sets[k] ?? EMPTY_SET), ...patch };
+		// A new container each time: `.raw` only notifies on reassignment.
+		sets = { ...sets, [k]: { ...(sets[k] ?? EMPTY_SET), ...patch } };
 	}
 
 	/**
-	 * How many records the cache holds.
-	 *
-	 * ⚑ A counter, not `Object.keys(records).length`. The demo panel rendered
-	 * that figure and it built a 100 000-element array on EVERY render while
-	 * touching the whole proxy's key set — which is why the UI stayed laggy after
-	 * dropping the cap back to 2 000: the list had shrunk, the cache had not.
-	 */
-	let cachedCount = $state(0);
-
 	/**
 	 * ⚑ Bumped by WRITES only, never by fetches.
 	 *
@@ -170,11 +184,9 @@ export function createCollection<
 
 	/** Put records in the cache. The one way anything enters it. */
 	function cache(list: T[]): void {
-		for (const r of list) {
-			const key = String(io.keyOf(r));
-			if (records[key] === undefined) cachedCount += 1;
-			records[key] = r;
-		}
+		for (const r of list) records.set(String(io.keyOf(r)), r);
+		// One notification for the whole page, not one per record.
+		recordsVersion += 1;
 	}
 
 	/**
@@ -198,6 +210,9 @@ export function createCollection<
 	const memo = new Map<string, { keys: K[]; rows: T[]; epoch: number }>();
 
 	function hydrate(setKey: string, keys: K[]): T[] {
+		// Establish the dependency once. Everything below reads the plain Map, so
+		// a 10 000-row hydrate costs 10 000 lookups rather than 10 000 subscriptions.
+		void recordsVersion;
 		const prev = memo.get(setKey);
 		const reusable =
 			prev !== undefined &&
@@ -209,7 +224,7 @@ export function createCollection<
 
 		const rows = reusable ? prev.rows.slice() : [];
 		for (let i = reusable ? prev.keys.length : 0; i < keys.length; i++) {
-			const r = records[String(keys[i])];
+			const r = records.get(String(keys[i]));
 			if (r !== undefined) rows.push(r);
 		}
 		memo.set(setKey, { keys, rows, epoch: recordsEpoch });
@@ -536,7 +551,8 @@ export function createCollection<
 			 */
 			byKey(key: K) {
 				void ensure(scope, query);
-				return records[String(key)];
+				void recordsVersion;
+				return records.get(String(key));
 			}
 		};
 	}
@@ -550,9 +566,9 @@ export function createCollection<
 	 */
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
-		if (records[key] === undefined) cachedCount += 1;
-		else recordsEpoch += 1;
-		records[key] = record;
+		if (records.has(key)) recordsEpoch += 1;
+		records.set(key, record);
+		recordsVersion += 1;
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
@@ -781,12 +797,15 @@ export function createCollection<
 		 */
 		evict(scope?: S): void {
 			const prefix = keyFor(arguments.length ? (scope as S) : scopeOf());
-			for (const k of Object.keys(sets)) {
+			const next = { ...sets };
+			for (const k of Object.keys(next)) {
 				if (k === prefix || k.startsWith(`${prefix} `)) {
-					delete sets[k];
+					delete next[k];
 					declarations.delete(k);
+					memo.delete(k);
 				}
 			}
+			sets = next;
 		},
 		evictAll(): void {
 			sets = {};
@@ -794,10 +813,10 @@ export function createCollection<
 		},
 		/** Drop cached records too. Separate because the two are separate. */
 		clearCache(): void {
-			records = {};
-			cachedCount = 0;
+			records.clear();
 			memo.clear();
 			recordsEpoch += 1;
+			recordsVersion += 1;
 		},
 
 		/** Drop the invalidation subscription. */
@@ -808,11 +827,12 @@ export function createCollection<
 
 		/** Introspection for tests and the gallery. */
 		get debug() {
+			void recordsVersion;
 			return {
 				writesInFlight,
 				writeEpoch,
 				sets: Object.keys(sets),
-				cached: cachedCount
+				cached: records.size
 			};
 		}
 	};
