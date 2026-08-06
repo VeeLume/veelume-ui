@@ -132,13 +132,71 @@ export function createCollection<
 		sets[k] = { ...(sets[k] ?? EMPTY_SET), ...patch };
 	}
 
+	/**
+	 * How many records the cache holds.
+	 *
+	 * ⚑ A counter, not `Object.keys(records).length`. The demo panel rendered
+	 * that figure and it built a 100 000-element array on EVERY render while
+	 * touching the whole proxy's key set — which is why the UI stayed laggy after
+	 * dropping the cap back to 2 000: the list had shrunk, the cache had not.
+	 */
+	let cachedCount = $state(0);
+
+	/**
+	 * Bumped only when an EXISTING record is replaced. Accumulation adds new keys
+	 * and leaves old rows untouched, which is what makes the hydration memo below
+	 * safe to extend rather than rebuild.
+	 */
+	let recordsEpoch = 0;
+
 	/** Put records in the cache. The one way anything enters it. */
 	function cache(list: T[]): void {
-		for (const r of list) records[String(io.keyOf(r))] = r;
+		for (const r of list) {
+			const key = String(io.keyOf(r));
+			if (records[key] === undefined) cachedCount += 1;
+			else recordsEpoch += 1;
+			records[key] = r;
+		}
 	}
 
-	const hydrate = (keys: K[]): T[] =>
-		keys.map((key) => records[String(key)]).filter((r): r is T => r !== undefined);
+	/**
+	 * ⚑ Hydration is INCREMENTAL, and it has to be.
+	 *
+	 * Rebuilding the whole array on every read is O(n) per read, and a
+	 * progressive reveal reads it once per chunk — so filling a list is
+	 * quadratic. Observed as ms/row rising with the cap: ~0.05 at 20 000 rows and
+	 * 0.2–0.5 at 100 000, i.e. a per-row cost that grew with the number of rows,
+	 * which a per-row cost should not do.
+	 *
+	 * Since a growing set only ever appends keys, the previous answer is a prefix
+	 * of the next one and the tail is all that needs mapping.
+	 *
+	 * Still O(n) in the array copy — a fresh reference is required or downstream
+	 * `$derived`s will not re-run — but the copy is a flat memcpy rather than n
+	 * proxy reads, which is where the cost actually was. Mutating in place and
+	 * returning the same reference would remove even that, at the price of
+	 * reactivity that works by accident.
+	 */
+	const memo = new Map<string, { keys: K[]; rows: T[]; epoch: number }>();
+
+	function hydrate(setKey: string, keys: K[]): T[] {
+		const prev = memo.get(setKey);
+		const reusable =
+			prev !== undefined &&
+			prev.epoch === recordsEpoch &&
+			prev.keys.length <= keys.length &&
+			// Cheap prefix check: same length and same last element is enough here,
+			// because keys are only ever appended to a set.
+			(prev.keys.length === 0 || prev.keys[prev.keys.length - 1] === keys[prev.keys.length - 1]);
+
+		const rows = reusable ? prev.rows.slice() : [];
+		for (let i = reusable ? prev.keys.length : 0; i < keys.length; i++) {
+			const r = records[String(keys[i])];
+			if (r !== undefined) rows.push(r);
+		}
+		memo.set(setKey, { keys, rows, epoch: recordsEpoch });
+		return rows;
+	}
 
 	/**
 	 * Attach the invalidation listener once, on first use. There is no explicit
@@ -362,7 +420,7 @@ export function createCollection<
 			get all() {
 				void ensure(scope, query);
 				const ks = set()?.keys ?? [];
-				return hydrate(ks.length > limit ? ks.slice(0, limit) : ks);
+				return hydrate(k, ks.length > limit ? ks.slice(0, limit) : ks);
 			},
 			get status() {
 				void ensure(scope, query);
@@ -415,8 +473,10 @@ export function createCollection<
 	 * only the server can answer — see the note's open item.
 	 */
 	function upsert(record: T): void {
-		const key = io.keyOf(record);
-		records[String(key)] = record;
+		const key = String(io.keyOf(record));
+		if (records[key] === undefined) cachedCount += 1;
+		else recordsEpoch += 1;
+		records[key] = record;
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
@@ -659,6 +719,9 @@ export function createCollection<
 		/** Drop cached records too. Separate because the two are separate. */
 		clearCache(): void {
 			records = {};
+			cachedCount = 0;
+			memo.clear();
+			recordsEpoch += 1;
 		},
 
 		/** Drop the invalidation subscription. */
@@ -673,7 +736,7 @@ export function createCollection<
 				writesInFlight,
 				writeEpoch,
 				sets: Object.keys(sets),
-				cached: Object.keys(records).length
+				cached: cachedCount
 			};
 		}
 	};
