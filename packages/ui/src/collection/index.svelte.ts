@@ -28,7 +28,12 @@ import type {
 export * from './types.js';
 
 const DEFAULT_KEY = '__single__';
-const DEFAULT_CAP = 2000;
+/**
+ * ⚑ The ENVELOPE, not a tunable — see DESIGN.md "The envelope". Below it, a
+ * set is held whole and filtering/search/counts are local; above it, the set
+ * reports `capped` and refinement pushes down into the query.
+ */
+const DEFAULT_CAP = 10_000;
 const DEFAULT_PAGE = 500;
 
 /**
@@ -153,120 +158,151 @@ export function createCollection<
 	}
 
 
-	/** Put records in the cache. The one way anything enters it. */
 	/**
-	 * ⚑ A LIVE SET: rows derived once, then maintained in place.
+	 * ⚑ A LIVE SET: rows derived once, then maintained by BATCH.
 	 *
-	 * The rows array is `$state` and is *mutated*, never replaced. That is the
-	 * whole point. Handing Svelte a fresh array on every fill page made every
-	 * downstream stage — merge, slice, each-block walk, reveal restart — cost
-	 * O(rows already on screen), so a fill of k pages cost O(k · n) and the UI
-	 * stuttered k times. Mutating in place costs O(what changed).
+	 * Design E maintained rows per record — every arrival paid a binary search,
+	 * a splice and an O(n) reindex, so inserting 10 000 records into a 10 000-row
+	 * set was ~10⁸ operations. Design D had the right algorithm all along:
+	 * filter the batch, sort the batch, one merge pass — O(n + k log k) for a
+	 * whole page instead of O(n · k). D's only sin was its reactivity, fixed
+	 * below. See DESIGN.md.
 	 *
-	 * The key→index map is what makes that exact: with it, an arrival, a
-	 * replacement and a deletion are all maintainable, so a full re-derive is
-	 * needed ONLY when the set's identity changes (a different predicate or
-	 * order). There is no rebuild-vs-maintain judgement call left to tune.
+	 * Reactivity is a plain array plus a VERSION counter — the exact pattern
+	 * `records` uses, for the exact reason it uses it: `$state<T[]>` deep-proxies
+	 * every record pushed in (a proxy plus per-property signals each — measured
+	 * at ~1 GB for 20 000 records), and every splice invalidates every index
+	 * signal after it. One version signal gives readers the only dependency they
+	 * need: "the rows changed".
+	 *
+	 * Membership is a `Set` of keys. The key→position map is gone — it is the
+	 * thing that cannot survive insertions cheaply, and with batch merges nothing
+	 * needs positions.
 	 */
 	type Live = {
 		readonly rows: T[];
 		readonly deriving: boolean;
-		apply(record: T): void;
+		applyBatch(batch: T[]): void;
 		drop(key: string): void;
 		derive(): void;
 	};
 
 	function createLive(query: SetQuery): Live {
-		const rows = $state<T[]>([]);
+		let rows: T[] = [];
+		let version = $state(0);
 		let deriving = $state(false);
-		const index = new Map<string, number>();
+		const have = new Set<string>();
 		const match = options.matches;
-		const cmp = options.compare?.(query.order);
+		const base = options.compare?.(query.order);
+		/**
+		 * ⚑ PK tiebreak, so the order is TOTAL — the same guarantee the wire
+		 * contract demands of the backend. Without it, equal sort keys make row
+		 * positions merge-order-dependent and the client's order can disagree
+		 * with the server's between two fills of the same set.
+		 */
+		const cmp = base
+			? (a: T, b: T): number => {
+					const c = base(a, b);
+					if (c !== 0) return c;
+					const ka = io.keyOf(a);
+					const kb = io.keyOf(b);
+					return ka < kb ? -1 : ka > kb ? 1 : 0;
+				}
+			: undefined;
 
-		/** First position whose row sorts after `r`. */
-		function seek(r: T): number {
-			if (!cmp) return rows.length;
-			let lo = 0;
-			let hi = rows.length;
-			while (lo < hi) {
-				const mid = (lo + hi) >> 1;
-				if (cmp(rows[mid], r) <= 0) lo = mid + 1;
-				else hi = mid;
+		/** Merge a sorted run of new rows into `rows` — one pass, one allocation. */
+		function merge(adds: T[]): void {
+			if (adds.length === 0) return;
+			if (!cmp) {
+				for (const r of adds) rows.push(r);
+				return;
 			}
-			return lo;
+			adds.sort(cmp);
+			const merged = new Array<T>(rows.length + adds.length);
+			let i = 0;
+			let j = 0;
+			let o = 0;
+			while (i < rows.length && j < adds.length)
+				merged[o++] = cmp(rows[i], adds[j]) <= 0 ? rows[i++] : adds[j++];
+			while (i < rows.length) merged[o++] = rows[i++];
+			while (j < adds.length) merged[o++] = adds[j++];
+			rows = merged;
 		}
 
-		function reindexFrom(i: number): void {
-			for (let j = i; j < rows.length; j++) index.set(String(io.keyOf(rows[j])), j);
-		}
-
-		function removeAt(i: number): void {
-			index.delete(String(io.keyOf(rows[i])));
-			rows.splice(i, 1);
-			reindexFrom(i);
-		}
-
-		function insert(r: T): void {
-			const at = seek(r);
-			rows.splice(at, 0, r);
-			reindexFrom(at);
+		/**
+		 * One batch, one rule — covers arrival, replacement and disappearance.
+		 *
+		 * A record already present is stripped in a single filter pass and, if it
+		 * still matches, re-added through the merge — which is how a moved sort
+		 * position is handled without ever asking where it was. Re-fetching
+		 * records we already hold is the NORMAL case (every refresh page is one),
+		 * so the replace path must be batch-cheap, not per-record-clever.
+		 */
+		function applyBatch(batch: T[]): void {
+			const adds: T[] = [];
+			// A cursor source can re-emit a row at a page boundary; within one
+			// batch the first occurrence wins, or a key could be merged in twice.
+			const seen = new Set<string>();
+			let strip: Set<string> | null = null;
+			for (const r of batch) {
+				const key = String(io.keyOf(r));
+				if (seen.has(key)) continue;
+				seen.add(key);
+				const ok = !match || match(r, query);
+				if (have.has(key)) {
+					(strip ??= new Set()).add(key);
+					if (ok) adds.push(r);
+					else have.delete(key);
+				} else if (ok) {
+					have.add(key);
+					adds.push(r);
+				}
+			}
+			if (strip) {
+				const s = strip;
+				rows = rows.filter((r) => !s.has(String(io.keyOf(r))));
+			}
+			merge(adds);
+			if (strip || adds.length) version += 1;
 		}
 
 		return {
 			get rows() {
+				void version;
 				return rows;
 			},
 			get deriving() {
 				return deriving;
 			},
-			/**
-			 * One record, one rule. Covers arrival, replacement and disappearance —
-			 * a replaced record whose sort position moved is removed and reinserted,
-			 * which is why nothing here can drift out of order.
-			 */
-			apply(record: T) {
-				const key = String(io.keyOf(record));
-				const at = index.get(key);
-				const ok = !match || match(record, query);
-				if (at === undefined) {
-					if (ok) insert(record);
-					return;
-				}
-				if (!ok) {
-					removeAt(at);
-					return;
-				}
-				const moved =
-					cmp !== undefined &&
-					((at > 0 && cmp(rows[at - 1], record) > 0) ||
-						(at + 1 < rows.length && cmp(record, rows[at + 1]) > 0));
-				if (moved) {
-					removeAt(at);
-					insert(record);
-				} else {
-					rows[at] = record;
-				}
-			},
+			applyBatch,
 			drop(key: string) {
-				const at = index.get(key);
-				if (at !== undefined) removeAt(at);
+				if (!have.delete(key)) return;
+				rows = rows.filter((r) => String(io.keyOf(r)) !== key);
+				version += 1;
 			},
 			/**
 			 * The one irreducible O(cache) cost, and the only place a set is built
 			 * rather than maintained. Chunked across tasks so a large cache does not
-			 * stall the frame, publishing as it goes — partial data beats a spinner.
+			 * stall the frame, publishing each chunk as it lands — partial data
+			 * beats a spinner. Each chunk goes through `applyBatch`, so building IS
+			 * maintaining: sort the chunk, merge once.
 			 */
 			derive() {
+				rows = [];
+				have.clear();
+				version += 1;
 				const all = [...records.values()];
 				const CHUNK = 5_000;
 				deriving = true;
 				let i = 0;
 				const step = () => {
 					const end = Math.min(i + CHUNK, all.length);
+					const batch: T[] = [];
 					for (; i < end; i++) {
 						const r = all[i];
-						if (!match || match(r, query)) insert(r);
+						if (!match || match(r, query)) batch.push(r);
 					}
+					applyBatch(batch);
 					if (i < all.length) setTimeout(step, 0);
 					else deriving = false;
 				};
@@ -290,16 +326,15 @@ export function createCollection<
 	/**
 	 * Put records in the cache and maintain every live set with them.
 	 *
-	 * ⚑ No publish step, no cadence. Rows are `$state` arrays mutated in place,
-	 * so Svelte sees the appends directly and there is nothing left to schedule.
-	 * `PUBLISH_EVERY` and its interval successor both existed only to limit how
-	 * often an O(n) rebuild ran.
+	 * ⚑ The whole page goes to each live set as ONE batch — one sort of the
+	 * page, one merge pass, one version bump. Per-record application was E's
+	 * regression; per-batch is D's algorithm with working reactivity. There is
+	 * no publish cadence left to tune: a fill of k pages costs each set k
+	 * merges, not k rebuilds.
 	 */
 	function cache(list: T[]): void {
-		for (const r of list) {
-			records.set(String(io.keyOf(r)), r);
-			for (const l of live.values()) l.apply(r);
-		}
+		for (const r of list) records.set(String(io.keyOf(r)), r);
+		for (const l of live.values()) l.applyBatch(list);
 		recordsVersion += 1;
 	}
 
@@ -578,10 +613,9 @@ export function createCollection<
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
 		records.set(key, record);
-		// No special case: a replacement is a record change like any other, and
-		// `apply` moves it if its sort position changed. The rescan this used to
-		// force is exactly what the key→index map made unnecessary.
-		for (const l of live.values()) l.apply(record);
+		// No special case: a replacement is a batch of one, and the strip-and-
+		// remerge inside `applyBatch` moves it if its sort position changed.
+		for (const l of live.values()) l.applyBatch([record]);
 		recordsVersion += 1;
 	}
 

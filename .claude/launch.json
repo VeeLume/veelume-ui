@@ -1,0 +1,11 @@
+{
+	"version": "0.0.1",
+	"configurations": [
+		{
+			"name": "demo-browser",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["--filter", "veelume-ui-demo", "dev"],
+			"port": 1420
+		}
+	]
+}

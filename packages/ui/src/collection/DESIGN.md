@@ -1,8 +1,8 @@
 # The collection primitive — design history
 
 Five successive designs, written down because four of them failed for reasons
-that are not obvious from the outside, and because the fifth is **currently
-broken** in a way the fourth was not.
+that are not obvious from the outside. The fifth shipped broken, was diagnosed
+here, and now runs fixed — as E′ below.
 
 Read this before changing `index.svelte.ts`. Every approach below looked correct
 when written; most were disproved by measurement rather than by review.
@@ -171,6 +171,41 @@ choosing the wrong primitives for it.
 
 ---
 
+## E′ — live sets, maintained by batch *(current)*
+
+E's two bugs fixed by taking D's algorithm and B's reactivity:
+
+- **Batches, not records.** `cache()` hands the whole page to each live set as
+  one batch: filter it, sort it, one merge pass — O(n + k log k) per page where
+  E paid O(n · k). The key→position map is gone entirely; membership is a `Set`
+  and nothing needs positions, because a replacement is "strip in one filter
+  pass, re-add through the merge".
+- **Plain array + version counter**, the pattern `records` already used. One
+  signal instead of a proxy per record; `derive()` builds through the same
+  batch path, so building *is* maintaining.
+- **Comparator gets a PK tiebreak**, making the client order total — the same
+  guarantee the wire contract demands of the backend.
+
+**Measured, same machine, dev server, browser fixtures (E → E′):**
+
+| case | E | E′ |
+|---|---|---|
+| 10 000 → search "Jonas" → search "Kira" | 105 s | **≈ 350–400 ms per search** |
+| clear search (cache hit, set already held) | — | **93 ms** |
+| webview heap | ~1 GB @ 20k cached | **240 MB total** — *including* the 1.5M-row fixture dataset itself |
+
+**New finding, recorded for the windowing work:** flipping to `desc` cost
+13.7 s — and the collection is not where it went. The new set first derives
+~29k cached matches, then every fill page arrives *in front of* them
+(descending ids), and the stress list — unkeyed and fully rendered — rewrites
+the text of every DOM row below the insertion point, ~30k rows × 20 pages.
+Maintenance is O(page + n); the DOM strategy is O(rendered · pages). This is
+the standing argument for windowed rendering, and it interacts with the
+semantic change below (`view.all` returned 28 720 rows against a cap of
+10 000, because derivation answers from the whole cache).
+
+---
+
 ## Cross-cutting failure patterns
 
 Five things bit more than once. They are worth more than the designs.
@@ -214,9 +249,8 @@ harness artefacts.
 
 **Working:** the cache/set split, `stopped` instead of tracked `complete`,
 keyset accumulation, `matches` + `compare` as the definition of a set,
-chunked initial derivation, `createReveal`'s frame-budgeted rendering.
-
-**Broken:** the two bugs in E above.
+chunked initial derivation, `createReveal`'s frame-budgeted rendering, and —
+since E′ — batch-maintained live sets.
 
 **Designed, not built:**
 
@@ -240,7 +274,8 @@ is the consumer's business and `cap` governs fill depth only.
 
 ## The likely fixes for E
 
-Recorded so the next attempt does not rediscover them:
+Recorded so the next attempt would not rediscover them — and then applied:
+all of the below landed as E′.
 
 - **Drop `reindexFrom`.** A key→position map cannot survive insertions cheaply.
   Use a `Set` for membership and locate by binary search plus a short linear
