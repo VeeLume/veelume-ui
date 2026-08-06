@@ -154,9 +154,17 @@ export function createCollection<
 	let cachedCount = $state(0);
 
 	/**
-	 * Bumped only when an EXISTING record is replaced. Accumulation adds new keys
-	 * and leaves old rows untouched, which is what makes the hydration memo below
-	 * safe to extend rather than rebuild.
+	 * ⚑ Bumped by WRITES only, never by fetches.
+	 *
+	 * It started out bumping whenever a fetch replaced an already-cached record,
+	 * which sounded conservative and destroyed the memo below: searching within a
+	 * dataset re-fetches records you already hold, so 20 pages of 500 bumped it
+	 * 10 000 times and hydration went straight back to quadratic. Measured: a
+	 * 10 000-row query went from ~0.3s to ~13s.
+	 *
+	 * Staleness from a re-fetch is handled precisely instead — `run()` drops the
+	 * memo for a set it is rebuilding — so the only thing left that can make a
+	 * memoised row wrong is a write.
 	 */
 	let recordsEpoch = 0;
 
@@ -165,7 +173,6 @@ export function createCollection<
 		for (const r of list) {
 			const key = String(io.keyOf(r));
 			if (records[key] === undefined) cachedCount += 1;
-			else recordsEpoch += 1;
 			records[key] = r;
 		}
 	}
@@ -243,6 +250,10 @@ export function createCollection<
 		targetCap?: number
 	): Promise<void> {
 		const prev = sets[k];
+		// Rebuilding from scratch: the memo's rows describe the previous answer and
+		// would be reused as a prefix of the new one. Precise invalidation here is
+		// what lets `cache()` leave the epoch alone.
+		if (!append) memo.delete(k);
 		patchSet(k, { status: mode, error: undefined });
 		const epoch = writeEpoch;
 
@@ -442,16 +453,21 @@ export function createCollection<
 		 *
 		 * Anything else stays blank rather than guessing.
 		 */
-		const previewRows = (): T[] | null => {
+		/** Cheap test, so the flag costs nothing to read. */
+		const canPreview = (): boolean => {
 			const s = set();
-			if (s && s.keys.length > 0) return null;
-			if (s && s.status !== 'loading' && s.status !== 'idle') return null;
-			if (!lastReady || lastReady === k) return null;
-			const prevSet = sets[lastReady];
-			const prevDecl = declarations.get(lastReady);
+			if (s && s.keys.length > 0) return false;
+			if (s && s.status !== 'loading' && s.status !== 'idle') return false;
+			return !!lastReady && lastReady !== k && !!sets[lastReady];
+		};
+
+		const previewRows = (): T[] | null => {
+			if (!canPreview()) return null;
+			const prevSet = sets[lastReady!];
+			const prevDecl = declarations.get(lastReady!);
 			if (!prevSet || !prevDecl) return null;
 
-			const held = hydrate(lastReady, prevSet.keys);
+			const held = hydrate(lastReady!, prevSet.keys);
 			if (options.preview) {
 				const out: T[] = [];
 				for (const r of held) {
@@ -480,7 +496,7 @@ export function createCollection<
 			 * new question is worse than a spinner.
 			 */
 			get preview() {
-				return previewRows() !== null;
+				return canPreview();
 			},
 			get status() {
 				void ensure(scope, query);
