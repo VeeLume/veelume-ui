@@ -31,6 +31,16 @@ export * from './types.js';
 
 const DEFAULT_KEY = '__single__';
 /**
+ * Separator between a set key's scope part and query part. NUL cannot occur in
+ * an app-supplied scope key, so prefix matching by scope cannot collide with a
+ * scope whose key contains the separator. Written as an ESCAPE deliberately:
+ * this used to be a raw NUL byte in the source, which made grep and ripgrep
+ * classify the file as binary — and it silently disagreed with the plain
+ * space that `reload` and `evict` matched on, so scope-filtered invalidation
+ * and eviction never touched a set that had a query part.
+ */
+const SEP = '\u0000';
+/**
  * ⚑ The ENVELOPE, not a tunable — see DESIGN.md "The envelope". Below it, a
  * set is held whole and filtering/search/counts are local; above it, the set
  * reports `capped` and refinement pushes down into the query.
@@ -112,6 +122,15 @@ export function createCollection<
 	const records = new Map<string, T>();
 	let recordsVersion = $state(0);
 	/**
+	 * ⚑ Which records arrived under which scope. The fill or write that produced
+	 * a record knows its scope; the record itself cannot say — so without this,
+	 * a 2025 fill leaks into a live 2026 set the moment both exist, which is
+	 * exactly the cross-scope leak design C removed and E silently reintroduced.
+	 * Live sets are FED and DERIVED per scope; the record cache stays shared, so
+	 * `byKey` still answers across scopes.
+	 */
+	const scopeIndex = new Map<string, Set<string>>();
+	/**
 	 * ⚑ `$state.raw`, because a set holds a key array up to the cap.
 	 *
 	 * Plain `$state` deep-proxies it, so slicing 100 000 keys becomes 100 000
@@ -185,6 +204,8 @@ export function createCollection<
 	 * needs positions.
 	 */
 	type Live = {
+		/** The scope key this set belongs to — feeding is routed by it. */
+		readonly sk: string;
 		readonly rows: T[];
 		readonly deriving: boolean;
 		applyBatch(batch: T[]): void;
@@ -192,7 +213,7 @@ export function createCollection<
 		derive(): void;
 	};
 
-	function createLive(setKey: string, query: SetQuery): Live {
+	function createLive(setKey: string, sk: string, query: SetQuery): Live {
 		let rows: T[] = [];
 		let version = $state(0);
 		let deriving = $state(false);
@@ -287,6 +308,7 @@ export function createCollection<
 		}
 
 		const self: Live = {
+			sk,
 			get rows() {
 				subscribe();
 				void version;
@@ -313,7 +335,9 @@ export function createCollection<
 				rows = [];
 				have.clear();
 				version += 1;
-				const all = [...records.values()];
+				// Only THIS scope's records — scope membership is structural (which
+				// fill produced the record), not something `match` can decide.
+				const all = [...(scopeIndex.get(sk) ?? [])];
 				const CHUNK = 5_000;
 				deriving = true;
 				let i = 0;
@@ -323,8 +347,8 @@ export function createCollection<
 					const end = Math.min(i + CHUNK, all.length);
 					const batch: T[] = [];
 					for (; i < end; i++) {
-						const r = all[i];
-						if (!match || match(r, query)) batch.push(r);
+						const r = records.get(all[i]);
+						if (r !== undefined && (!match || match(r, query))) batch.push(r);
 					}
 					applyBatch(batch);
 					if (i < all.length) setTimeout(step, 0);
@@ -338,10 +362,10 @@ export function createCollection<
 
 	const live = new Map<string, Live>();
 
-	function liveFor(setKey: string, query: SetQuery): Live {
+	function liveFor(setKey: string, sk: string, query: SetQuery): Live {
 		let l = live.get(setKey);
 		if (!l) {
-			l = createLive(setKey, query);
+			l = createLive(setKey, sk, query);
 			live.set(setKey, l);
 			l.derive();
 		}
@@ -357,9 +381,16 @@ export function createCollection<
 	 * no publish cadence left to tune: a fill of k pages costs each set k
 	 * merges, not k rebuilds.
 	 */
-	function cache(list: T[]): void {
-		for (const r of list) records.set(String(io.keyOf(r)), r);
-		for (const l of live.values()) l.applyBatch(list);
+	function cache(list: T[], sk: string): void {
+		let idx = scopeIndex.get(sk);
+		if (!idx) scopeIndex.set(sk, (idx = new Set()));
+		for (const r of list) {
+			const key = String(io.keyOf(r));
+			records.set(key, r);
+			idx.add(key);
+		}
+		// Only live sets of the scope this fill ran under — see `scopeIndex`.
+		for (const l of live.values()) if (l.sk === sk) l.applyBatch(list);
 		recordsVersion += 1;
 	}
 
@@ -397,6 +428,7 @@ export function createCollection<
 		targetCap?: number
 	): Promise<void> {
 		const prev = sets[k];
+		const sk = keyFor(scope);
 		// Rebuilding from scratch: the memo's rows describe the previous answer and
 		// would be reused as a prefix of the new one. Precise invalidation here is
 		// what lets `cache()` leave the epoch alone.
@@ -426,7 +458,7 @@ export function createCollection<
 				if (!io.fetchAll) throw new Error('collection: io needs fetchAll or fetchPage');
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
-				cache(data);
+				cache(data, sk);
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
@@ -455,7 +487,7 @@ export function createCollection<
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				pages += 1;
 
-				cache(page.records);
+				cache(page.records, sk);
 				const before = keys.length;
 				for (const r of page.records) {
 					const key = io.keyOf(r);
@@ -519,7 +551,7 @@ export function createCollection<
 	/** A set's cache key: scope and declaration together, since both are identity. */
 	const setKeyFor = (scope: S, query: SetQuery): string => {
 		const q = queryKey(query);
-		return q ? `${keyFor(scope)} ${q}` : keyFor(scope);
+		return q ? `${keyFor(scope)}${SEP}${q}` : keyFor(scope);
 	};
 
 	/**
@@ -564,6 +596,7 @@ export function createCollection<
 
 	function view(scope: S, query: SetQuery = {}): ScopedView<T, K> {
 		const k = setKeyFor(scope, query);
+		const sk = keyFor(scope);
 		const set = () => sets[k];
 		return {
 			/**
@@ -578,7 +611,7 @@ export function createCollection<
 			 */
 			get all() {
 				void ensure(scope, query);
-				return liveFor(k, query).rows;
+				return liveFor(k, sk, query).rows;
 			},
 			get status() {
 				void ensure(scope, query);
@@ -588,7 +621,7 @@ export function createCollection<
 				return set()?.error;
 			},
 			get hasData() {
-				return liveFor(k, query).rows.length > 0;
+				return liveFor(k, sk, query).rows.length > 0;
 			},
 			get stopped() {
 				void ensure(scope, query);
@@ -597,7 +630,7 @@ export function createCollection<
 			get fetching() {
 				void ensure(scope, query);
 				const st = set()?.status;
-				return st === 'loading' || st === 'refreshing' || liveFor(k, query).deriving;
+				return st === 'loading' || st === 'refreshing' || liveFor(k, sk, query).deriving;
 			},
 			/** Derived, never stored — see the note on `stopped`. */
 			get complete() {
@@ -729,19 +762,11 @@ export function createCollection<
 	}
 
 	/**
-	 * Fold a record into the cache and into any set that already lists it.
-	 *
-	 * Note what it does NOT do: add the key to sets that do not have it. Whether
-	 * a new record belongs to a set carrying pushed-down predicates is a question
-	 * only the server can answer — see the note's open item.
+	 * Fold one record into the cache and its scope's live sets — a write result,
+	 * a deep link, a search hit. A batch of one through the same path fills use.
 	 */
-	function upsert(record: T): void {
-		const key = String(io.keyOf(record));
-		records.set(key, record);
-		// No special case: a replacement is a batch of one, and the strip-and-
-		// remerge inside `applyBatch` moves it if its sort position changed.
-		for (const l of live.values()) l.applyBatch([record]);
-		recordsVersion += 1;
+	function upsert(record: T, scope: S): void {
+		cache([record], keyFor(scope));
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
@@ -773,7 +798,7 @@ export function createCollection<
 			if (!d) continue;
 			// A scope-tagged event only touches that scope's sets; an untagged one
 			// (stibu's events carry neither id nor scope) touches all of them.
-			if (prefix !== null && k !== prefix && !k.startsWith(`${prefix} `)) continue;
+			if (prefix !== null && k !== prefix && !k.startsWith(prefix + SEP)) continue;
 			void ensure(d.scope, d.query, true);
 		}
 	}
@@ -832,7 +857,7 @@ export function createCollection<
 		writesInFlight += 1;
 		try {
 			const saved = await w.save(key, payload, scope);
-			upsert(saved);
+			upsert(saved, scope);
 
 			// The server is authoritative, so the cache now holds the truth — but the
 			// caller's intent was not honoured, and staying silent about that is the
@@ -862,7 +887,7 @@ export function createCollection<
 		writesInFlight += 1;
 		try {
 			const made = await w.create(body, scope);
-			upsert(made);
+			upsert(made, scope);
 			// Safe only for the unfiltered set: whether a new record satisfies a
 			// pushed-down predicate is the server's answer, not ours.
 			joinSet(setKeyFor(scope, {}), io.keyOf(made));
@@ -963,8 +988,9 @@ export function createCollection<
 		 *  server-side search that belongs to no set we hold. */
 		async refreshOne(key: K): Promise<T> {
 			if (!io.fetchOne) throw new Error('collection: fetchOne not supplied');
-			const fresh = await io.fetchOne(key, scopeOf());
-			upsert(fresh);
+			const scope = scopeOf();
+			const fresh = await io.fetchOne(key, scope);
+			upsert(fresh, scope);
 			return fresh;
 		},
 
@@ -980,7 +1006,7 @@ export function createCollection<
 			const prefix = keyFor(arguments.length ? (scope as S) : scopeOf());
 			const next = { ...sets };
 			for (const k of Object.keys(next)) {
-				if (k === prefix || k.startsWith(`${prefix} `)) {
+				if (k === prefix || k.startsWith(prefix + SEP)) {
 					delete next[k];
 					declarations.delete(k);
 					live.delete(k);
@@ -995,6 +1021,7 @@ export function createCollection<
 		/** Drop cached records too. Separate because the two are separate. */
 		clearCache(): void {
 			records.clear();
+			scopeIndex.clear();
 			recordsVersion += 1;
 		},
 
