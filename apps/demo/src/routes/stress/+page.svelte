@@ -31,14 +31,28 @@
 	const CAPS = [200, 1000, 2000, 5000, 10000, 20000, 100000];
 	let cap = $state(10000);
 
-	/** Debounced, because it is server-stage and fires per keystroke. */
+	/**
+	 * ⚑ Only the TEXT FIELD debounces.
+	 *
+	 * Debouncing everything was lazy: a checkbox or a select is a single
+	 * deliberate act, and making the user wait 250ms for it to register feels
+	 * broken. Typing is the only input that fires per keystroke, so it is the only
+	 * one that needs holding back.
+	 */
 	let applied = $state({ search: '', kind: '', order: 'date', desc: false });
+
+	let debouncedSearch = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
-		const next = { search, kind, order, desc };
+		const next = search;
 		clearTimeout(timer);
-		timer = setTimeout(() => (applied = next), 250);
+		timer = setTimeout(() => (debouncedSearch = next), 250);
 		return () => clearTimeout(timer);
+	});
+
+	// Discrete controls land immediately; only `search` arrives via the debounce.
+	$effect(() => {
+		applied = { search: debouncedSearch, kind, order, desc };
 	});
 
 	const query = $derived({
