@@ -37,13 +37,16 @@ type Reactive = number | (() => number);
 
 export type RevealOptions = {
 	/**
-	 * What a single render is allowed to cost. Above this, slicing starts.
-	 * ~120ms is roughly where a UI stops feeling like it responded to you.
+	 * How long a frame may take before it counts as dropped. Under it the chunk
+	 * doubles, over it the chunk halves.
+	 *
+	 * ⚑ This replaced a `budgetMs` + `frameMs` pair that drove chunk size from a
+	 * measured cost-per-row. That model could not work: the only thing
+	 * observable between `requestAnimationFrame` callbacks is the frame
+	 * interval, so a small chunk always measures a whole frame and reports a
+	 * huge per-row cost, which shrinks the next chunk further.
 	 */
-	budgetMs?: Reactive;
-	/** Work handed to one frame while slicing. Under a 16ms frame, with room
-	 *  left for the browser's own work. */
-	frameMs?: Reactive;
+	overrunMs?: Reactive;
 	/** Rows in the first render, before anything has been measured. Small
 	 *  enough to be cheap on any row, large enough to time reliably. */
 	probe?: number;
@@ -61,17 +64,19 @@ export type Reveal = {
 };
 
 /**
- * Above this, a sample is not a row render — it is a teardown, a GC pause or a
- * backgrounded tab. Folding it into the average makes every later chunk tiny
- * and the reveal crawls, which is how a transient stall becomes permanent.
+ * A frame this long or longer means we overran and the user saw jank. Under it,
+ * we came in on time and can afford more. ~20ms allows 50fps.
  */
-const IMPLAUSIBLE_MS_PER_ROW = 20;
+const FRAME_OVERRUN_MS = 20;
+
+/** Never shrink below this — one row per frame is indistinguishable from a
+ *  hang, which is the failure this primitive is supposed to prevent. */
+const MIN_CHUNK = 25;
 
 export function createReveal(getTotal: () => number, options: RevealOptions = {}): Reveal {
 	const read = (v: Reactive | undefined, fallback: number): number =>
 		typeof v === 'function' ? v() : (v ?? fallback);
-	const budget = () => read(options.budgetMs, 120);
-	const frame = () => read(options.frameMs, 8);
+	const overrunMs = () => read(options.overrunMs, FRAME_OVERRUN_MS);
 	const probe = options.probe ?? 100;
 
 	let count = $state(0);
@@ -86,6 +91,22 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 	 */
 	let learned = 0;
 	let msPerRow = $state(0);
+
+	/**
+	 * ⚑ Chunk size is adapted directly; it is NOT derived from a per-row cost.
+	 *
+	 * Deriving it was a death spiral. The only thing measurable across
+	 * `requestAnimationFrame` callbacks is the FRAME INTERVAL, which is ~16.7ms
+	 * whatever the chunk size — so a small chunk measures a whole frame, reports
+	 * a huge ms/row, and shrinks the next chunk further. Observed live: 19.17
+	 * ms/row and a chunk of one row per frame, i.e. a list that never finishes.
+	 *
+	 * So: did we hold the frame or not? Under budget, grow. Over, shrink. The
+	 * signal is the thing actually cared about — dropped frames — and it cannot
+	 * run away, because overrunning is what shrinks it.
+	 */
+	let chunk = 0;
+	let lastFrameAt = 0;
 
 	const total = $derived(getTotal());
 
@@ -117,24 +138,34 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 		requestAnimationFrame(() => {
 			pending = false;
 
+			const now = performance.now();
+			const delta = lastFrameAt ? now - lastFrameAt : overrunMs();
+			lastFrameAt = now;
+
 			if (measurable && markedCount > 0) {
-				const per = (performance.now() - markedAt) / markedCount;
-				// Discard implausible samples rather than smoothing them in — one
-				// janky frame should not permanently shrink every later chunk.
-				if (per < IMPLAUSIBLE_MS_PER_ROW) {
-					learned = learned ? learned * 0.6 + per * 0.4 : per;
-					msPerRow = learned;
-				}
+				// Additive-ish growth, halving on overrun. Grows fast enough to reach
+				// thousands of rows within a few frames on a cheap list, and backs off
+				// immediately on an expensive one.
+				chunk =
+					delta < overrunMs()
+						? Math.min(markedCount * 2, 20_000)
+						: Math.max(MIN_CHUNK, Math.floor(markedCount / 2));
+				// Reported only. Nothing sizes itself from this any more.
+				const per = delta / markedCount;
+				learned = learned ? learned * 0.6 + per * 0.4 : per;
+				msPerRow = learned;
 			}
 			markedCount = 0;
 			measurable = false;
 
 			if (rendered >= lastTotal) return;
 
+			// One adapted chunk. Nothing here consults ms/row: doubling reaches
+			// 20 000 rows within ~8 healthy frames from a 100-row probe, so a cheap
+			// list finishes in well under the budget without needing a cost model,
+			// and an expensive one halves back without one either.
 			const remaining = lastTotal - rendered;
-			const perRow = learned || 0.02;
-			const next =
-				remaining * perRow <= budget() ? remaining : Math.max(1, Math.floor(frame() / perRow));
+			const next = Math.min(remaining, chunk || probe);
 
 			markedAt = performance.now();
 			markedCount = next;
@@ -177,13 +208,18 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 		// it was. Only a genuinely shorter list shrinks, and only to its length.
 		const keep = first ? 0 : Math.min(rendered, n);
 
-		const perRow = learned;
-		if (perRow && n * perRow <= budget()) {
+		// Small enough that slicing would be pure overhead. A row count, not a cost
+		// estimate — the estimate is what kept being wrong.
+		if (n <= probe) {
 			show(n);
 			return;
 		}
 
 		slicing = true;
+		// A fresh list re-probes rather than trusting a chunk size learned against
+		// different rows; a continued one keeps its pace.
+		if (keep === 0) chunk = probe;
+		lastFrameAt = 0;
 		const start = keep > 0 ? keep : Math.min(n, probe);
 		markedAt = performance.now();
 		markedCount = start;

@@ -57,10 +57,12 @@
 	 * Below the budget this does nothing at all; above it, the list fills in
 	 * across frames and the page stays interactive the whole time.
 	 */
-	let budgetMs = $state(120);
+	/** How long a frame may take before the reveal counts it as dropped and
+	 *  halves the chunk. Lower = smoother but slower to fill. */
+	let overrunMs = $state(20);
 	// A getter, not the value — the same rule `scope` follows on collections. As
-	// a plain value the budget control would be captured once and do nothing.
-	const reveal = createReveal(() => rows.length, { budgetMs: () => budgetMs });
+	// a plain value the control would be captured once and do nothing.
+	const reveal = createReveal(() => rows.length, { overrunMs: () => overrunMs });
 	const shown = $derived(reveal.count < rows.length ? rows.slice(0, reveal.count) : rows);
 
 	// ── instrumentation ────────────────────────────────────────────────────────
@@ -155,12 +157,12 @@
 			<input type="checkbox" bind:checked={desc} /> desc
 		</label>
 		<label class="flex items-center gap-1 text-sm">
-			budget
+			frame
 			<select
 				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-				bind:value={budgetMs}
+				bind:value={overrunMs}
 			>
-				{#each [16, 50, 120, 400, 10000] as n (n)}<option value={n}>{n} ms</option>{/each}
+				{#each [12, 20, 33, 100] as n (n)}<option value={n}>{n} ms</option>{/each}
 			</select>
 		</label>
 		<label class="flex items-center gap-1 text-sm">
@@ -203,7 +205,7 @@
 			</dd></div>
 		<div><dt class="text-xs text-muted-foreground">to paint</dt>
 			<dd class="tabular-nums">{paintMs ?? '…'} ms</dd></div>
-		<div><dt class="text-xs text-muted-foreground">ms / row</dt>
+		<div><dt class="text-xs text-muted-foreground">ms / row (info)</dt>
 			<dd class="tabular-nums">{reveal.msPerRow ? reveal.msPerRow.toFixed(3) : '…'}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">cached records</dt>
 			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>

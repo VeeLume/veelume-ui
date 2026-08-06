@@ -18,6 +18,8 @@
 //! That cost is the finding, not an accident to be optimised away. Generation
 //! is lazy (see `stress_commands`), so the other surfaces never pay it.
 
+use std::sync::Mutex;
+
 use serde::{Deserialize, Serialize};
 
 /// How many entries the stress dataset holds.
@@ -128,6 +130,14 @@ fn date_of(day: i32) -> String {
 }
 
 pub struct StressData {
+    /// Last match list, keyed by the query that produced it.
+    ///
+    /// Accumulating 20 000 rows at 500 per page is 40 calls, and each one was
+    /// re-scanning all 1.5M rows and re-sorting the matches - measured at 19.5s
+    /// for one search. A real database does this once and holds a cursor; the
+    /// memo is the cheap stand-in, and without it the backend's cost drowns
+    /// every client-side effect this surface exists to observe.
+    memo: Mutex<Option<(String, Vec<u32>)>>,
     rows: Vec<Entry>,
     /// Lowercased party, precomputed. Without it every search allocates 1.5M
     /// temporary strings per keystroke — which is a fixture artefact rather
@@ -161,7 +171,11 @@ impl StressData {
                 cents: (r1 % 500_000) as i32 - 50_000,
             });
         }
-        Self { rows, party_lc }
+        Self {
+            memo: Mutex::new(None),
+            rows,
+            party_lc,
+        }
     }
 
     /// Everything matching, as indices, in the requested order.
@@ -199,6 +213,21 @@ impl StressData {
 
     /// Keyset paging over the ordered match list: the cursor is the last row's
     /// id and the next page starts *after* it.
+    /// Matching ids for a query, reusing the previous answer when it is the
+    /// same query - which, during an accumulation, it always is.
+    fn hits_for(&self, search: &str, kind: &str, order: &str, desc: bool) -> Vec<u32> {
+        let key = format!("{search}|{kind}|{order}|{desc}");
+        let mut memo = self.memo.lock().unwrap();
+        if let Some((k, hits)) = memo.as_ref() {
+            if *k == key {
+                return hits.clone();
+            }
+        }
+        let hits = self.matching(search, kind, order, desc);
+        *memo = Some((key, hits.clone()));
+        hits
+    }
+
     pub fn page(
         &self,
         search: &str,
@@ -208,7 +237,7 @@ impl StressData {
         limit: i32,
         cursor: Option<String>,
     ) -> EntryPage {
-        let hits = self.matching(search, kind, order, desc);
+        let hits = self.hits_for(search, kind, order, desc);
 
         let start = match cursor.and_then(|c| c.parse::<i32>().ok()) {
             Some(id) => hits

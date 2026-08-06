@@ -90,6 +90,25 @@ function data(): Entry[] {
 	return rows;
 }
 
+/**
+ * Last match list, keyed by its query.
+ *
+ * ⚑ Accumulating 20 000 rows at 500 per page is 40 calls, and each one was
+ * re-scanning 1.5M rows and re-sorting the matches — 19.5s for a single search.
+ * A real database does the work once and holds a cursor; this memo is the cheap
+ * stand-in, and without it the backend's cost drowns every client-side effect
+ * this surface exists to observe.
+ */
+let memo: { key: string; hits: number[] } | null = null;
+
+function hitsFor(search: string, kind: string, order: string, desc: boolean): number[] {
+	const key = `${search}|${kind}|${order}|${desc}`;
+	if (memo && memo.key === key) return memo.hits;
+	const hits = matching(search, kind, order, desc);
+	memo = { key, hits };
+	return hits;
+}
+
 /** Matching ids in the requested order — a full scan plus a sort of the hits.
  *  Honest work; if it is slow, that is the finding. */
 function matching(search: string, kind: string, order: string, desc: boolean): number[] {
@@ -121,7 +140,7 @@ export const stressFixtures: FixtureModule = {
 	 *  the next page starts after it. */
 	stress_page: (payload) => {
 		const all = data();
-		const hits = matching(
+		const hits = hitsFor(
 			String(payload.search ?? ''),
 			String(payload.kind ?? ''),
 			String(payload.order ?? ''),
