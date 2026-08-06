@@ -248,6 +248,13 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 		},
 		container(node: HTMLElement) {
 			box = node;
+			// ⚑ Scroll anchoring fights a windowed list. Every pad update makes the
+			// browser re-anchor scrollTop to keep visible content stationary — so
+			// during a thumb drag the mouse and the thumb drift apart, the browser
+			// correcting one way while the hand pulls the other. The window owns
+			// the position bookkeeping; the browser must not second-guess it.
+			const prevAnchor = node.style.overflowAnchor;
+			node.style.overflowAnchor = 'none';
 			const onScroll = () => schedule();
 			node.addEventListener('scroll', onScroll, { passive: true });
 			const ro = new ResizeObserver(() => schedule());
@@ -256,6 +263,7 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 			return () => {
 				node.removeEventListener('scroll', onScroll);
 				ro.disconnect();
+				node.style.overflowAnchor = prevAnchor;
 				if (box === node) box = null;
 			};
 		},
