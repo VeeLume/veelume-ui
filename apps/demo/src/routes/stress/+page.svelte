@@ -146,6 +146,10 @@
 		{#if warmMs !== null}
 			<span class="text-xs text-muted-foreground">generated in {warmMs} ms</span>
 		{/if}
+		<!-- The same data through the kit's real surfaces — the archetypes the
+		     hand-rolled instrument below deliberately bypasses. -->
+		<a class="ml-auto text-sm underline underline-offset-2" href="/stress/list">list archetype</a>
+		<a class="text-sm underline underline-offset-2" href="/stress/catalog">catalog archetype</a>
 	</header>
 
 	<!-- Controls. Plain, because the point is the numbers below them. -->
