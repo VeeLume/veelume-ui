@@ -13,6 +13,8 @@
  * throws `rune_outside_svelte` at runtime. `svelte-check` does NOT catch it.
  */
 
+import { createSubscriber } from 'svelte/reactivity';
+
 import type {
 	ChangeInfo,
 	CollectionIO,
@@ -187,13 +189,26 @@ export function createCollection<
 		derive(): void;
 	};
 
-	function createLive(query: SetQuery): Live {
+	function createLive(setKey: string, query: SetQuery): Live {
 		let rows: T[] = [];
 		let version = $state(0);
 		let deriving = $state(false);
 		const have = new Set<string>();
 		const match = options.matches;
 		const base = options.compare?.(query.order);
+		/**
+		 * ⚑ Maintenance is tied to OBSERVATION. Every live set is offered every
+		 * arriving record forever, so under E each search term left an immortal
+		 * set behind and maintenance cost scaled with history, not with the
+		 * screen. `createSubscriber` tells us when the last reactive reader
+		 * leaves; the set then forgets itself. It is a cache of a cache — the
+		 * records stay, the declaration stays, and rebuilding is one derive.
+		 */
+		const subscribe = createSubscriber(() => {
+			return () => {
+				live.delete(setKey);
+			};
+		});
 		/**
 		 * ⚑ PK tiebreak, so the order is TOTAL — the same guarantee the wire
 		 * contract demands of the backend. Without it, equal sort keys make row
@@ -266,12 +281,14 @@ export function createCollection<
 			if (strip || adds.length) version += 1;
 		}
 
-		return {
+		const self: Live = {
 			get rows() {
+				subscribe();
 				void version;
 				return rows;
 			},
 			get deriving() {
+				subscribe();
 				return deriving;
 			},
 			applyBatch,
@@ -296,6 +313,8 @@ export function createCollection<
 				deriving = true;
 				let i = 0;
 				const step = () => {
+					// Dropped (or replaced) while deriving: stop filling a corpse.
+					if (live.get(setKey) !== self) return;
 					const end = Math.min(i + CHUNK, all.length);
 					const batch: T[] = [];
 					for (; i < end; i++) {
@@ -309,6 +328,7 @@ export function createCollection<
 				step();
 			}
 		};
+		return self;
 	}
 
 	const live = new Map<string, Live>();
@@ -316,7 +336,7 @@ export function createCollection<
 	function liveFor(setKey: string, query: SetQuery): Live {
 		let l = live.get(setKey);
 		if (!l) {
-			l = createLive(query);
+			l = createLive(setKey, query);
 			live.set(setKey, l);
 			l.derive();
 		}
@@ -878,6 +898,9 @@ export function createCollection<
 				writesInFlight,
 				writeEpoch,
 				sets: Object.keys(sets),
+				/** Sets actually being MAINTAINED — observed ones. The difference
+				 *  against `sets` is the lifecycle working. */
+				liveSets: [...live.keys()],
 				cached: records.size
 			};
 		}

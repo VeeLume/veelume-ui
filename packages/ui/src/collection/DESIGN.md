@@ -185,6 +185,12 @@ E's two bugs fixed by taking D's algorithm and B's reactivity:
   batch path, so building *is* maintaining.
 - **Comparator gets a PK tiebreak**, making the client order total — the same
   guarantee the wire contract demands of the backend.
+- **Maintenance is tied to observation** (landed just after the above).
+  `createSubscriber` tells a live set when its last reactive reader leaves; it
+  then deletes itself from the maintenance map. Records stay, the declaration
+  stays, and a return visit is one re-derive — measured at **36 ms** to rebuild
+  a 28 700-row set from cache. The stress panel now shows `live sets`, which
+  hovers at 1 where E accumulated one immortal set per search term.
 
 **Measured, same machine, dev server, browser fixtures (E → E′):**
 
@@ -254,9 +260,6 @@ since E′ — batch-maintained live sets.
 
 **Designed, not built:**
 
-- **Drop unsubscribed sets.** Maintenance scales with set count, and every search
-  term creates a set. Only sets something is reading should be maintained; the
-  rest are a cache of a cache and cost nothing to forget.
 - **Deletion.** Three tiers: we did it (remove by key) · the backend event
   carries keys (`ChangeInfo.keys` exists and is unused) · neither, in which case
   the fill reconciles the **key interval** it covered. Absence is only meaningful

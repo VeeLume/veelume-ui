@@ -223,6 +223,11 @@
 			<dd class="tabular-nums">{reveal.msPerRow ? reveal.msPerRow.toFixed(3) : '…'}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">cached records</dt>
 			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>
+		<!-- Sets being MAINTAINED right now. Should hover at 1–2: this page reads
+		     one set at a time, and every set beyond that is paying maintenance
+		     for nobody. Climbing with search history means the lifecycle broke. -->
+		<div><dt class="text-xs text-muted-foreground">live sets</dt>
+			<dd class="tabular-nums">{entries.debug.liveSets.length}</dd></div>
 	</dl>
 
 	{#if view.fetching && !view.complete}
