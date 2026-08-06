@@ -30,6 +30,9 @@ export * from './types.js';
 const DEFAULT_KEY = '__single__';
 const DEFAULT_CAP = 2000;
 const DEFAULT_PAGE = 500;
+/** Pages between progress publishes. Every page is quadratic downstream; only
+ *  at the end is invisible until it finishes. */
+const PUBLISH_EVERY = 8;
 
 /**
  * Canonical encoding of a set's declaration.
@@ -250,17 +253,21 @@ export function createCollection<
 				// which would turn our bug into a silent truncation.
 				stalled = !exhausted && gained === 0;
 
-				// ⚑ Publish the FIRST page only, then go quiet until the end.
+				// ⚑ Publish periodically AND yield, and the yield is the load-bearing
+				// half.
 				//
-				// Publishing every page looks like progressive painting and is
-				// quadratic: each publish rebuilds the whole key→record array
-				// downstream, so 40 pages of 500 cost ~800k record lookups and 40
-				// array builds. Measured at 5.6s for a 20 000-row accumulation whose
-				// actual IPC cost was 13ms — the client was the entire bill.
+				// Publishing every page is quadratic — each one rebuilds the whole
+				// key→record array downstream, so 40 pages of 500 cost ~800k record
+				// lookups (measured: 5.6s for an accumulation whose IPC cost was
+				// 13ms). But publishing rarely is not enough on its own, because
+				// every `await` here resolves into a MICROTASK: the browser paints
+				// between tasks, never between microtasks, so a loop of immediately-
+				// resolving fetches completes without a single frame. Rows were being
+				// published early and staying invisible until the end.
 				//
-				// One early publish still gets rows on screen fast, which is the only
-				// part the user could perceive anyway.
-				if (pages === 1) {
+				// So: publish on a cadence, and hand the browser a real task each
+				// time so it can actually draw what was published.
+				if (pages === 1 || pages % PUBLISH_EVERY === 0) {
 					patchSet(k, {
 						keys: [...keys],
 						fetchedCount: fetched,
@@ -269,6 +276,9 @@ export function createCollection<
 						complete: exhausted,
 						status: 'refreshing'
 					});
+					// setTimeout, not requestAnimationFrame: rAF never fires in a hidden
+					// document and would stall the whole accumulation there.
+					await new Promise((r) => setTimeout(r, 0));
 				}
 			}
 
