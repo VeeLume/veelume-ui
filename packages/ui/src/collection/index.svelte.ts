@@ -30,16 +30,6 @@ export * from './types.js';
 const DEFAULT_KEY = '__single__';
 const DEFAULT_CAP = 2000;
 const DEFAULT_PAGE = 500;
-/**
- * Pages between progress publishes.
- *
- * ⚑ Was 8, to limit how often the whole key→record array got rebuilt. With
- * derivation incremental, catching up costs a filter over one page plus a linear
- * merge — so publishing every page is affordable again, and it is what makes the
- * border between filling the cache and updating the view smooth instead of
- * arriving in three lumps.
- */
-const PUBLISH_EVERY = 1;
 
 /**
  * Canonical encoding of a set's declaration.
@@ -165,101 +155,152 @@ export function createCollection<
 
 	/** Put records in the cache. The one way anything enters it. */
 	/**
-	 * Put records in the cache WITHOUT notifying, recording them as pending so the
-	 * next publish can derive incrementally rather than rescanning.
+	 * ⚑ A LIVE SET: rows derived once, then maintained in place.
+	 *
+	 * The rows array is `$state` and is *mutated*, never replaced. That is the
+	 * whole point. Handing Svelte a fresh array on every fill page made every
+	 * downstream stage — merge, slice, each-block walk, reveal restart — cost
+	 * O(rows already on screen), so a fill of k pages cost O(k · n) and the UI
+	 * stuttered k times. Mutating in place costs O(what changed).
+	 *
+	 * The key→index map is what makes that exact: with it, an arrival, a
+	 * replacement and a deletion are all maintainable, so a full re-derive is
+	 * needed ONLY when the set's identity changes (a different predicate or
+	 * order). There is no rebuild-vs-maintain judgement call left to tune.
+	 */
+	type Live = {
+		readonly rows: T[];
+		readonly deriving: boolean;
+		apply(record: T): void;
+		drop(key: string): void;
+		derive(): void;
+	};
+
+	function createLive(query: SetQuery): Live {
+		const rows = $state<T[]>([]);
+		let deriving = $state(false);
+		const index = new Map<string, number>();
+		const match = options.matches;
+		const cmp = options.compare?.(query.order);
+
+		/** First position whose row sorts after `r`. */
+		function seek(r: T): number {
+			if (!cmp) return rows.length;
+			let lo = 0;
+			let hi = rows.length;
+			while (lo < hi) {
+				const mid = (lo + hi) >> 1;
+				if (cmp(rows[mid], r) <= 0) lo = mid + 1;
+				else hi = mid;
+			}
+			return lo;
+		}
+
+		function reindexFrom(i: number): void {
+			for (let j = i; j < rows.length; j++) index.set(String(io.keyOf(rows[j])), j);
+		}
+
+		function removeAt(i: number): void {
+			index.delete(String(io.keyOf(rows[i])));
+			rows.splice(i, 1);
+			reindexFrom(i);
+		}
+
+		function insert(r: T): void {
+			const at = seek(r);
+			rows.splice(at, 0, r);
+			reindexFrom(at);
+		}
+
+		return {
+			get rows() {
+				return rows;
+			},
+			get deriving() {
+				return deriving;
+			},
+			/**
+			 * One record, one rule. Covers arrival, replacement and disappearance —
+			 * a replaced record whose sort position moved is removed and reinserted,
+			 * which is why nothing here can drift out of order.
+			 */
+			apply(record: T) {
+				const key = String(io.keyOf(record));
+				const at = index.get(key);
+				const ok = !match || match(record, query);
+				if (at === undefined) {
+					if (ok) insert(record);
+					return;
+				}
+				if (!ok) {
+					removeAt(at);
+					return;
+				}
+				const moved =
+					cmp !== undefined &&
+					((at > 0 && cmp(rows[at - 1], record) > 0) ||
+						(at + 1 < rows.length && cmp(record, rows[at + 1]) > 0));
+				if (moved) {
+					removeAt(at);
+					insert(record);
+				} else {
+					rows[at] = record;
+				}
+			},
+			drop(key: string) {
+				const at = index.get(key);
+				if (at !== undefined) removeAt(at);
+			},
+			/**
+			 * The one irreducible O(cache) cost, and the only place a set is built
+			 * rather than maintained. Chunked across tasks so a large cache does not
+			 * stall the frame, publishing as it goes — partial data beats a spinner.
+			 */
+			derive() {
+				const all = [...records.values()];
+				const CHUNK = 5_000;
+				deriving = true;
+				let i = 0;
+				const step = () => {
+					const end = Math.min(i + CHUNK, all.length);
+					for (; i < end; i++) {
+						const r = all[i];
+						if (!match || match(r, query)) insert(r);
+					}
+					if (i < all.length) setTimeout(step, 0);
+					else deriving = false;
+				};
+				step();
+			}
+		};
+	}
+
+	const live = new Map<string, Live>();
+
+	function liveFor(setKey: string, query: SetQuery): Live {
+		let l = live.get(setKey);
+		if (!l) {
+			l = createLive(query);
+			live.set(setKey, l);
+			l.derive();
+		}
+		return l;
+	}
+
+	/**
+	 * Put records in the cache and maintain every live set with them.
+	 *
+	 * ⚑ No publish step, no cadence. Rows are `$state` arrays mutated in place,
+	 * so Svelte sees the appends directly and there is nothing left to schedule.
+	 * `PUBLISH_EVERY` and its interval successor both existed only to limit how
+	 * often an O(n) rebuild ran.
 	 */
 	function cache(list: T[]): void {
 		for (const r of list) {
 			records.set(String(io.keyOf(r)), r);
-			pending.push(r);
+			for (const l of live.values()) l.apply(r);
 		}
-	}
-
-	/**
-	 * ⚑ The append log is what makes derivation incremental.
-	 *
-	 * `addLog[v]` is the batch that became visible at version `v + 1`, so a memo
-	 * that last derived at version `m` needs exactly `addLog.slice(m)` to catch
-	 * up. Records only ever *arrive* during a fill, so catching up is a filter
-	 * over the new ones plus a merge — never a rescan of the cache.
-	 *
-	 * A REPLACEMENT (a write) cannot be merged: the record may already be in the
-	 * list and may now sort elsewhere. Those bump `fullInvalidateAt`, and any memo
-	 * older than that rescans. Writes are rare; fills are not.
-	 */
-	let pending: T[] = [];
-	const addLog: T[][] = [];
-	let fullInvalidateAt = 0;
-
-	/** Make cached records visible to derivations. Called at a publish point. */
-	function publishCache(): void {
-		if (!pending.length) return;
-		addLog.push(pending);
-		pending = [];
 		recordsVersion += 1;
-	}
-
-	/**
-	 * ⚑ Rows are DERIVED from the cache, not held by the set.
-	 *
-	 * A set fixes only `(predicate, order, cap)`; what it shows is whatever the
-	 * cache currently satisfies. That is what makes it live — a record arriving
-	 * for any other query, a write, or a delete all change every matching set for
-	 * free, with no key lists to maintain at each mutation site.
-	 *
-	 * The memo holds the FULL sorted match list, uncapped, and slices on the way
-	 * out. It has to: a capped memo has already discarded rows that a later
-	 * arrival could displace, so it could not be extended correctly.
-	 */
-	const derived = new Map<string, { version: number; rows: T[] }>();
-
-	function deriveRows(setKey: string, query: SetQuery, cap: number): T[] {
-		void recordsVersion;
-		const match = options.matches;
-		const cmp = options.compare?.(query.order);
-		const hit = derived.get(setKey);
-
-		let rows: T[];
-		if (hit && hit.version >= fullInvalidateAt && hit.version <= recordsVersion) {
-			if (hit.version === recordsVersion) {
-				rows = hit.rows;
-			} else {
-				// Incremental: filter only what arrived since, then merge two sorted
-				// runs. O(new log new + n) rather than O(cache log cache).
-				const fresh: T[] = [];
-				for (let v = hit.version; v < addLog.length; v++) {
-					for (const r of addLog[v]) if (!match || match(r, query)) fresh.push(r);
-				}
-				if (fresh.length === 0) {
-					rows = hit.rows;
-				} else if (!cmp) {
-					rows = hit.rows.concat(fresh);
-				} else {
-					fresh.sort(cmp);
-					rows = merge(hit.rows, fresh, cmp);
-				}
-			}
-		} else {
-			rows = [];
-			for (const r of records.values()) if (!match || match(r, query)) rows.push(r);
-			if (cmp) rows.sort(cmp);
-		}
-
-		derived.set(setKey, { version: recordsVersion, rows });
-		return rows.length > cap ? rows.slice(0, cap) : rows;
-	}
-
-	/** Two sorted runs into one. Linear, and the reason incremental merging beats
-	 *  re-sorting the whole list. */
-	function merge(a: T[], b: T[], cmp: (x: T, y: T) => number): T[] {
-		const out: T[] = new Array(a.length + b.length);
-		let i = 0;
-		let j = 0;
-		let o = 0;
-		while (i < a.length && j < b.length) out[o++] = cmp(a[i], b[j]) <= 0 ? a[i++] : b[j++];
-		while (i < a.length) out[o++] = a[i++];
-		while (j < b.length) out[o++] = b[j++];
-		return out;
 	}
 
 	/**
@@ -299,7 +340,6 @@ export function createCollection<
 		// Rebuilding from scratch: the memo's rows describe the previous answer and
 		// would be reused as a prefix of the new one. Precise invalidation here is
 		// what lets `cache()` leave the epoch alone.
-		if (!append) derived.delete(k);
 		patchSet(k, { status: mode, error: undefined });
 		const epoch = writeEpoch;
 
@@ -327,7 +367,6 @@ export function createCollection<
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				cache(data);
-				publishCache();
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
@@ -394,23 +433,12 @@ export function createCollection<
 				//
 				// So: publish on a cadence, and hand the browser a real task each
 				// time so it can actually draw what was published.
-				if (pages === 1 || pages % PUBLISH_EVERY === 0) {
-					publishCache();
-					patchSet(k, {
-						keys: [...keys],
-						fetchedCount: fetched,
-						total,
-						cursor,
-						stopped: exhausted ? 'exhausted' : undefined,
-						status: 'refreshing'
-					});
-					// setTimeout, not requestAnimationFrame: rAF never fires in a hidden
-					// document and would stall the whole accumulation there.
-					await new Promise((r) => setTimeout(r, 0));
-				}
+				// Hand the browser a task between pages so it can paint what the live
+				// sets already picked up. The maintenance itself is O(page), so this
+				// is a yield, not a publish.
+				await new Promise((r) => setTimeout(r, 0));
 			}
 
-			publishCache();
 			patchSet(k, {
 				keys,
 				fetchedCount: fetched,
@@ -477,17 +505,20 @@ export function createCollection<
 	function view(scope: S, query: SetQuery = {}): ScopedView<T, K> {
 		const k = setKeyFor(scope, query);
 		const set = () => sets[k];
-		const limit = query.cap ?? cap;
-
 		return {
 			/**
 			 * Derived, always. There is no loading state that hides rows: whatever
 			 * the cache can answer is shown immediately and the fill corrects it in
 			 * the background. Partial data beats a spinner.
 			 */
+			/**
+			 * The maintained array itself, not a copy. Capping is the consumer's
+			 * business now — `cap` governs how deep the FILL goes, and slicing here
+			 * would reintroduce an O(cap) copy on every read.
+			 */
 			get all() {
 				void ensure(scope, query);
-				return deriveRows(k, query, limit);
+				return liveFor(k, query).rows;
 			},
 			get status() {
 				void ensure(scope, query);
@@ -497,7 +528,7 @@ export function createCollection<
 				return set()?.error;
 			},
 			get hasData() {
-				return deriveRows(k, query, limit).length > 0;
+				return liveFor(k, query).rows.length > 0;
 			},
 			get stopped() {
 				void ensure(scope, query);
@@ -506,7 +537,7 @@ export function createCollection<
 			get fetching() {
 				void ensure(scope, query);
 				const st = set()?.status;
-				return st === 'loading' || st === 'refreshing';
+				return st === 'loading' || st === 'refreshing' || liveFor(k, query).deriving;
 			},
 			/** Derived, never stored — see the note on `stopped`. */
 			get complete() {
@@ -547,11 +578,11 @@ export function createCollection<
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
 		records.set(key, record);
-		// A replacement cannot be merged into a sorted list — it may already be in
-		// it and may now sort elsewhere. Force a rescan.
+		// No special case: a replacement is a record change like any other, and
+		// `apply` moves it if its sort position changed. The rescan this used to
+		// force is exactly what the key→index map made unnecessary.
+		for (const l of live.values()) l.apply(record);
 		recordsVersion += 1;
-		addLog.push([]);
-		fullInvalidateAt = recordsVersion;
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
@@ -785,7 +816,7 @@ export function createCollection<
 				if (k === prefix || k.startsWith(`${prefix} `)) {
 					delete next[k];
 					declarations.delete(k);
-					derived.delete(k);
+					live.delete(k);
 				}
 			}
 			sets = next;
@@ -797,7 +828,6 @@ export function createCollection<
 		/** Drop cached records too. Separate because the two are separate. */
 		clearCache(): void {
 			records.clear();
-			derived.clear();
 			recordsVersion += 1;
 		},
 
