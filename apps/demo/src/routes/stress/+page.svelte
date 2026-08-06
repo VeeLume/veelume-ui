@@ -18,6 +18,7 @@
 	 * parts to a server-stage set is the next piece of work, and pretending it
 	 * already worked would hide that.
 	 */
+	import { untrack } from 'svelte';
 	import { getKitContext, Button, createReveal } from '@veelume/ui';
 	import { entries, warmStress, KINDS, ORDERS, type Entry } from '$lib/stress.svelte';
 
@@ -66,7 +67,9 @@
 	let warmMs = $state<number | null>(null);
 	let queryMs = $state<number | null>(null);
 	let paintMs = $state<number | null>(null);
-	let lastKey = $state('');
+	/** Plain, not `$state`. An effect that reads and writes the same state is the
+	 *  textbook `effect_update_depth_exceeded`, and this one did exactly that. */
+	let lastKey = '';
 
 	const key = $derived(JSON.stringify(applied) + `|${cap}`);
 
@@ -86,12 +89,18 @@
 		const t0 = performance.now();
 		queryMs = null;
 		paintMs = null;
-		// Was this set already held at the depth we want? Read before the call,
-		// because the call is what changes the answer.
-		const before = entries.query(query);
-		cached = before.status === 'ready' && (before.complete || before.all.length >= cap);
 
-		entries.prefetch(undefined, query);
+		// ⚑ `untrack`, and it is not optional.
+		//
+		// Reading a collection view LAZILY FETCHES — `.all` and `.status` both call
+		// `ensure()`, which writes the set. Reading them tracked inside an effect
+		// means the write re-triggers the effect that caused it, forever. Nothing
+		// in the type system hints at this: it looks like reading a property.
+		untrack(() => {
+			const before = entries.query(query);
+			cached = before.status === 'ready' && (before.complete || before.all.length >= cap);
+			entries.prefetch(undefined, query);
+		});
 		queueMicrotask(() => {
 			const settle = () => {
 				const v = entries.query(query);

@@ -88,6 +88,18 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 	let pending = false;
 	let markedAt = 0;
 	let markedCount = 0;
+	/**
+	 * ⚑ Plain, and the guard is load-bearing.
+	 *
+	 * `total` comes from a getter the caller supplies, and in practice that getter
+	 * reads a collection view — whose read LAZILY FETCHES. So `total` recomputes
+	 * on every set mutation, the effect reruns, resets `count` to zero, and the
+	 * reveal restarts forever: `effect_update_depth_exceeded`.
+	 *
+	 * Only an actual change in length is a reason to re-plan. Recomputing to the
+	 * same number is not.
+	 */
+	let lastTotal = -1;
 
 	function schedule(): void {
 		if (pending) return;
@@ -127,6 +139,8 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 	$effect(() => {
 		// Re-reading `total` is what makes this restart when the list changes.
 		const n = total;
+		if (n === lastTotal) return;
+		lastTotal = n;
 		count = 0;
 		slicing = false;
 		if (n === 0) return;

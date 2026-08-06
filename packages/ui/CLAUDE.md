@@ -222,6 +222,14 @@ are one fact — passing it three times is three chances to disagree.
 
 Each of these type-checks clean and fails at runtime, or fails silently:
 
+- **⚑ Never read a collection view inside an `$effect` without `untrack`.**
+  `view.all` / `.status` / `.complete` lazily call `ensure()`, which writes the
+  set — so the effect re-triggers itself through the write it caused, and the
+  page freezes with `effect_update_depth_exceeded`. It looks like reading a
+  property and it type-checks. Safe in templates, where the read is a render
+  dependency; a landmine in effects. Pair `untrack()` with a **plain-variable**
+  guard (`if (n === last) return`) so a re-run on an unchanged value does not
+  re-plan — and never make that guard `$state`, or it becomes the same bug.
 - **Runes need `.svelte.ts`.** `$state` in a plain `.ts` passes `svelte-check`
   and throws `rune_outside_svelte` when it runs. No static check catches it.
 - **The consumer must tell Tailwind about this package.** It arrives through a
