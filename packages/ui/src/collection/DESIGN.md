@@ -1,0 +1,247 @@
+# The collection primitive — design history
+
+Five successive designs, written down because four of them failed for reasons
+that are not obvious from the outside, and because the fifth is **currently
+broken** in a way the fourth was not.
+
+Read this before changing `index.svelte.ts`. Every approach below looked correct
+when written; most were disproved by measurement rather than by review.
+
+The *project-level* why lives in the vault note `Programmieren/Projects/veelume-ui.md`.
+This file is the subsystem's own history.
+
+---
+
+## The problem
+
+A list surface needs, at the same time:
+
+- **client-side filtering and contextual counts** — which require holding the
+  whole matching set;
+- **1.5M rows** — which make holding the whole set impossible;
+- **a UI that stays responsive** while data arrives.
+
+Those three are in tension, and every design below is an attempt to resolve it.
+The test bed is `apps/demo/src/routes/stress`, a real 1.5M-record dataset over
+both transports.
+
+---
+
+## A — scope-keyed entries *(original)*
+
+```ts
+entries: Record<scopeKey, { data: T[]; status }>
+```
+
+One array per scope, replaced wholesale by `fetchAll`.
+
+**Why it went:** it cannot express partial data at all. `scope` was supposed to
+be the answer to unbounded collections — partition into units the user already
+thinks in (year, account) — but that only *delays* the problem: whether a
+partition is small enough is a property of the data you cannot know in advance.
+A year with 200 000 orders defeats it.
+
+It also conflated two things the rest of this history keeps separating: the
+records themselves, and the answer to a query.
+
+---
+
+## B — cache / working-set split, server-owned key lists
+
+```ts
+records: Map<key, T>                          // the cache
+sets:    Map<setKey, { keys: K[], total?, fetchedCount, complete, ... }>
+```
+
+Rows = `set.keys.map(k => records.get(k))`. The fetch produced the key list; the
+set *was* the server's answer.
+
+**What it got right, and what survives:** separating records from queries. Once
+split, a record fetched by id (deep link, search hit) is available to every set
+that should contain it, and a write upserts once rather than into every entry
+holding that record.
+
+**How it failed — four ways, all measured:**
+
+| symptom | cause |
+|---|---|
+| `loadMore()` silently did nothing | `cap` was part of the set key, so raising it built a *second* set while the view read the first |
+| 20 000-row accumulation took **5623 ms**; the IPC cost was **13 ms** | published after every page; each publish rebuilt the whole key→record array (~800k lookups) |
+| a 10 000-row query went **0.3 s → 13 s** | "conservatively" invalidating a hydration memo whenever a fetch replaced an already-cached record — and re-fetching records you already hold is the *normal* case, not the exception |
+| UI froze while a counter ticked up | `records` was a deep `$state` object: one reactive write per record, one dependency per key read. The counter moving *was* the render loop |
+
+**The lesson that repeats:** every one of those is *state maintained by hand at
+each mutation site*. None was a logic error; all were bookkeeping that drifted.
+
+It also left a question it could not answer: *after a create, does this record
+belong to a set with pushed-down predicates?* The client can evaluate local
+predicates but not server ones.
+
+---
+
+## C — rows derived from the cache *(pull, memoised)*
+
+```ts
+set  = (predicate, order, cap)     // the only fixed part
+rows = cache.filter(matches).sort(compare).slice(cap)
+fetch = a cache filler, not the set's contents
+```
+
+**Why:** it deletes the hand-maintained key lists, and with them the create
+question — a record matches the predicate or it does not. `preview`,
+`canPreview`, `lastReady` and a cross-scope leak all disappeared because
+"show local matches while loading" stopped being a special case and became the
+normal path.
+
+Also replaced tracked `complete` with `stopped: 'exhausted' | 'capped'` — a
+readout of why the last fill ended rather than an invariant needing three rules.
+That removed a real hole: completeness used to compare `fetched >= total`, and
+under over-fetch-and-filter-locally `total` counts the *wider* query.
+
+**How it failed:** deriving is O(cache), and the memo was keyed on a version
+bumped **per page**, so a 20-page fill did twenty full derivations over a growing
+cache — scan 49 000, filter, sort 6 000 matches, twenty times. **21 s, main
+thread blocked.**
+
+---
+
+## D — incremental derivation *(append log)*
+
+`addLog[v]` = the batch that became visible at version `v+1`. A memo last derived
+at version `m` needs exactly `addLog.slice(m)`: filter the new records, sort
+them, merge two sorted runs in linear time.
+
+**Why it was still not enough:** the merge *allocates a new array*, so every
+publish handed Svelte a fresh reference and every downstream stage re-walked
+everything:
+
+```
+derive merge          O(n)
+slice(0, cap)         O(cap)
+slice(0, reveal)      O(rendered)
+each-block walk       O(rendered)
+reveal restart        total changed
+```
+
+**Everything except the fetch scaled with what was already on screen.** A fill of
+k pages cost O(k · n) and interrupted the UI k times. That is why tuning
+`PUBLISH_EVERY` between 1 and 8 kept trading one bad behaviour for another:
+per-page publishing made *growth* smooth and the *frame rate* choppy; a coarse
+cadence did the reverse. A cadence only picks a point on the k axis — it cannot
+remove the k · n.
+
+---
+
+## E — live sets, maintained in place *(current — BROKEN)*
+
+```ts
+rows:  $state<T[]>        // mutated, never replaced
+index: Map<key, position>
+```
+
+Arrival → binary-search insert. Replacement → swap in place, or remove+reinsert
+if its sort position moved. Disappearance → remove by index. A full re-derive
+only when the set's *identity* changes.
+
+The intent: make a change cost O(what changed) rather than O(what is displayed),
+which removes the publish cadence entirely — Svelte sees the mutations, so there
+is nothing left to schedule.
+
+**⚑ It is worse than D, and measurably so.** Reproduction: load 10 000 → search
+"Jonas", let it settle → search "Kira". Query time **105 s**; the webview reached
+**~1 GB** for ~20 000 cached records.
+
+Two causes, both introduced by this design:
+
+1. **`reindexFrom(at)` walks from the insertion point to the end**, so every
+   insert is O(n). Inserting 10 000 records into a 10 000-row set is ~10⁸
+   operations. Compounded because **live sets are never dropped** — every search
+   term adds another set that must be offered every arriving record.
+2. **`$state<T[]>` deep-proxies.** Every record pushed in gets a Proxy plus
+   per-property signals, and every `splice` invalidates every index signal after
+   the insertion point. That is both the memory and a second source of the
+   freeze.
+
+Neither is a flaw in "maintain in place" as an idea. Both are the implementation
+choosing the wrong primitives for it.
+
+---
+
+## Cross-cutting failure patterns
+
+Five things bit more than once. They are worth more than the designs.
+
+**1. The instrument was the bug, three times.**
+- The stress page called `refresh()` (which forces), so it measured a cold fetch
+  every time and *never once exercised the cache* — which looked exactly like a
+  broken cache.
+- `createReveal` sized its chunks from the interval between `requestAnimationFrame`
+  callbacks. That interval is ~16.7 ms whatever the chunk contains, so a small
+  chunk measured a whole frame, reported a huge per-row cost, and shrank the next
+  chunk further: **19.17 ms/row and one row per frame**, a list that never
+  finishes.
+- The panel rendered `Object.keys(records).length`, building a 100 000-element
+  array on every render — which is why the UI stayed laggy *after* shrinking the
+  list, since the cache had not shrunk.
+
+**2. Type-checking proves almost nothing here.** `$state` in a plain `.ts` file
+passes `svelte-check` and throws `rune_outside_svelte` at runtime. Reading a
+collection view inside an `$effect` type-checks and produces
+`effect_update_depth_exceeded`, because the read *lazily fetches* and the write
+re-triggers the effect that caused it.
+
+**3. Conservative guards fire constantly.** "Invalidate whenever a fetch replaces
+a cached record" sounds safe and cost 13 s, because re-fetching records you
+already hold is the normal case. Precise invalidation at the one place staleness
+can occur beats a blanket rule.
+
+**4. What looks fine at 8 rows falls over at 100 000.** Every design here worked
+on `/loans`. `/stress` exists because nothing else in the demo could tell these
+approaches apart.
+
+**5. Measure the artefact that actually fails.** A production build and the dev
+server scan sources differently; a hidden browser tab clamps `setTimeout` to ~1 s
+and never fires `requestAnimationFrame`. Several numbers in this history were
+harness artefacts.
+
+---
+
+## Where it stands
+
+**Working:** the cache/set split, `stopped` instead of tracked `complete`,
+keyset accumulation, `matches` + `compare` as the definition of a set,
+chunked initial derivation, `createReveal`'s frame-budgeted rendering.
+
+**Broken:** the two bugs in E above.
+
+**Designed, not built:**
+
+- **Drop unsubscribed sets.** Maintenance scales with set count, and every search
+  term creates a set. Only sets something is reading should be maintained; the
+  rest are a cache of a cache and cost nothing to forget.
+- **Deletion.** Three tiers: we did it (remove by key) · the backend event
+  carries keys (`ChangeInfo.keys` exists and is unused) · neither, in which case
+  the fill reconciles the **key interval** it covered. Absence is only meaningful
+  inside a range the server enumerated. `FetchPage.from` exists for this and is
+  not yet consumed.
+- **Halting a superseded fill.** Suppressing its writes is easy; stopping a
+  1.5M-row scan so they do not queue behind each other is not.
+- **Eviction by age or reference.** Supersedes the old "explicit only, no LRU"
+  decision, which was taken when the cache was per-scope and small.
+
+**Known semantic change to watch:** `view.all` no longer applies `cap` — capping
+is the consumer's business and `cap` governs fill depth only.
+
+---
+
+## The likely fixes for E
+
+Recorded so the next attempt does not rediscover them:
+
+- **Drop `reindexFrom`.** A key→position map cannot survive insertions cheaply.
+  Use a `Set` for membership and locate by binary search plus a short linear
+  probe within the equal-sort-key run. Insert then costs O(log n) plus a native
+  splice memmove.
+- **Do not use `$state` for the rows array.** Use a plain array with a version
+  counter, exactly as `records` already does — mutation stays a memmove and
+  reactivity is one signal instead of a proxy per record.
