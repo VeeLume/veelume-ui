@@ -58,12 +58,13 @@ export type {
 	SurfaceState
 } from './surface/index.js';
 
-// ── L1: reveal ─────────────────────────────────────────────────────────────
-// Render to a paint BUDGET, not a row count. A fixed step is a guess about row
-// cost and it is wrong in both directions — 100k simple rows paint fine, a few
-// thousand expensive ones do not.
-export { createReveal } from './reveal/index.svelte.js';
-export type { Reveal, RevealOptions } from './reveal/index.svelte.js';
+// ── L1: window ─────────────────────────────────────────────────────────────
+// Render O(viewport), whatever the list holds. Supersedes the reveal: the
+// reveal throttled how fast rows ENTERED the DOM, but once entered they all
+// paid the update tax on every publish — measured at ~1 ms per rendered row
+// per fill during an order switch. Neutral below its threshold.
+export { createWindow } from './window/index.svelte.js';
+export type { ListWindow, WindowOptions } from './window/index.svelte.js';
 
 // ── L1: browse state ───────────────────────────────────────────────────────
 export { createBrowseState } from './browse/index.js';

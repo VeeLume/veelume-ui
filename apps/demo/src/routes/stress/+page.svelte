@@ -19,7 +19,7 @@
 	 * already worked would hide that.
 	 */
 	import { untrack } from 'svelte';
-	import { getKitContext, Button, createReveal } from '@veelume/ui';
+	import { getKitContext, Button, createWindow } from '@veelume/ui';
 	import { entries, warmStress, KINDS, ORDERS, type Entry } from '$lib/stress.svelte';
 
 	const kit = getKitContext();
@@ -66,18 +66,13 @@
 	const rows = $derived(view.all);
 
 	/**
-	 * Render to a paint budget rather than a row count — the point Valerie made:
-	 * past a target, the answer is a better rendering strategy, not a freeze.
-	 * Below the budget this does nothing at all; above it, the list fills in
-	 * across frames and the page stays interactive the whole time.
+	 * Viewport windowing — the better rendering strategy the reveal was standing
+	 * in for. The DOM holds ~a viewport of rows however many the set derives, so
+	 * a fill page costs O(window) in the DOM instead of O(everything rendered) —
+	 * which is what made an order switch cost 35 s at 35k rendered rows.
 	 */
-	/** How long a frame may take before the reveal counts it as dropped and
-	 *  halves the chunk. Lower = smoother but slower to fill. */
-	let overrunMs = $state(20);
-	// A getter, not the value — the same rule `scope` follows on collections. As
-	// a plain value the control would be captured once and do nothing.
-	const reveal = createReveal(() => rows.length, { overrunMs: () => overrunMs });
-	const shown = $derived(reveal.count < rows.length ? rows.slice(0, reveal.count) : rows);
+	const win = createWindow(() => rows.length, { estimate: 33 });
+	const shown = $derived(rows.slice(win.start, win.end));
 
 	// ── instrumentation ────────────────────────────────────────────────────────
 	let warmMs = $state<number | null>(null);
@@ -171,15 +166,6 @@
 			<input type="checkbox" bind:checked={desc} /> desc
 		</label>
 		<label class="flex items-center gap-1 text-sm">
-			frame
-			<select
-				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-				bind:value={overrunMs}
-			>
-				{#each [12, 20, 33, 100] as n (n)}<option value={n}>{n} ms</option>{/each}
-			</select>
-		</label>
-		<label class="flex items-center gap-1 text-sm">
 			cap
 			<select
 				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
@@ -203,11 +189,12 @@
 			<dd class="tabular-nums">{kit.format.number(view.total ?? 0)}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">fetched</dt>
 			<dd class="tabular-nums">{kit.format.number(view.fetchedCount)}</dd></div>
+		<!-- DOM rows, not derived rows. With the window this stays ~a viewport
+		     however many rows the set holds — which is the whole point. -->
 		<div><dt class="text-xs text-muted-foreground">rendered</dt>
 			<dd class="tabular-nums">
-				{kit.format.number(reveal.count)}{#if reveal.slicing}<span
-						class="text-xs text-muted-foreground"> · filling</span
-					>{/if}
+				{kit.format.number(shown.length)}<span class="text-xs text-muted-foreground">
+					of {kit.format.number(rows.length)}</span>
 			</dd></div>
 		<div><dt class="text-xs text-muted-foreground">complete</dt>
 			<dd class={view.complete ? '' : 'text-destructive'}>{view.complete}</dd></div>
@@ -219,8 +206,8 @@
 			</dd></div>
 		<div><dt class="text-xs text-muted-foreground">to paint</dt>
 			<dd class="tabular-nums">{paintMs ?? '…'} ms</dd></div>
-		<div><dt class="text-xs text-muted-foreground">ms / row (info)</dt>
-			<dd class="tabular-nums">{reveal.msPerRow ? reveal.msPerRow.toFixed(3) : '…'}</dd></div>
+		<div><dt class="text-xs text-muted-foreground">window</dt>
+			<dd class="tabular-nums">{win.start}–{win.end}</dd></div>
 		<div><dt class="text-xs text-muted-foreground">cached records</dt>
 			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>
 		<!-- Sets being MAINTAINED right now. Should hover at 1–2: this page reads
@@ -271,7 +258,10 @@
 		</div>
 	{/if}
 
-	<div class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
+	<div
+		class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card"
+		{@attach win.container}
+	>
 		{#if view.fetching && rows.length === 0}
 			<!-- Only when there is genuinely nothing to show. With `stale` in play
 			     that is now rare: a filter change keeps the previous rows up as a
@@ -282,24 +272,20 @@
 		{:else if rows.length === 0}
 			<p class="p-6 text-center text-sm text-muted-foreground">{kit.labels.empty()}</p>
 		{:else}
-			<!-- Rows still all land in the DOM eventually; what changed is that they
-			     arrive across frames when they exceed the budget, so the page never
-			     stalls waiting for one enormous commit. -->
 			<!--
-				⚑ UNKEYED, deliberately.
+				⚑ UNKEYED, deliberately — and doubly right under a window.
 
-				Keyed by id, changing the sort order destroys and recreates every row
-				— thousands of nodes in one commit, which is the chug. Unkeyed, the
-				each-block reuses the DOM and updates text in place, so a reorder
-				costs property writes rather than allocation.
-
-				Safe here because these rows carry no per-row component state and no
+				Keyed by id, scrolling or reordering destroys and recreates nodes;
+				unkeyed, the ~viewport of <li>s is reused and only text updates.
+				Safe because these rows carry no per-row component state and no
 				transitions: position IS the identity. A row with an input in it
 				would need the key back.
 			-->
-			<ul>
-				{#each shown as r}
+			<ul style:padding-top="{win.padTop}px" style:padding-bottom="{win.padBottom}px">
+				{#each shown as r, i}
 					<li
+						data-index={win.start + i}
+						{@attach win.item}
 						class="flex items-baseline gap-3 border-b border-border px-3 py-1.5 text-sm
 						       last:border-b-0"
 					>

@@ -261,14 +261,26 @@ re-observation. Related: the subscription failure path was silently swallowed
 (`void promise` with no catch), which made "listener never registered" look
 identical to "events broken" — error paths that cannot speak cost sessions.
 
+**7. A corrupted toolchain wears a code bug's face perfectly.** An abruptly
+killed dev server left a partial Vite dependency pre-bundle; the next server
+served a split module graph — two Svelte runtime copies — and every scoped
+surface rendered its empty state while unscoped ones worked, which read
+exactly like a scope-routing regression. Hours went into bisecting working-
+tree changes that were all innocent: the tree reverted to a commit VERIFIED
+working still failed. The tell, in hindsight: kit labels silently fell back to
+English defaults — context lookups fail across runtime copies, and data
+plumbed through context dies with them. When a bisect reaches "identical code,
+different behaviour", stop bisecting code: purge `.vite` and `.svelte-kit`,
+reinstall, and re-test before believing anything.
+
 ---
 
 ## Where it stands
 
 **Working:** the cache/set split, `stopped` instead of tracked `complete`,
 keyset accumulation, `matches` + `compare` as the definition of a set,
-chunked initial derivation, `createReveal`'s frame-budgeted rendering, and —
-since E′ — batch-maintained live sets.
+chunked initial derivation, `createWindow`'s viewport rendering (which
+retired `createReveal`), and — since E′ — batch-maintained live sets.
 
 **Built since (2026-08): deletion, tiers 1 and 2.**
 
@@ -307,6 +319,33 @@ Measured over Tauri (debug build): a search that costs ~1.5 s clean cost
 - **`[profile.dev.package.veelume-ui-demo] opt-level = 2`** — the debug-build
   scan cost ~1.5 s where release costs ~100 ms, making every dev-mode /stress
   number a harness artefact (failure pattern 5 again).
+
+**Built since (2026-08): windowed rendering (`createWindow`).**
+
+The order-switch measurements above ended the reveal era: once entered, every
+rendered row paid the update tax on every fill page, so query time scaled with
+the DOM (~1 ms per rendered row per fill) rather than with the data.
+`createWindow` renders O(viewport): scroll-driven window, measured row heights
+through one shared `ResizeObserver` (a catalog bundle expanding in place
+re-measures automatically), estimate-based pads, and — the load-bearing
+property — **neutrality below its threshold**: a seven-row loans list renders
+byte-for-byte as before, pads zero, nothing measured. `Surface.List` windows
+by default with no new props; the stress page consumes the L1 primitive
+directly. Measured in the browser: the desc flip fell 13.7 s → 181 ms with 22
+DOM rows where 28 700 used to rewrite twenty times. It supersedes
+`createReveal`, deleted.
+
+Two lessons from building it, both nearly casebook-grade:
+
+- The first version put `$effect(() => { void count(); schedule(); })` in the
+  primitive — `count()` reads a collection view, which is the documented
+  landmine, now demonstrated to apply to LIBRARY primitives reading consumer
+  deriveds, not just app effects. The shipped design is effect-free: getters
+  capture the count during the consumer's tracked reads and schedule an async
+  catch-up; `requestAnimationFrame` is used for alignment only, never for
+  progress (a visible-but-not-compositing document fires no frames and is not
+  `document.hidden` — found as a window frozen at 0–22 under a scrollTop of
+  165 000).
 
 **Designed, not built:**
 

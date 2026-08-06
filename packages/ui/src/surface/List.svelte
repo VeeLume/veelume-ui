@@ -17,6 +17,7 @@
 	import ListHeader from './ListHeader.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
+	import { createWindow } from '../window/index.svelte.js';
 	import type { Row } from './types.js';
 	import type { Action } from '../actions/types.js';
 	import type { Status } from '../collection/index.svelte.js';
@@ -52,6 +53,12 @@
 	const kit = getKitContext();
 
 	const openKey = $derived(selected !== undefined ? selected : s.selected);
+
+	// Viewport windowing — neutral below its threshold, so a short list renders
+	// exactly as before. Engages by size, not by prop: a rendering strategy is
+	// the kit's business, not a flag the consumer has to remember.
+	const win = createWindow(() => s.visible.length);
+	const windowed = $derived(s.visible.slice(win.start, win.end));
 
 	const rowClass = (isSelected: boolean) =>
 		'flex w-full items-baseline gap-2 border-b border-border px-3 py-2 text-left text-sm ' +
@@ -102,7 +109,7 @@
 		</div>
 	{/if}
 
-	<div class="min-h-0 flex-1 overflow-auto">
+	<div class="min-h-0 flex-1 overflow-auto" {@attach win.container}>
 		{#if status === 'loading'}
 			<p class="p-4 text-sm text-muted-foreground">{kit.labels.loading()}</p>
 		{:else if status === 'error'}
@@ -114,10 +121,10 @@
 				<p class="p-6 text-center text-sm text-muted-foreground">{kit.labels.empty()}</p>
 			{/if}
 		{:else}
-			<ul>
-				{#each s.visible as r (r.key)}
+			<ul style:padding-top="{win.padTop}px" style:padding-bottom="{win.padBottom}px">
+				{#each windowed as r, i (r.key)}
 					{@const isSelected = openKey === r.key}
-					<li>
+					<li data-index={win.start + i} {@attach win.item}>
 						{#if row}
 							{@render row(r, isSelected)}
 						{:else if r.href}
