@@ -16,6 +16,7 @@
  *     collection's write layer deliberately does not try to own them.
  */
 
+import { emit } from '@tauri-apps/api/event';
 import type { FixtureModule } from './types.js';
 
 export type LoanStatus = 'draft' | 'out' | 'returned' | 'lost' | 'archived';
@@ -69,6 +70,16 @@ function find(year: string, id: string): Loan {
 	return loan;
 }
 
+/**
+ * The invalidation channel, exactly as the Rust twin emits it. `mockIPC`'s
+ * `shouldMockEvents` makes `emit` reach the app's `listen` — which is what
+ * lets a browser drive the collection's whole keyed-invalidation path.
+ * Fire-and-forget: a fixture must not couple its response to event delivery.
+ */
+function changed(year: string, kind: 'create' | 'update' | 'delete', keys: string[]): void {
+	void emit('loans-changed', { kind, keys, year });
+}
+
 export const loanFixtures: FixtureModule = {
 	loans_list: (payload) => (byYear[String(payload.year)] ?? []).map((l) => ({ ...l })),
 
@@ -110,23 +121,29 @@ export const loanFixtures: FixtureModule = {
 		const i = list.findIndex((l) => l.id === body.id);
 		if (i < 0) throw new Error(`loan ${body.id} not found`);
 		list[i] = { ...body };
+		changed(year, 'update', [body.id]);
 		return { ...list[i] };
 	},
 
 	/** 1 — soft delete. Returns the record. */
 	loans_return: (payload) => {
-		const loan = find(String(payload.year), String(payload.id));
+		const year = String(payload.year);
+		const loan = find(year, String(payload.id));
 		loan.status = 'returned';
+		changed(year, 'update', [loan.id]);
 		return { ...loan };
 	},
 
-	/** 2 — hard delete. Drafts only, and returns nothing. */
+	/** 2 — hard delete. Drafts only, and returns nothing. The keyed `delete`
+	 *  event is tier-2 deletion: any OTHER client holding this record learns of
+	 *  its absence without a refetch. */
 	loans_cancel: (payload) => {
 		const year = String(payload.year);
 		const id = String(payload.id);
 		const loan = find(year, id);
 		if (loan.status !== 'draft') throw new Error('only a draft can be cancelled');
 		byYear[year] = byYear[year].filter((l) => l.id !== id);
+		changed(year, 'delete', [id]);
 		return null;
 	},
 
@@ -145,13 +162,18 @@ export const loanFixtures: FixtureModule = {
 		original.status = 'lost';
 		original.replaced_by = replacement.id;
 		byYear[year] = [...byYear[year], replacement];
+		// Both ids: the closed original AND the issued replacement — which is
+		// what makes the counter-document work over keyed refresh.
+		changed(year, 'update', [original.id, replacement.id]);
 		return { ...replacement };
 	},
 
 	/** 4 — soft, terminal. Returns nothing. */
 	loans_archive: (payload) => {
-		const loan = find(String(payload.year), String(payload.id));
+		const year = String(payload.year);
+		const loan = find(year, String(payload.id));
 		loan.status = 'archived';
+		changed(year, 'update', [loan.id]);
 		return null;
 	},
 

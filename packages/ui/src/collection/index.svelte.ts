@@ -161,7 +161,13 @@ export function createCollection<
 	 * lets us discard such a result instead of letting it clobber.
 	 */
 	let writeEpoch = 0;
-	let pendingInvalidation: ChangeInfo<K, S> | null | undefined;
+	/**
+	 * A QUEUE, not a single collapsed entry. When events were only ever "reload
+	 * everything", keeping the last one was enough; a keyed delete arriving
+	 * beside a keyed update must not overwrite it. Redundant reloads in the
+	 * drained queue still collapse — `ensure` dedupes through `inflight`.
+	 */
+	let pendingInvalidations: (ChangeInfo<K, S> | undefined)[] = [];
 	let unsubscribe: Unsubscribe | null = null;
 	let subscribing = false;
 
@@ -228,9 +234,28 @@ export function createCollection<
 		 * leaves; the set then forgets itself. It is a cache of a cache — the
 		 * records stay, the declaration stays, and rebuilding is one derive.
 		 */
+		/**
+		 * ⚑ Forgetting is DEFERRED, and the grace period is load-bearing.
+		 *
+		 * The subscriber count transiently crosses zero during re-renders (a
+		 * scope switch destroys the old effects before the new ones attach), and
+		 * deleting synchronously on that crossing split the brain: the template
+		 * kept rendering instance A while a recreated B took its place in the
+		 * map — every later event then mutated a set nobody rendered. Found via
+		 * a keyed delete that logged `rows 7 → 6` while the DOM showed 7.
+		 * Re-observation within the grace period cancels the drop.
+		 */
+		let forget: ReturnType<typeof setTimeout> | undefined;
 		const subscribe = createSubscriber(() => {
+			if (forget !== undefined) {
+				clearTimeout(forget);
+				forget = undefined;
+			}
 			return () => {
-				live.delete(setKey);
+				forget = setTimeout(() => {
+					// Identity check: an evict may have replaced us already.
+					if (live.get(setKey) === self) live.delete(setKey);
+				}, 1_000);
 			};
 		});
 		/**
@@ -406,6 +431,9 @@ export function createCollection<
 			.then((un) => {
 				unsubscribe = un;
 			})
+			// Loud, deliberately: a silently-failed subscription looks exactly like
+			// "invalidation is broken" and costs a debugging session to find.
+			.catch((e) => console.error('collection: subscribe failed', e))
 			.finally(() => {
 				subscribing = false;
 			});
@@ -803,24 +831,79 @@ export function createCollection<
 		}
 	}
 
+	/**
+	 * Remove records locally — the cache, the scope index, every live set, and
+	 * the working-set bookkeeping (mirroring `joinSet`'s increments). No fetch:
+	 * this is the path where absence is KNOWN, either because this client
+	 * deleted (tier 1, `discard`) or the backend event named the keys (tier 2).
+	 */
+	function removeLocal(keys: K[]): void {
+		if (!keys.length) return;
+		const strip = new Set(keys.map(String));
+		for (const k of strip) records.delete(k);
+		for (const idx of scopeIndex.values()) for (const k of strip) idx.delete(k);
+		for (const l of live.values()) for (const k of strip) l.drop(k);
+		let next: Record<string, WorkingSet<K>> | null = null;
+		for (const [k, set] of Object.entries(sets)) {
+			const kept = set.keys.filter((x) => !strip.has(String(x)));
+			const removed = set.keys.length - kept.length;
+			if (!removed) continue;
+			(next ??= { ...sets })[k] = {
+				...set,
+				keys: kept,
+				fetchedCount: Math.max(0, set.fetchedCount - removed),
+				total: set.total === undefined ? undefined : Math.max(0, set.total - removed)
+			};
+		}
+		if (next) sets = next;
+		recordsVersion += 1;
+	}
+
+	/**
+	 * One change event, routed by how much it says:
+	 *
+	 *  - `delete` + keys  → remove locally, fetch nothing.
+	 *  - keys + `fetchOne` → refresh exactly those records; a key the server no
+	 *    longer answers for falls back to a reload, which self-heals.
+	 *  - anything less    → reload the affected sets, as always.
+	 */
+	function handleChange(info?: ChangeInfo<K, S> | null): void {
+		if (info?.keys?.length) {
+			if (info.kind === 'delete') {
+				removeLocal(info.keys);
+				return;
+			}
+			if (io.fetchOne) {
+				const scope = info.scope !== undefined ? info.scope : scopeOf();
+				for (const key of info.keys) {
+					io.fetchOne(key, scope).then(
+						(fresh) => upsert(fresh, scope),
+						() => reload(info)
+					);
+				}
+				return;
+			}
+		}
+		reload(info);
+	}
+
 	function onInvalidated(info?: ChangeInfo<K, S>): void {
 		if (writesInFlight > 0) {
 			// Defer, per the spike: a naive reload starts a fetch before the write
-			// commits and can serve pre-write state. Several events collapse into
-			// one pending entry — one write emitted THREE events in the spike.
-			pendingInvalidation = info ?? null;
+			// commits and can serve pre-write state.
+			pendingInvalidations.push(info);
 			return;
 		}
-		reload(info);
+		handleChange(info);
 	}
 
 	function settleWrite(): void {
 		writesInFlight -= 1;
 		writeEpoch += 1;
-		if (writesInFlight === 0 && pendingInvalidation !== undefined) {
-			const info = pendingInvalidation;
-			pendingInvalidation = undefined;
-			reload(info);
+		if (writesInFlight === 0 && pendingInvalidations.length) {
+			const drained = pendingInvalidations;
+			pendingInvalidations = [];
+			for (const info of drained) handleChange(info);
 		}
 	}
 
@@ -996,6 +1079,16 @@ export function createCollection<
 
 		save,
 		create,
+
+		/**
+		 * Tier-1 deletion: WE did it. The app just performed a delete the server
+		 * confirmed, so the records leave the cache and every live set locally —
+		 * no refetch, no event required. The server stays authoritative: this is
+		 * only ever called AFTER it answered.
+		 */
+		discard(...keys: K[]): void {
+			removeLocal(keys);
+		},
 
 		/**
 		 * Drop working sets. Records stay cached — they are shared, and a set is

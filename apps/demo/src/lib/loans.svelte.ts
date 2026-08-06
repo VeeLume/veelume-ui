@@ -6,13 +6,20 @@
  * grow monotonically and will need exactly this.
  *
  * Only `save` goes through the collection's write layer, because only `save` is
- * a record-shaped update. The four closers are separate commands followed by
- * `refresh()` — stibu's "write through the API, reload after".
+ * a record-shaped update. The four closers are separate commands; what used to
+ * be "write through the API, reload after" is now event-driven — the backend
+ * emits `loans-changed` with kind + keys, and the collection refreshes exactly
+ * the records named (or removes them locally, for a keyed delete).
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { createCollection } from '@veelume/ui';
 import type { Loan } from './fixtures/loans.js';
+
+/** What both backends put on the `loans-changed` event. Mirrors `ChangeInfo`,
+ *  with the scope under its domain name. */
+type LoanChange = { kind?: 'create' | 'update' | 'delete'; keys?: string[]; year?: string };
 
 /** The year the surface is looking at. Set from the URL by the page; the
  *  collection reads it through a getter, so switching is just another entry. */
@@ -46,7 +53,17 @@ export const loans = createCollection<Loan, string, string>(
 		write: {
 			semantics: 'replace',
 			save: (_id, body, year) => invoke('loans_save', { body, year })
-		}
+		},
+		/**
+		 * Backend invalidation, from both transports: Rust emits after each
+		 * mutation, the fixtures emit through the mocked event bus. A keyed
+		 * `delete` removes locally with no refetch; keyed updates refresh just
+		 * those records; anything less reloads the year's sets.
+		 */
+		subscribe: async (onChange) =>
+			listen<LoanChange>('loans-changed', (e) =>
+				onChange({ kind: e.payload.kind, keys: e.payload.keys, scope: e.payload.year })
+			)
 	},
 	{ scope: () => currentYear, cap: capFromUrl || 5, pageSize: 3 }
 );
@@ -62,28 +79,32 @@ export async function createLoan(): Promise<string> {
 	return loan.id;
 }
 
-/** 1 — soft delete: status change, returns the record. */
+/** 1 — soft delete: status change, returns the record. The keyed `update`
+ *  event refreshes exactly this record — no full reload anymore. */
 export async function returnLoan(id: string): Promise<void> {
 	await invoke('loans_return', { id, year: currentYear });
-	await loans.refresh();
 }
 
-/** 2 — hard delete: drafts only, returns nothing. */
+/** 2 — hard delete: drafts only, returns nothing.
+ *
+ *  Tier-1 deletion: WE did it, so `discard` drops the record locally the
+ *  moment the server confirms. The backend's keyed `delete` event (tier 2)
+ *  lands right after and finds nothing left to remove — idempotent by
+ *  design, and the second tier is what covers OTHER writers' deletes. */
 export async function cancelLoan(id: string): Promise<void> {
 	await invoke('loans_cancel', { id, year: currentYear });
-	await loans.refresh();
+	loans.discard(id);
 }
 
 /** 3 — counter-document: closes the original, issues a replacement, returns
- *  the NEW record. The one shape that cannot be modelled as a deletion at all. */
+ *  the NEW record. The one shape that cannot be modelled as a deletion at all
+ *  — the keyed event carries BOTH ids, and both records refresh. */
 export async function markLost(id: string): Promise<string> {
 	const replacement = await invoke<Loan>('loans_mark_lost', { id, year: currentYear });
-	await loans.refresh();
 	return replacement.id;
 }
 
 /** 4 — soft, terminal: returns nothing. */
 export async function archiveLoan(id: string): Promise<void> {
 	await invoke('loans_archive', { id, year: currentYear });
-	await loans.refresh();
 }

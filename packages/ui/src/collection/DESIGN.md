@@ -249,6 +249,18 @@ server scan sources differently; a hidden browser tab clamps `setTimeout` to ~1 
 and never fires `requestAnimationFrame`. Several numbers in this history were
 harness artefacts.
 
+**6. A destructive teardown on a reactive lifecycle is a split brain waiting
+to happen.** The first set-lifecycle implementation deleted the live set the
+moment `createSubscriber` reported zero observers — but the count transiently
+crosses zero during re-renders (a scope switch destroys old effects before new
+ones attach), so the template kept rendering instance A while a recreated B
+took its place in the map, and every later event mutated a set nobody
+rendered. A keyed delete that logged `rows 7 → 6` against a DOM stuck at 7 is
+what exposed it. The fix is a grace period: schedule the forget, cancel it on
+re-observation. Related: the subscription failure path was silently swallowed
+(`void promise` with no catch), which made "listener never registered" look
+identical to "events broken" — error paths that cannot speak cost sessions.
+
 ---
 
 ## Where it stands
@@ -258,13 +270,26 @@ keyset accumulation, `matches` + `compare` as the definition of a set,
 chunked initial derivation, `createReveal`'s frame-budgeted rendering, and —
 since E′ — batch-maintained live sets.
 
+**Built since (2026-08): deletion, tiers 1 and 2.**
+
+- Tier 1 — we did it: `discard(...keys)` removes locally after the server
+  confirmed a delete this client initiated. Loans' `cancel` uses it.
+- Tier 2 — the event carries keys: `ChangeInfo` gained `kind`, and a
+  `delete` + keys event removes from the cache, the scope index, every live
+  set and the working-set bookkeeping — no refetch. Keys with any other kind
+  refresh exactly those records via `fetchOne` (a key the server no longer
+  answers falls back to a reload, which self-heals); keyless events reload as
+  before. The deferral queue is now a real queue — collapsing several pending
+  events into one entry was fine when every event meant "reload", and loses a
+  delete the moment it doesn't.
+- Both transports emit `loans-changed` (Rust `Emitter`, fixtures through the
+  mocked event bus), so the whole chain runs in a plain browser.
+
 **Designed, not built:**
 
-- **Deletion.** Three tiers: we did it (remove by key) · the backend event
-  carries keys (`ChangeInfo.keys` exists and is unused) · neither, in which case
-  the fill reconciles the **key interval** it covered. Absence is only meaningful
-  inside a range the server enumerated. `FetchPage.from` exists for this and is
-  not yet consumed.
+- **Deletion, tier 3.** No keys from the backend: the fill reconciles the
+  **key interval** it covered. Absence is only meaningful inside a range the
+  server enumerated. `FetchPage.from` exists for this and is not yet consumed.
 - **Halting a superseded fill.** Suppressing its writes is easy; stopping a
   1.5M-row scan so they do not queue behind each other is not.
 - **Eviction by age or reference.** Supersedes the old "explicit only, no LRU"

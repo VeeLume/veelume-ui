@@ -129,7 +129,9 @@ async loansReturn(id: string, year: string) : Promise<Result<Loan, string>> {
 }
 },
 /**
- * 2 — hard delete. Drafts only, returns nothing.
+ * 2 — hard delete. Drafts only, returns nothing. The keyed `delete` event is
+ * tier-2 deletion: any OTHER client holding this record learns of its absence
+ * without a refetch.
  */
 async loansCancel(id: string, year: string) : Promise<Result<null, string>> {
     try {

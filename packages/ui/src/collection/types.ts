@@ -48,7 +48,19 @@ export type Unsubscribe = () => void;
 
 /** What a backend tells us changed. Everything is optional: stibu's events
  *  carry neither scope nor keys, and the collection degrades to "reload all". */
-export type ChangeInfo<K, S> = { scope?: S; keys?: K[] };
+export type ChangeInfo<K, S> = {
+	scope?: S;
+	keys?: K[];
+	/**
+	 * What happened, when the backend can say.
+	 *
+	 * `delete` + keys is the tier-2 deletion path: the records are removed from
+	 * the cache and every live set locally, with NO refetch. Other kinds with
+	 * keys refresh just those records via `fetchOne`. Absent — or keys absent —
+	 * the collection degrades to reloading the affected sets, exactly as before.
+	 */
+	kind?: 'create' | 'update' | 'delete';
+};
 
 /**
  * Write semantics are DECLARED, not assumed.

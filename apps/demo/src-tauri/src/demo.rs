@@ -175,6 +175,16 @@ pub struct LoanPage {
     pub done: bool,
 }
 
+/// What goes on the `loans-changed` event — the kit's `ChangeInfo`, with the
+/// scope under its domain name. `kind: "delete"` + keys is tier-2 deletion:
+/// the frontend removes those records locally without a refetch.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct LoanChange {
+    pub kind: String,
+    pub keys: Vec<String>,
+    pub year: String,
+}
+
 const BORROWERS: [&str; 5] = ["Petra", "Norbert", "Dr. Nagel", "Markus", "Anja"];
 const STATUSES: [&str; 6] = ["draft", "out", "out", "returned", "lost", "archived"];
 

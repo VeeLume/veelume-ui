@@ -9,11 +9,26 @@
 //! With one-word names camelCase and snake_case are identical and the question
 //! cannot arise.
 
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::demo::{
-    DemoState, Edition, Loan, LoanPage, Preferences, Probe, ProbePage, ProbePatch, ShelfEntry,
+    DemoState, Edition, Loan, LoanChange, LoanPage, Preferences, Probe, ProbePage, ProbePatch,
+    ShelfEntry,
 };
+
+/// Emit the invalidation event the loans collection subscribes to. Mirrors the
+/// fixture backend's `changed()` — fire-and-forget, a command's response must
+/// not couple to event delivery.
+fn loans_changed(app: &AppHandle, year: &str, kind: &str, keys: Vec<String>) {
+    let _ = app.emit(
+        "loans-changed",
+        LoanChange {
+            kind: kind.into(),
+            keys,
+            year: year.into(),
+        },
+    );
+}
 
 // ── probes ─────────────────────────────────────────────────────────────────
 
@@ -190,7 +205,12 @@ pub fn loans_list(state: State<'_, DemoState>, year: String) -> Vec<Loan> {
 /// collection's write layer.
 #[tauri::command]
 #[specta::specta]
-pub fn loans_save(state: State<'_, DemoState>, body: Loan, year: String) -> Result<Loan, String> {
+pub fn loans_save(
+    app: AppHandle,
+    state: State<'_, DemoState>,
+    body: Loan,
+    year: String,
+) -> Result<Loan, String> {
     let mut data = state.0.lock().unwrap();
     let list = data.loans_mut(&year).ok_or("unknown year")?;
     let i = list
@@ -198,13 +218,19 @@ pub fn loans_save(state: State<'_, DemoState>, body: Loan, year: String) -> Resu
         .position(|l| l.id == body.id)
         .ok_or_else(|| format!("loan {} not found", body.id))?;
     list[i] = body.clone();
+    loans_changed(&app, &year, "update", vec![body.id.clone()]);
     Ok(body)
 }
 
 /// 1 — soft delete. Returns the record.
 #[tauri::command]
 #[specta::specta]
-pub fn loans_return(state: State<'_, DemoState>, id: String, year: String) -> Result<Loan, String> {
+pub fn loans_return(
+    app: AppHandle,
+    state: State<'_, DemoState>,
+    id: String,
+    year: String,
+) -> Result<Loan, String> {
     let mut data = state.0.lock().unwrap();
     let list = data.loans_mut(&year).ok_or("unknown year")?;
     let loan = list
@@ -212,13 +238,22 @@ pub fn loans_return(state: State<'_, DemoState>, id: String, year: String) -> Re
         .find(|l| l.id == id)
         .ok_or("loan not found")?;
     loan.status = "returned".into();
-    Ok(loan.clone())
+    let out = loan.clone();
+    loans_changed(&app, &year, "update", vec![id]);
+    Ok(out)
 }
 
-/// 2 — hard delete. Drafts only, returns nothing.
+/// 2 — hard delete. Drafts only, returns nothing. The keyed `delete` event is
+/// tier-2 deletion: any OTHER client holding this record learns of its absence
+/// without a refetch.
 #[tauri::command]
 #[specta::specta]
-pub fn loans_cancel(state: State<'_, DemoState>, id: String, year: String) -> Result<(), String> {
+pub fn loans_cancel(
+    app: AppHandle,
+    state: State<'_, DemoState>,
+    id: String,
+    year: String,
+) -> Result<(), String> {
     let mut data = state.0.lock().unwrap();
     let list = data.loans_mut(&year).ok_or("unknown year")?;
     let i = list
@@ -229,6 +264,7 @@ pub fn loans_cancel(state: State<'_, DemoState>, id: String, year: String) -> Re
         return Err("only a draft can be cancelled".into());
     }
     list.remove(i);
+    loans_changed(&app, &year, "delete", vec![id]);
     Ok(())
 }
 
@@ -237,6 +273,7 @@ pub fn loans_cancel(state: State<'_, DemoState>, id: String, year: String) -> Re
 #[tauri::command]
 #[specta::specta]
 pub fn loans_mark_lost(
+    app: AppHandle,
     state: State<'_, DemoState>,
     id: String,
     year: String,
@@ -258,13 +295,21 @@ pub fn loans_mark_lost(
     list[i].status = "lost".into();
     list[i].replaced_by = Some(replacement.id.clone());
     list.push(replacement.clone());
+    // Both ids: the closed original AND the issued replacement — which is what
+    // makes the counter-document work over keyed refresh.
+    loans_changed(&app, &year, "update", vec![id, replacement.id.clone()]);
     Ok(replacement)
 }
 
 /// 4 — soft, terminal. Returns nothing.
 #[tauri::command]
 #[specta::specta]
-pub fn loans_archive(state: State<'_, DemoState>, id: String, year: String) -> Result<(), String> {
+pub fn loans_archive(
+    app: AppHandle,
+    state: State<'_, DemoState>,
+    id: String,
+    year: String,
+) -> Result<(), String> {
     let mut data = state.0.lock().unwrap();
     let list = data.loans_mut(&year).ok_or("unknown year")?;
     let loan = list
@@ -272,6 +317,7 @@ pub fn loans_archive(state: State<'_, DemoState>, id: String, year: String) -> R
         .find(|l| l.id == id)
         .ok_or("loan not found")?;
     loan.status = "archived".into();
+    loans_changed(&app, &year, "update", vec![id]);
     Ok(())
 }
 
