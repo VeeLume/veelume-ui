@@ -135,17 +135,6 @@ export function createCollection<
 	 * lets us discard such a result instead of letting it clobber.
 	 */
 	let writeEpoch = 0;
-	/**
-	 * ⚑ The last set that reached `ready`, so a NEW set can show it while it
-	 * loads.
-	 *
-	 * `refreshing` already stops a revalidation from blanking good data, but it
-	 * only covers the same set. Changing a filter makes a DIFFERENT set, which is
-	 * legitimately cold — and the user, who just narrowed a list they were
-	 * reading, sees it vanish. `view.preview` filters this set's rows to the new
-	 * query and shows those, which is what keeps it honest.
-	 */
-	let lastReady = $state<string | null>(null);
 	let pendingInvalidation: ChangeInfo<K, S> | null | undefined;
 	let unsubscribe: Unsubscribe | null = null;
 	let subscribing = false;
@@ -166,20 +155,6 @@ export function createCollection<
 		sets = { ...sets, [k]: { ...(sets[k] ?? EMPTY_SET), ...patch } };
 	}
 
-	/**
-	 * ⚑ Bumped by WRITES only, never by fetches.
-	 *
-	 * It started out bumping whenever a fetch replaced an already-cached record,
-	 * which sounded conservative and destroyed the memo below: searching within a
-	 * dataset re-fetches records you already hold, so 20 pages of 500 bumped it
-	 * 10 000 times and hydration went straight back to quadratic. Measured: a
-	 * 10 000-row query went from ~0.3s to ~13s.
-	 *
-	 * Staleness from a re-fetch is handled precisely instead — `run()` drops the
-	 * memo for a set it is rebuilding — so the only thing left that can make a
-	 * memoised row wrong is a write.
-	 */
-	let recordsEpoch = 0;
 
 	/** Put records in the cache. The one way anything enters it. */
 	function cache(list: T[]): void {
@@ -189,45 +164,37 @@ export function createCollection<
 	}
 
 	/**
-	 * ⚑ Hydration is INCREMENTAL, and it has to be.
+	 * ⚑ Rows are DERIVED from the cache, not held by the set.
 	 *
-	 * Rebuilding the whole array on every read is O(n) per read, and a
-	 * progressive reveal reads it once per chunk — so filling a list is
-	 * quadratic. Observed as ms/row rising with the cap: ~0.05 at 20 000 rows and
-	 * 0.2–0.5 at 100 000, i.e. a per-row cost that grew with the number of rows,
-	 * which a per-row cost should not do.
+	 * A set fixes only `(predicate, order, cap)`; what it shows is whatever the
+	 * cache currently satisfies. That is what makes it live — a record arriving
+	 * for any other query, a write, or a delete all change every matching set for
+	 * free, with no key lists to maintain at each mutation site.
 	 *
-	 * Since a growing set only ever appends keys, the previous answer is a prefix
-	 * of the next one and the tail is all that needs mapping.
+	 * It also deletes a question the key-list model could not answer: "after a
+	 * create, does this record belong to the set?" It matches the predicate or it
+	 * does not.
 	 *
-	 * Still O(n) in the array copy — a fresh reference is required or downstream
-	 * `$derived`s will not re-run — but the copy is a flat memcpy rather than n
-	 * proxy reads, which is where the cost actually was. Mutating in place and
-	 * returning the same reference would remove even that, at the price of
-	 * reactivity that works by accident.
+	 * Memoised on the cache version, because deriving is O(cache) and a
+	 * progressive reveal reads it once per chunk.
 	 */
-	const memo = new Map<string, { keys: K[]; rows: T[]; epoch: number }>();
+	const derived = new Map<string, { version: number; cap: number; rows: T[] }>();
 
-	function hydrate(setKey: string, keys: K[]): T[] {
-		// Establish the dependency once. Everything below reads the plain Map, so
-		// a 10 000-row hydrate costs 10 000 lookups rather than 10 000 subscriptions.
+	function deriveRows(setKey: string, query: SetQuery, cap: number): T[] {
 		void recordsVersion;
-		const prev = memo.get(setKey);
-		const reusable =
-			prev !== undefined &&
-			prev.epoch === recordsEpoch &&
-			prev.keys.length <= keys.length &&
-			// Cheap prefix check: same length and same last element is enough here,
-			// because keys are only ever appended to a set.
-			(prev.keys.length === 0 || prev.keys[prev.keys.length - 1] === keys[prev.keys.length - 1]);
+		const hit = derived.get(setKey);
+		if (hit && hit.version === recordsVersion && hit.cap === cap) return hit.rows;
 
-		const rows = reusable ? prev.rows.slice() : [];
-		for (let i = reusable ? prev.keys.length : 0; i < keys.length; i++) {
-			const r = records.get(String(keys[i]));
-			if (r !== undefined) rows.push(r);
+		const match = options.matches;
+		const rows: T[] = [];
+		for (const r of records.values()) {
+			if (!match || match(r, query)) rows.push(r);
 		}
-		memo.set(setKey, { keys, rows, epoch: recordsEpoch });
-		return rows;
+		const cmp = options.compare?.(query.order);
+		if (cmp) rows.sort(cmp);
+		const out = rows.length > cap ? rows.slice(0, cap) : rows;
+		derived.set(setKey, { version: recordsVersion, cap, rows: out });
+		return out;
 	}
 
 	/**
@@ -267,7 +234,7 @@ export function createCollection<
 		// Rebuilding from scratch: the memo's rows describe the previous answer and
 		// would be reused as a prefix of the new one. Precise invalidation here is
 		// what lets `cache()` leave the epoch alone.
-		if (!append) memo.delete(k);
+		if (!append) derived.delete(k);
 		patchSet(k, { status: mode, error: undefined });
 		const epoch = writeEpoch;
 
@@ -295,12 +262,11 @@ export function createCollection<
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				cache(data);
-				lastReady = k;
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
 					total: data.length,
-					complete: true,
+					stopped: 'exhausted',
 					cursor: undefined,
 					status: 'ready',
 					error: undefined
@@ -368,7 +334,7 @@ export function createCollection<
 						fetchedCount: fetched,
 						total,
 						cursor,
-						complete: exhausted,
+						stopped: exhausted ? 'exhausted' : undefined,
 						status: 'refreshing'
 					});
 					// setTimeout, not requestAnimationFrame: rAF never fires in a hidden
@@ -377,15 +343,15 @@ export function createCollection<
 				}
 			}
 
-			lastReady = k;
 			patchSet(k, {
 				keys,
 				fetchedCount: fetched,
 				total,
 				cursor,
-				// Exhausted, or the total says we hold it all. Hitting the cap is NOT
-				// completeness — that is the case the whole model exists to surface.
-				complete: exhausted || (total !== undefined && fetched >= total),
+				// ⚑ WHY we stopped, not whether we are "complete". Two reasons, and
+				// nothing compares counts — which is what removed the hole where
+				// over-fetch-and-filter made `total` count the wider query.
+				stopped: exhausted ? 'exhausted' : 'capped',
 				status: 'ready',
 				error: undefined
 			});
@@ -423,7 +389,7 @@ export function createCollection<
 			// only way to see more is a forced refetch, which throws away the rows
 			// already held.
 			const wanted = targetCap ?? query.cap ?? cap;
-			if (held.complete || held.keys.length >= wanted) return Promise.resolve();
+			if (held.stopped === 'exhausted' || held.keys.length >= wanted) return Promise.resolve();
 			append = true;
 			targetCap = wanted;
 		}
@@ -443,80 +409,17 @@ export function createCollection<
 	function view(scope: S, query: SetQuery = {}): ScopedView<T, K> {
 		const k = setKeyFor(scope, query);
 		const set = () => sets[k];
-		/**
-		 * ⚑ The cap is ONE number: how many rows the caller wants. The fetch tops
-		 * up when the set is short of it, and the view slices when the set is
-		 * deeper than it.
-		 *
-		 * It was only the former, so dropping 20 000 back to 2 000 kept rendering
-		 * 20 000 — the set had them and nothing trimmed. Slicing here also makes
-		 * lowering free and perfectly reversible: the extra keys stay held, so
-		 * going back up is instant rather than a refetch.
-		 */
 		const limit = query.cap ?? cap;
-		const slice = (ks: K[]) => (ks.length > limit ? ks.slice(0, limit) : ks);
-
-		/**
-		 * Rows we can show RIGHT NOW for this query, drawn from what we already
-		 * hold, while the server answers.
-		 *
-		 * Two ways to be sure a held row is a valid answer:
-		 *  - `options.preview` says so (the app knows what `search`/`where` mean);
-		 *  - or the query differs from the previous one only in `order`/`cap`, in
-		 *    which case every held row matches by construction.
-		 *
-		 * Anything else stays blank rather than guessing. `canPreview` is the cheap
-		 * half, so reading the flag costs nothing.
-		 */
-		const scopePrefix = keyFor(scope);
-		const canPreview = (): boolean => {
-			const s = set();
-			if (s && s.keys.length > 0) return false;
-			if (s && s.status !== 'loading' && s.status !== 'idle') return false;
-			if (!lastReady || lastReady === k || !sets[lastReady]) return false;
-			// ⚑ Same SCOPE only. `queryKey` deliberately excludes the scope, so two
-			// scopes with no predicates compare as "same query" — without this check
-			// switching year on /loans would preview 2024's rows as 2025's, with no
-			// predicate able to catch it because neither has one.
-			return lastReady === scopePrefix || lastReady.startsWith(`${scopePrefix} `);
-		};
-
-		const previewRows = (): T[] | null => {
-			if (!canPreview()) return null;
-			const prevSet = sets[lastReady!];
-			const prevDecl = declarations.get(lastReady!);
-			if (!prevSet || !prevDecl) return null;
-
-			const held = hydrate(lastReady!, prevSet.keys);
-			if (options.preview) {
-				const out: T[] = [];
-				for (const r of held) {
-					if (options.preview(r, query)) out.push(r);
-					if (out.length >= limit) break;
-				}
-				return out;
-			}
-			// No predicate: only safe when the predicates themselves did not change.
-			const samePredicates =
-				queryKey({ ...prevDecl.query, order: undefined, cap: undefined }) ===
-				queryKey({ ...query, order: undefined, cap: undefined });
-			return samePredicates ? held.slice(0, limit) : null;
-		};
 
 		return {
+			/**
+			 * Derived, always. There is no loading state that hides rows: whatever
+			 * the cache can answer is shown immediately and the fill corrects it in
+			 * the background. Partial data beats a spinner.
+			 */
 			get all() {
 				void ensure(scope, query);
-				const p = previewRows();
-				if (p) return p;
-				return hydrate(k, slice(set()?.keys ?? []));
-			},
-			/**
-			 * These rows answer a DIFFERENT query — the one you were looking at
-			 * before. Render them, but say so; silently showing the old answer to a
-			 * new question is worse than a spinner.
-			 */
-			get preview() {
-				return canPreview();
+				return deriveRows(k, query, limit);
 			},
 			get status() {
 				void ensure(scope, query);
@@ -526,12 +429,21 @@ export function createCollection<
 				return set()?.error;
 			},
 			get hasData() {
-				const s = set()?.status;
-				return s === 'ready' || s === 'refreshing';
+				return deriveRows(k, query, limit).length > 0;
 			},
+			get stopped() {
+				void ensure(scope, query);
+				return set()?.stopped;
+			},
+			get fetching() {
+				void ensure(scope, query);
+				const st = set()?.status;
+				return st === 'loading' || st === 'refreshing';
+			},
+			/** Derived, never stored — see the note on `stopped`. */
 			get complete() {
 				void ensure(scope, query);
-				return set()?.complete ?? false;
+				return set()?.stopped === 'exhausted';
 			},
 			get fetchedCount() {
 				return set()?.fetchedCount ?? 0;
@@ -539,20 +451,15 @@ export function createCollection<
 			get total() {
 				return set()?.total;
 			},
-			/**
-			 * More to show, from either direction: the server has rows we have not
-			 * fetched, OR we hold rows the cap is currently hiding. Both are "raise
-			 * the cap", and only one of them costs a request.
-			 */
+			/** More to be had: the fill stopped at our own cap. */
 			get hasMore() {
 				const s = set();
-				if (!s || s.status === 'loading') return false;
-				return !s.complete || s.keys.length > limit;
+				return !!s && s.stopped === 'capped';
 			},
 			/**
-			 * Reads the CACHE, not the set. A record reached from a deep link or a
-			 * server search belongs to no set, and refusing to render it because it
-			 * is not in the current one would be the split failing at its whole job.
+			 * Reads the CACHE, not the set. A record from a deep link or a server
+			 * search belongs to no set, and refusing to render it because of that
+			 * would be the split failing at its whole job.
 			 */
 			byKey(key: K) {
 				void ensure(scope, query);
@@ -571,7 +478,6 @@ export function createCollection<
 	 */
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
-		if (records.has(key)) recordsEpoch += 1;
 		records.set(key, record);
 		recordsVersion += 1;
 	}
@@ -777,7 +683,7 @@ export function createCollection<
 		loadMore(query: SetQuery = {}, by?: number): Promise<void> {
 			const scope = scopeOf();
 			const set = sets[setKeyFor(scope, query)];
-			if (!set || set.complete) return Promise.resolve();
+			if (!set || set.stopped === 'exhausted') return Promise.resolve();
 			// Raise the depth on the SAME set — the cap is not part of its key, so
 			// this extends rather than forking a parallel one.
 			return ensure(scope, query, true, true, set.keys.length + (by ?? query.cap ?? cap));
@@ -807,7 +713,7 @@ export function createCollection<
 				if (k === prefix || k.startsWith(`${prefix} `)) {
 					delete next[k];
 					declarations.delete(k);
-					memo.delete(k);
+					derived.delete(k);
 				}
 			}
 			sets = next;
@@ -819,8 +725,7 @@ export function createCollection<
 		/** Drop cached records too. Separate because the two are separate. */
 		clearCache(): void {
 			records.clear();
-			memo.clear();
-			recordsEpoch += 1;
+			derived.clear();
 			recordsVersion += 1;
 		},
 

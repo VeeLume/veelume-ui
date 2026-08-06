@@ -120,6 +120,16 @@ export type FetchRequest<S> = {
 
 export type FetchPage<T> = {
 	records: T[];
+	/**
+	 * The sort key this page STARTED from, when continuing from a cursor.
+	 *
+	 * ⚑ Needed for deletion reconciliation, which works over the key INTERVAL a
+	 * fill covered. Without it the interval's start is implicit and a
+	 * cursor-continued page silently under-covers: rows between the cursor and
+	 * the first returned row would never be reconciled. Omit on the first page,
+	 * where the interval starts at the beginning of the result.
+	 */
+	from?: string;
 	/** Continuation token. Absent means the source is exhausted. */
 	cursor?: string;
 	/**
@@ -198,11 +208,22 @@ export type CollectionOptions<T, S> = {
 	 * The kit cannot do this itself: `search` and `where` are opaque strings it
 	 * only forwards, and which fields they mean is the app's knowledge.
 	 *
-	 * Omit it and a cold set stays blank, except when the new query differs from
-	 * the old only in `order` or `cap` — there every held row still matches by
-	 * construction, so no predicate is needed.
+	 * ⚑ This is the DEFINITION of a set, not an optimisation. Rows are derived by
+	 * running this over the cache; the server fetch exists to make sure the cache
+	 * holds enough records for that derivation to be complete, and must agree
+	 * with this predicate. A backend that cannot express the query is not a
+	 * blocker — over-fetch and let this filter locally.
+	 *
+	 * Omit it only for a collection with no pushed-down predicates, where every
+	 * cached record in scope belongs to the one set.
 	 */
-	preview?: (record: T, query: SetQuery) => boolean;
+	matches?: (record: T, query: SetQuery) => boolean;
+	/**
+	 * Comparator for a set's order. Mandatory alongside `matches`, because the
+	 * derivation sorts locally — the server's ordering is an accelerator, not the
+	 * source of the row order.
+	 */
+	compare?: (order: SetQuery['order']) => (a: T, b: T) => number;
 	/**
 	 * How many records to accumulate before stopping and reporting the set
 	 * incomplete. A **row count, not a time budget** — a time budget makes the
@@ -226,8 +247,19 @@ export type CollectionOptions<T, S> = {
  * affordable, and what retracts the earlier worry about explicit-only eviction.
  */
 export type WorkingSet<K> = {
-	/** In the set's order. That order is part of its identity. */
+	/**
+	 * Keys the SERVER has confirmed for this set, in its order.
+	 *
+	 * ⚑ No longer what gets rendered. Rows are derived from the cache through
+	 * `matches` + `compare`; this is kept because it records what the fill
+	 * actually returned, which is what deletion reconciliation diffs against.
+	 */
 	readonly keys: K[];
+	/** Key interval the fills have covered, for reconciliation. */
+	readonly coveredFrom?: string;
+	readonly coveredTo?: string;
+	/** Why the last fill stopped. Replaces the tracked `complete`. */
+	readonly stopped?: 'exhausted' | 'capped';
 	/**
 	 * Rows the server has handed us for this set.
 	 *
@@ -265,19 +297,23 @@ export type ScopedView<T, K extends string | number> = {
 	readonly error: KitError | undefined;
 	/** `ready` or `refreshing` — i.e. "there is data worth rendering". */
 	readonly hasData: boolean;
-	/** False while the set is capped short of everything matching its query. */
-	readonly complete: boolean;
 	/**
-	 * The rows being returned are what we already held, filtered locally to the
-	 * current query, because the server has not answered yet.
+	 * Why the last fill stopped — the whole of what `complete` used to track.
 	 *
-	 * ⚑ Not the same axis as `complete`. `complete: false` is a partial answer
-	 * from the SERVER; `preview` is a partial answer from what the client already
-	 * held, filtered locally. Both are correct answers to the current query — the
-	 * preview is simply the subset we could produce without waiting. It drops the
-	 * moment page one arrives.
+	 * ⚑ `exhausted` means the server had nothing more, so we hold everything
+	 * matching. `capped` means we stopped ourselves and there is more.
+	 * `undefined` means no fill has finished yet. A readout, not an invariant.
+	 *
+	 * A boolean `complete` conflated the two reasons, needed three rules to
+	 * compute, and still leaked under over-fetch-and-filter-locally because it
+	 * compared `fetched >= total` and `total` then counted the wider query.
+	 * Nothing compares counts any more.
 	 */
-	readonly preview: boolean;
+	readonly stopped: 'exhausted' | 'capped' | undefined;
+	/** A fill is running. Rows are still readable throughout. */
+	readonly fetching: boolean;
+	/** Convenience for the common check. Derived, never stored. */
+	readonly complete: boolean;
 	readonly fetchedCount: number;
 	readonly total: number | undefined;
 	/** Whether another accumulation step would yield more. */

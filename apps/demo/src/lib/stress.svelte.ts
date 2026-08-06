@@ -43,23 +43,29 @@ export const entries = createCollection<Entry, number, void>(
 		cap: 10_000,
 		pageSize: 500,
 		/**
-		 * ⚑ The same predicate the backend applies, evaluated locally.
+		 * ⚑ The DEFINITION of a set, and the same predicate the backend applies.
 		 *
-		 * Without it, typing "Greta" over a list that visibly contains a Greta
-		 * blanks to a spinner while the server round-trips — hiding the row you
-		 * were looking at. With it, the rows we already hold that match appear
-		 * instantly as a partial answer, and the server's fuller answer replaces
-		 * them when it lands.
-		 *
-		 * It MUST agree with the server: `party` substring, id equality, exact
-		 * kind. A predicate that disagrees shows rows the real answer will not
-		 * contain, which is worse than showing nothing.
+		 * Rows are derived by running this over the cache, so a search shows its
+		 * matches instantly from what is already held and the fetch only tops the
+		 * cache up. It MUST agree with the server — a predicate that disagrees
+		 * shows rows the real answer will not contain, which is worse than showing
+		 * nothing.
 		 */
-		preview: (e, q) => {
+		matches: (e: Entry, q) => {
 			if (q.where?.kind && e.kind !== q.where.kind) return false;
 			const needle = (q.search ?? '').trim().toLowerCase();
 			if (!needle) return true;
 			return e.party.toLowerCase().includes(needle) || String(e.id) === needle;
+		},
+		/**
+		 * The derivation sorts locally, so the order needs a real comparator — the
+		 * server's ordering is an accelerator, not the source of row order.
+		 */
+		compare: (order) => {
+			const dir = order?.dir === 'desc' ? -1 : 1;
+			if (order?.by === 'amount') return (a: Entry, b: Entry) => (a.cents - b.cents) * dir;
+			if (order?.by === 'party') return (a: Entry, b: Entry) => a.party.localeCompare(b.party) * dir;
+			return (a: Entry, b: Entry) => (a.id - b.id) * dir;
 		}
 	}
 );

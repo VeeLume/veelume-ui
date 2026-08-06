@@ -225,7 +225,7 @@
 			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>
 	</dl>
 
-	{#if view.preview}
+	{#if view.fetching && !view.complete}
 		<!--
 			⚑ A different axis from `complete`. These rows are held records filtered
 			LOCALLY to the current query — a correct partial answer produced without
@@ -237,11 +237,11 @@
 			       text-muted-foreground"
 		>
 			<span class="size-2 animate-pulse rounded-full bg-primary"></span>
-			Showing matches from what is already loaded, while the full result arrives…
+			Showing matches from the cache while the full result arrives…
 		</div>
 	{/if}
 
-	{#if !view.complete && view.status === 'ready' && !view.preview}
+	{#if view.hasMore && !view.fetching}
 		<!-- The truncation band, hand-rolled here until it exists in the kit. -->
 		<div
 			class="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
@@ -267,7 +267,7 @@
 	{/if}
 
 	<div class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
-		{#if view.status === 'loading' && rows.length === 0}
+		{#if view.fetching && rows.length === 0}
 			<!-- Only when there is genuinely nothing to show. With `stale` in play
 			     that is now rare: a filter change keeps the previous rows up as a
 			     bridge until page one of the new set lands. -->
