@@ -142,8 +142,8 @@ export function createCollection<
 	 * `refreshing` already stops a revalidation from blanking good data, but it
 	 * only covers the same set. Changing a filter makes a DIFFERENT set, which is
 	 * legitimately cold — and the user, who just narrowed a list they were
-	 * reading, sees it vanish. Keeping the previous rows visible is the same
-	 * principle one level up; `stale` is what keeps it honest.
+	 * reading, sees it vanish. `view.preview` filters this set's rows to the new
+	 * query and shows those, which is what keeps it honest.
 	 */
 	let lastReady = $state<string | null>(null);
 	let pendingInvalidation: ChangeInfo<K, S> | null | undefined;
@@ -166,7 +166,6 @@ export function createCollection<
 		sets = { ...sets, [k]: { ...(sets[k] ?? EMPTY_SET), ...patch } };
 	}
 
-	/**
 	/**
 	 * ⚑ Bumped by WRITES only, never by fetches.
 	 *
@@ -395,16 +394,16 @@ export function createCollection<
 		}
 	}
 
-	/**
-	 * Start a fetch if one is warranted. Safe to call from a getter during
-	 * render: every `$state` write happens in a microtask, never synchronously.
-	 */
 	/** A set's cache key: scope and declaration together, since both are identity. */
 	const setKeyFor = (scope: S, query: SetQuery): string => {
 		const q = queryKey(query);
 		return q ? `${keyFor(scope)} ${q}` : keyFor(scope);
 	};
 
+	/**
+	 * Start a fetch if one is warranted. Safe to call from a getter during
+	 * render: every `$state` write happens in a microtask, never synchronously.
+	 */
 	function ensure(
 		scope: S,
 		query: SetQuery,
@@ -466,14 +465,20 @@ export function createCollection<
 		 *  - or the query differs from the previous one only in `order`/`cap`, in
 		 *    which case every held row matches by construction.
 		 *
-		 * Anything else stays blank rather than guessing.
+		 * Anything else stays blank rather than guessing. `canPreview` is the cheap
+		 * half, so reading the flag costs nothing.
 		 */
-		/** Cheap test, so the flag costs nothing to read. */
+		const scopePrefix = keyFor(scope);
 		const canPreview = (): boolean => {
 			const s = set();
 			if (s && s.keys.length > 0) return false;
 			if (s && s.status !== 'loading' && s.status !== 'idle') return false;
-			return !!lastReady && lastReady !== k && !!sets[lastReady];
+			if (!lastReady || lastReady === k || !sets[lastReady]) return false;
+			// ⚑ Same SCOPE only. `queryKey` deliberately excludes the scope, so two
+			// scopes with no predicates compare as "same query" — without this check
+			// switching year on /loans would preview 2024's rows as 2025's, with no
+			// predicate able to catch it because neither has one.
+			return lastReady === scopePrefix || lastReady.startsWith(`${scopePrefix} `);
 		};
 
 		const previewRows = (): T[] | null => {
