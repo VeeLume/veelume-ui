@@ -25,6 +25,10 @@ use serde::{Deserialize, Serialize};
 /// How many entries the stress dataset holds.
 pub const COUNT: usize = 1_500_000;
 
+/// How many recent query answers to keep — enough for a few interleaved fills
+/// plus back-and-forth between two queries, small enough to be memory-trivial.
+const MEMO_KEEP: usize = 8;
+
 /// The facet axis — small and fixed, as a status column would be.
 pub const KINDS: [&str; 6] = [
     "invoice",
@@ -130,14 +134,20 @@ fn date_of(day: i32) -> String {
 }
 
 pub struct StressData {
-    /// Last match list, keyed by the query that produced it.
+    /// Recent match lists, keyed by the query that produced them. Most recent
+    /// last; bounded at [`MEMO_KEEP`].
     ///
     /// Accumulating 20 000 rows at 500 per page is 40 calls, and each one was
     /// re-scanning all 1.5M rows and re-sorting the matches - measured at 19.5s
     /// for one search. A real database does this once and holds a cursor; the
     /// memo is the cheap stand-in, and without it the backend's cost drowns
     /// every client-side effect this surface exists to observe.
-    memo: Mutex<Option<(String, Vec<u32>)>>,
+    ///
+    /// ⚑ A MAP, not a single entry. Two fills interleaving page-wise (typing
+    /// commits a query before the previous fill finishes) made a one-entry memo
+    /// ping-pong: every page missed, every miss re-scanned 1.5M rows — a search
+    /// that costs ~1.5s clean measured 25s behind two abandoned fills.
+    memo: Mutex<Vec<(String, Vec<u32>)>>,
     rows: Vec<Entry>,
     /// Lowercased party, precomputed. Without it every search allocates 1.5M
     /// temporary strings per keystroke — which is a fixture artefact rather
@@ -172,7 +182,7 @@ impl StressData {
             });
         }
         Self {
-            memo: Mutex::new(None),
+            memo: Mutex::new(Vec::new()),
             rows,
             party_lc,
         }
@@ -218,13 +228,18 @@ impl StressData {
     fn hits_for(&self, search: &str, kind: &str, order: &str, desc: bool) -> Vec<u32> {
         let key = format!("{search}|{kind}|{order}|{desc}");
         let mut memo = self.memo.lock().unwrap();
-        if let Some((k, hits)) = memo.as_ref() {
-            if *k == key {
-                return hits.clone();
-            }
+        if let Some(pos) = memo.iter().position(|(k, _)| *k == key) {
+            // Move to the back: recency is the eviction order.
+            let entry = memo.remove(pos);
+            let hits = entry.1.clone();
+            memo.push(entry);
+            return hits;
         }
         let hits = self.matching(search, kind, order, desc);
-        *memo = Some((key, hits.clone()));
+        memo.push((key, hits.clone()));
+        if memo.len() > MEMO_KEEP {
+            memo.remove(0);
+        }
         hits
     }
 

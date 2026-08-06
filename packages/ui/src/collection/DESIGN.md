@@ -285,13 +285,34 @@ since E′ — batch-maintained live sets.
 - Both transports emit `loans-changed` (Rust `Emitter`, fixtures through the
   mocked event bus), so the whole chain runs in a plain browser.
 
+**Built since (2026-08): halting a superseded fill.**
+
+Typing commits intermediate queries whose fills all ran to completion behind
+the current one — and with page-wise interleaving they thrashed the backend's
+single-entry query memo: every page missed, every miss re-scanned 1.5M rows.
+Measured over Tauri (debug build): a search that costs ~1.5 s clean cost
+**25 s** behind two abandoned fills. Three fixes, one per layer:
+
+- **The fill halts when its set stops being read.** Every view getter stamps a
+  `lastRead` timestamp (plain map, written during render — the `inflight`
+  rule); the fill checks it between pages and stops once the set was read and
+  then went a second unread. Verified: a fill abandoned mid-flight broke at
+  5 000 of 10 000, ~1.2 s after its last read; observed fills never false-halt
+  (every page bump re-renders the reader, which re-stamps). A pure prefetch —
+  never read — still completes: warming a set nobody reads yet is its job.
+  ⚑ NOT via `createSubscriber` teardown, which measured up to **15 s late** —
+  fine for the memory lifecycle, useless for cancellation.
+- **The backend memo became a small recency map** (8 entries, both twins), so
+  legitimately interleaved fills stop thrashing it.
+- **`[profile.dev.package.veelume-ui-demo] opt-level = 2`** — the debug-build
+  scan cost ~1.5 s where release costs ~100 ms, making every dev-mode /stress
+  number a harness artefact (failure pattern 5 again).
+
 **Designed, not built:**
 
 - **Deletion, tier 3.** No keys from the backend: the fill reconciles the
   **key interval** it covered. Absence is only meaningful inside a range the
   server enumerated. `FetchPage.from` exists for this and is not yet consumed.
-- **Halting a superseded fill.** Suppressing its writes is easy; stopping a
-  1.5M-row scan so they do not queue behind each other is not.
 - **Eviction by age or reference.** Supersedes the old "explicit only, no LRU"
   decision, which was taken when the cache was per-scope and small.
 

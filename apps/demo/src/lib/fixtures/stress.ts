@@ -91,21 +91,32 @@ function data(): Entry[] {
 }
 
 /**
- * Last match list, keyed by its query.
+ * Recent match lists, keyed by their query — most recent last, bounded.
  *
  * ⚑ Accumulating 20 000 rows at 500 per page is 40 calls, and each one was
  * re-scanning 1.5M rows and re-sorting the matches — 19.5s for a single search.
  * A real database does the work once and holds a cursor; this memo is the cheap
  * stand-in, and without it the backend's cost drowns every client-side effect
  * this surface exists to observe.
+ *
+ * ⚑ A MAP, not a single entry — mirroring the Rust twin exactly. Two fills
+ * interleaving page-wise made a one-entry memo ping-pong: every page missed,
+ * every miss re-scanned 1.5M rows.
  */
-let memo: { key: string; hits: number[] } | null = null;
+const MEMO_KEEP = 8;
+const memo: { key: string; hits: number[] }[] = [];
 
 function hitsFor(search: string, kind: string, order: string, desc: boolean): number[] {
 	const key = `${search}|${kind}|${order}|${desc}`;
-	if (memo && memo.key === key) return memo.hits;
+	const at = memo.findIndex((m) => m.key === key);
+	if (at >= 0) {
+		const [hit] = memo.splice(at, 1);
+		memo.push(hit); // recency is the eviction order
+		return hit.hits;
+	}
 	const hits = matching(search, kind, order, desc);
-	memo = { key, hits };
+	memo.push({ key, hits });
+	if (memo.length > MEMO_KEEP) memo.shift();
 	return hits;
 }
 

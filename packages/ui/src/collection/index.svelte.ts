@@ -151,6 +151,19 @@ export function createCollection<
 	 */
 	const inflight = new Map<string, Promise<void>>();
 
+	/**
+	 * When each set was last READ, by set key. Plain and untracked — getters
+	 * write it during render, which must stay legal (the `inflight` rule).
+	 *
+	 * This is the fill-halting signal. `createSubscriber`'s teardown also knows
+	 * when a set loses its readers, but measured up to 15s late — fine for the
+	 * memory lifecycle, useless for cancelling a fill. A read timestamp is
+	 * prompt by construction: every page the fill publishes re-renders the
+	 * observing surface, which re-reads the view, which refreshes this — so an
+	 * abandoned set goes stale within one page.
+	 */
+	const lastRead = new Map<string, number>();
+
 	// ── invalidation bookkeeping ───────────────────────────────────────────────
 	let writesInFlight = 0;
 	/**
@@ -505,7 +518,27 @@ export function createCollection<
 			// so. Conflating them would report `complete` on a set we merely gave up
 			// on — the silent truncation this whole model exists to prevent.
 			let stalled = false;
+			/**
+			 * ⚑ Halt a SUPERSEDED fill. Typing commits intermediate queries whose
+			 * fills otherwise all run to completion behind the current one — and
+			 * with page-wise interleaving they thrash any per-query state the
+			 * backend keeps (measured over Tauri: a search that costs ~1.5 s clean
+			 * cost 25 s behind two abandoned fills). "Abandoned" means: this set
+			 * WAS being read and has not been read for a second — see `lastRead`.
+			 * A pure prefetch — never read — still completes; warming a set nobody
+			 * reads yet is its whole job.
+			 */
+			const readRecently = () => {
+				const t = lastRead.get(k);
+				return t !== undefined && performance.now() - t < 1_000;
+			};
+			let everRead = false;
 			while (keys.length < limit && !exhausted && !stalled) {
+				const wanted = readRecently();
+				everRead ||= wanted;
+				// The final patch reports this as `capped`, which is exactly what it
+				// is: we stopped ourselves, more exists, and a later read extends.
+				if (everRead && !wanted) break;
 				const page: FetchPage<T> = await io.fetchPage({
 					scope,
 					query,
@@ -626,6 +659,10 @@ export function createCollection<
 		const k = setKeyFor(scope, query);
 		const sk = keyFor(scope);
 		const set = () => sets[k];
+		/** Every read stamps `lastRead` — the fill-halting signal. */
+		const touch = () => {
+			lastRead.set(k, performance.now());
+		};
 		return {
 			/**
 			 * Derived, always. There is no loading state that hides rows: whatever
@@ -638,10 +675,12 @@ export function createCollection<
 			 * would reintroduce an O(cap) copy on every read.
 			 */
 			get all() {
+				touch();
 				void ensure(scope, query);
 				return liveFor(k, sk, query).rows;
 			},
 			get status() {
+				touch();
 				void ensure(scope, query);
 				return set()?.status ?? 'idle';
 			},
@@ -649,19 +688,23 @@ export function createCollection<
 				return set()?.error;
 			},
 			get hasData() {
+				touch();
 				return liveFor(k, sk, query).rows.length > 0;
 			},
 			get stopped() {
+				touch();
 				void ensure(scope, query);
 				return set()?.stopped;
 			},
 			get fetching() {
+				touch();
 				void ensure(scope, query);
 				const st = set()?.status;
 				return st === 'loading' || st === 'refreshing' || liveFor(k, sk, query).deriving;
 			},
 			/** Derived, never stored — see the note on `stopped`. */
 			get complete() {
+				touch();
 				void ensure(scope, query);
 				return set()?.stopped === 'exhausted';
 			},

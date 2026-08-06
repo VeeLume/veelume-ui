@@ -13,6 +13,13 @@ members = ["apps/demo/src-tauri"]
 [profile.dev]
 incremental = true
 
+# The demo crate holds the 1.5M-row stress dataset. Unoptimised, its full scan
+# costs ~1.5s where release costs ~100ms — which makes every /stress number in
+# `tauri dev` a debug-build artefact ("measure the artefact that actually
+# fails"). Optimising just this crate keeps dep compile times untouched.
+[profile.dev.package.veelume-ui-demo]
+opt-level = 2
+
 [profile.release]
 codegen-units = 1
 lto = true
