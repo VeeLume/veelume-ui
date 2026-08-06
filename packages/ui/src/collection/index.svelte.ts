@@ -30,9 +30,16 @@ export * from './types.js';
 const DEFAULT_KEY = '__single__';
 const DEFAULT_CAP = 2000;
 const DEFAULT_PAGE = 500;
-/** Pages between progress publishes. Every page is quadratic downstream; only
- *  at the end is invisible until it finishes. */
-const PUBLISH_EVERY = 8;
+/**
+ * Pages between progress publishes.
+ *
+ * ⚑ Was 8, to limit how often the whole key→record array got rebuilt. With
+ * derivation incremental, catching up costs a filter over one page plus a linear
+ * merge — so publishing every page is affordable again, and it is what makes the
+ * border between filling the cache and updating the view smooth instead of
+ * arriving in three lumps.
+ */
+const PUBLISH_EVERY = 1;
 
 /**
  * Canonical encoding of a set's declaration.
@@ -158,21 +165,37 @@ export function createCollection<
 
 	/** Put records in the cache. The one way anything enters it. */
 	/**
-	 * Put records in the cache WITHOUT notifying.
-	 *
-	 * ⚑ Notification is separate because every bump re-derives every set, and a
-	 * derivation is O(cache): scan, filter, sort. Bumping per page made a 20-page
-	 * fill do twenty full derivations over a growing cache — 21s for a 10 000-row
-	 * query, with the main thread blocked throughout. The publish cadence already
-	 * decides when the user should see progress; invalidation belongs on the same
-	 * beat.
+	 * Put records in the cache WITHOUT notifying, recording them as pending so the
+	 * next publish can derive incrementally rather than rescanning.
 	 */
 	function cache(list: T[]): void {
-		for (const r of list) records.set(String(io.keyOf(r)), r);
+		for (const r of list) {
+			records.set(String(io.keyOf(r)), r);
+			pending.push(r);
+		}
 	}
 
-	/** Make cached records visible to derivations. Call at a publish point. */
+	/**
+	 * ⚑ The append log is what makes derivation incremental.
+	 *
+	 * `addLog[v]` is the batch that became visible at version `v + 1`, so a memo
+	 * that last derived at version `m` needs exactly `addLog.slice(m)` to catch
+	 * up. Records only ever *arrive* during a fill, so catching up is a filter
+	 * over the new ones plus a merge — never a rescan of the cache.
+	 *
+	 * A REPLACEMENT (a write) cannot be merged: the record may already be in the
+	 * list and may now sort elsewhere. Those bump `fullInvalidateAt`, and any memo
+	 * older than that rescans. Writes are rare; fills are not.
+	 */
+	let pending: T[] = [];
+	const addLog: T[][] = [];
+	let fullInvalidateAt = 0;
+
+	/** Make cached records visible to derivations. Called at a publish point. */
 	function publishCache(): void {
+		if (!pending.length) return;
+		addLog.push(pending);
+		pending = [];
 		recordsVersion += 1;
 	}
 
@@ -184,29 +207,58 @@ export function createCollection<
 	 * for any other query, a write, or a delete all change every matching set for
 	 * free, with no key lists to maintain at each mutation site.
 	 *
-	 * It also deletes a question the key-list model could not answer: "after a
-	 * create, does this record belong to the set?" It matches the predicate or it
-	 * does not.
-	 *
-	 * Memoised on the cache version, because deriving is O(cache) and a
-	 * progressive reveal reads it once per chunk.
+	 * The memo holds the FULL sorted match list, uncapped, and slices on the way
+	 * out. It has to: a capped memo has already discarded rows that a later
+	 * arrival could displace, so it could not be extended correctly.
 	 */
-	const derived = new Map<string, { version: number; cap: number; rows: T[] }>();
+	const derived = new Map<string, { version: number; rows: T[] }>();
 
 	function deriveRows(setKey: string, query: SetQuery, cap: number): T[] {
 		void recordsVersion;
-		const hit = derived.get(setKey);
-		if (hit && hit.version === recordsVersion && hit.cap === cap) return hit.rows;
-
 		const match = options.matches;
-		const rows: T[] = [];
-		for (const r of records.values()) {
-			if (!match || match(r, query)) rows.push(r);
-		}
 		const cmp = options.compare?.(query.order);
-		if (cmp) rows.sort(cmp);
-		const out = rows.length > cap ? rows.slice(0, cap) : rows;
-		derived.set(setKey, { version: recordsVersion, cap, rows: out });
+		const hit = derived.get(setKey);
+
+		let rows: T[];
+		if (hit && hit.version >= fullInvalidateAt && hit.version <= recordsVersion) {
+			if (hit.version === recordsVersion) {
+				rows = hit.rows;
+			} else {
+				// Incremental: filter only what arrived since, then merge two sorted
+				// runs. O(new log new + n) rather than O(cache log cache).
+				const fresh: T[] = [];
+				for (let v = hit.version; v < addLog.length; v++) {
+					for (const r of addLog[v]) if (!match || match(r, query)) fresh.push(r);
+				}
+				if (fresh.length === 0) {
+					rows = hit.rows;
+				} else if (!cmp) {
+					rows = hit.rows.concat(fresh);
+				} else {
+					fresh.sort(cmp);
+					rows = merge(hit.rows, fresh, cmp);
+				}
+			}
+		} else {
+			rows = [];
+			for (const r of records.values()) if (!match || match(r, query)) rows.push(r);
+			if (cmp) rows.sort(cmp);
+		}
+
+		derived.set(setKey, { version: recordsVersion, rows });
+		return rows.length > cap ? rows.slice(0, cap) : rows;
+	}
+
+	/** Two sorted runs into one. Linear, and the reason incremental merging beats
+	 *  re-sorting the whole list. */
+	function merge(a: T[], b: T[], cmp: (x: T, y: T) => number): T[] {
+		const out: T[] = new Array(a.length + b.length);
+		let i = 0;
+		let j = 0;
+		let o = 0;
+		while (i < a.length && j < b.length) out[o++] = cmp(a[i], b[j]) <= 0 ? a[i++] : b[j++];
+		while (i < a.length) out[o++] = a[i++];
+		while (j < b.length) out[o++] = b[j++];
 		return out;
 	}
 
@@ -495,7 +547,11 @@ export function createCollection<
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
 		records.set(key, record);
-		publishCache();
+		// A replacement cannot be merged into a sorted list — it may already be in
+		// it and may now sort elsewhere. Force a rescan.
+		recordsVersion += 1;
+		addLog.push([]);
+		fullInvalidateAt = recordsVersion;
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
