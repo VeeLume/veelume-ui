@@ -10,24 +10,39 @@
  * with the DOM, not with the data. A window caps the DOM at ~viewport size,
  * which removes that axis entirely instead of picking a point on it.
  *
- * ⚑ ABSENCE IS NEUTRAL. Below `threshold` rows the window is the whole list,
- * the pads are zero, and nothing is measured — a seven-row loans list renders
- * exactly as if this primitive did not exist. Windowing is a mechanism that
- * engages on size, not an option somebody has to remember to switch on.
+ * ⚑ A FIXED SPACER AND ABSOLUTE ROWS, not padding. The first version windowed
+ * with `padding-top`/`padding-bottom` on the list element, and dragging the
+ * scrollbar thumb drifted from the mouse: every window move rewrote the pads,
+ * every rewrite relaid out the whole list, and the browser's drag mapping
+ * recalibrated against a document that kept shifting under it — the thumb
+ * stalled at 72% while the mouse hit the screen edge. With one spacer whose
+ * height changes only when MEASUREMENTS change (never with scroll position)
+ * and rows placed by `translateY`, scrolling moves nothing and resizes
+ * nothing, so there is no layout event left to fight the drag.
+ *
+ * ⚑ ABSENCE IS NEUTRAL. Below `threshold` rows `active` is false and the
+ * consumer renders plain flow — a seven-row loans list renders exactly as if
+ * this primitive did not exist. Windowing is a mechanism that engages on
+ * size, not an option somebody has to remember to switch on.
  *
  * Variable heights are the normal case, not an extra: a catalog bundle expands
  * IN PLACE and changes height after render. Rendered rows are measured through
  * one shared `ResizeObserver`, unmeasured rows use a rolling average of what
- * has been measured (seeded by `estimate`), and the pads correct as truth
+ * has been measured (seeded by `estimate`), and offsets correct as truth
  * arrives.
  *
- * The consumer contract, deliberately small:
+ * The consumer contract:
  *
  *   <div {@attach win.container}>                          the scroll box
- *     <ul style:padding-top="{win.padTop}px"
- *         style:padding-bottom="{win.padBottom}px">
- *       {#each rows.slice(win.start, win.end) as r, i}
- *         <li data-index={win.start + i} {@attach win.item}>…
+ *     {#if win.active}
+ *       <ul style:position="relative" style:height="{win.height}px">
+ *         {#each rows.slice(win.start, win.end) as r, i}
+ *           <li data-index={win.start + i} {@attach win.item}
+ *               style:position="absolute" style:left="0" style:right="0"
+ *               style:top="0" style:transform="translateY({win.tops[i]}px)">…
+ *     {:else}
+ *       <ul> …plain flow, exactly the markup from before windowing… </ul>
+ *     {/if}
  *
  * ⚑ `item` reads the row's index from `data-index` AT MEASURE TIME rather than
  * capturing it. A per-index attachment closure changes identity on every
@@ -64,11 +79,12 @@ export type ListWindow = {
 	readonly start: number;
 	/** One past the last rendered row index — `rows.slice(start, end)`. */
 	readonly end: number;
-	/** Height of the unrendered rows above, in px. */
-	readonly padTop: number;
-	/** Height of the unrendered rows below, in px. */
-	readonly padBottom: number;
-	/** Whether the window is smaller than the list. */
+	/** Total height of the spacer, in px. Only meaningful while `active`. */
+	readonly height: number;
+	/** `translateY` offset for each rendered row, indexed like the slice. */
+	readonly tops: readonly number[];
+	/** Whether the window is smaller than the list — the consumer's cue to
+	 *  render the absolute layout instead of plain flow. */
 	readonly active: boolean;
 	/** Attach to the scroll container. */
 	container: (node: HTMLElement) => () => void;
@@ -80,14 +96,16 @@ const DEFAULT_ESTIMATE = 44;
 const DEFAULT_OVERSCAN = 10;
 const DEFAULT_THRESHOLD = 200;
 
+const EMPTY_TOPS: readonly number[] = [];
+
 export function createWindow(count: () => number, options: WindowOptions = {}): ListWindow {
 	const estimate = options.estimate ?? DEFAULT_ESTIMATE;
 	const overscan = options.overscan ?? DEFAULT_OVERSCAN;
 	const threshold = options.threshold ?? DEFAULT_THRESHOLD;
 
-	/** `.raw`, replaced wholesale — one signal for the four numbers a template
-	 *  reads together. */
-	let win = $state.raw({ start: 0, end: 0, padTop: 0, padBottom: 0 });
+	/** `.raw`, replaced wholesale — one signal for everything a template reads
+	 *  together. */
+	let win = $state.raw({ start: 0, end: 0, height: 0, tops: EMPTY_TOPS });
 
 	/** The row count as of the consumer's last tracked read — the ONLY place
 	 *  `count()` gets called. See the module note. */
@@ -138,8 +156,19 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 	function compute(): void {
 		const n = lastCount;
 		if (n <= threshold) {
-			if (win.start !== 0 || win.end !== n || win.padTop !== 0 || win.padBottom !== 0) {
-				win = { start: 0, end: n, padTop: 0, padBottom: 0 };
+			// The window is the whole list — but still with a valid absolute
+			// layout, so a consumer that renders one branch (the stress page)
+			// works at any size. `active` is false here, which is what lets
+			// Surface.List fall back to plain flow instead.
+			ensureCapacity(n);
+			const tops: number[] = [];
+			let off = 0;
+			for (let j = 0; j < n; j += 1) {
+				tops.push(off);
+				off += heightOf(j);
+			}
+			if (win.start !== 0 || win.end !== n || Math.abs(off - win.height) > 1) {
+				win = { start: 0, end: n, height: off, tops };
 			}
 			return;
 		}
@@ -160,8 +189,9 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 			i += 1;
 		}
 		const start = Math.max(0, i - overscan);
-		let padTop = y;
-		for (let j = i - 1; j >= start; j -= 1) padTop -= heightOf(j);
+		let offset = y;
+		for (let j = i - 1; j >= start; j -= 1) offset -= heightOf(j);
+		offset = Math.max(0, offset);
 
 		let end = i;
 		let bottom = y;
@@ -171,16 +201,23 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 		}
 		end = Math.min(n, end + overscan);
 
-		let padBottom = 0;
-		for (let j = end; j < n; j += 1) padBottom += heightOf(j);
+		const tops: number[] = [];
+		let off = offset;
+		for (let j = start; j < end; j += 1) {
+			tops.push(off);
+			off += heightOf(j);
+		}
+
+		let height = off;
+		for (let j = end; j < n; j += 1) height += heightOf(j);
 
 		if (
 			start !== win.start ||
 			end !== win.end ||
-			Math.abs(padTop - win.padTop) > 1 ||
-			Math.abs(padBottom - win.padBottom) > 1
+			Math.abs(height - win.height) > 1 ||
+			Math.abs((tops[0] ?? 0) - (win.tops[0] ?? 0)) > 1
 		) {
-			win = { start, end, padTop: Math.max(0, padTop), padBottom: Math.max(0, padBottom) };
+			win = { start, end, height, tops };
 		}
 	}
 
@@ -236,11 +273,11 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 			observe();
 			return win.end;
 		},
-		get padTop() {
-			return win.padTop;
+		get height() {
+			return win.height;
 		},
-		get padBottom() {
-			return win.padBottom;
+		get tops() {
+			return win.tops;
 		},
 		get active() {
 			observe();
@@ -248,11 +285,8 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 		},
 		container(node: HTMLElement) {
 			box = node;
-			// ⚑ Scroll anchoring fights a windowed list. Every pad update makes the
-			// browser re-anchor scrollTop to keep visible content stationary — so
-			// during a thumb drag the mouse and the thumb drift apart, the browser
-			// correcting one way while the hand pulls the other. The window owns
-			// the position bookkeeping; the browser must not second-guess it.
+			// Belt to the spacer's braces: even with a stable-height spacer, the
+			// browser must not re-anchor scrollTop around row content swaps.
 			const prevAnchor = node.style.overflowAnchor;
 			node.style.overflowAnchor = 'none';
 			const onScroll = () => schedule();

@@ -327,13 +327,24 @@ rendered row paid the update tax on every fill page, so query time scaled with
 the DOM (~1 ms per rendered row per fill) rather than with the data.
 `createWindow` renders O(viewport): scroll-driven window, measured row heights
 through one shared `ResizeObserver` (a catalog bundle expanding in place
-re-measures automatically), estimate-based pads, and — the load-bearing
-property — **neutrality below its threshold**: a seven-row loans list renders
-byte-for-byte as before, pads zero, nothing measured. `Surface.List` windows
-by default with no new props; the stress page consumes the L1 primitive
-directly. Measured in the browser: the desc flip fell 13.7 s → 181 ms with 22
-DOM rows where 28 700 used to rewrite twenty times. It supersedes
-`createReveal`, deleted.
+re-measures automatically), a **fixed-height spacer with rows placed by
+`translateY`**, and — the load-bearing property — **neutrality below its
+threshold**: a seven-row loans list renders byte-for-byte as before, plain
+flow, nothing measured. `Surface.List` windows by default with no new props;
+the stress page consumes the L1 primitive directly. Measured in the browser:
+the desc flip fell 13.7 s → 181 ms with 22 DOM rows where 28 700 used to
+rewrite twenty times. It supersedes `createReveal`, deleted.
+
+The spacer is not a styling choice. The first version windowed with
+`padding-top`/`padding-bottom`, and dragging the scrollbar thumb drifted from
+the mouse — stalled at 72 % of the track with the mouse at the screen edge —
+because every window move rewrote the pads, relaid out the whole list, and
+the browser's drag mapping kept recalibrating against a shifting document.
+With one spacer whose height changes only when measurements change (the
+browser-measured `scrollHeight` went from wobbling per recompute to a stable
+constant) and rows positioned by transform, scrolling moves and resizes
+nothing, so there is no layout event left to fight the drag.
+`overflow-anchor: none` on the container stays as the belt to those braces.
 
 Two lessons from building it, both nearly casebook-grade:
 

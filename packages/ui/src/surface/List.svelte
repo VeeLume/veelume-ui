@@ -66,6 +66,24 @@
 		(isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted');
 </script>
 
+{#snippet entry(r: R)}
+	{@const isSelected = openKey === r.key}
+	{#if row}
+		{@render row(r, isSelected)}
+	{:else if r.href}
+		<!-- Split rather than <svelte:element>: an anchor and a button carry
+		     different implicit roles, and a dynamic element leaves the
+		     compiler unable to check the a11y contract. -->
+		<a href={r.href} class={rowClass(isSelected)} onclick={() => onselect?.(r)}>
+			{@render body(r)}
+		</a>
+	{:else}
+		<button type="button" class={rowClass(isSelected)} onclick={() => onselect?.(r)}>
+			{@render body(r)}
+		</button>
+	{/if}
+{/snippet}
+
 {#snippet body(r: R)}
 	<span class="min-w-0 flex-1">
 		<span class="block truncate font-medium">{r.title}</span>
@@ -120,25 +138,32 @@
 			{:else}
 				<p class="p-6 text-center text-sm text-muted-foreground">{kit.labels.empty()}</p>
 			{/if}
-		{:else}
-			<ul style:padding-top="{win.padTop}px" style:padding-bottom="{win.padBottom}px">
+		{:else if win.active}
+			<!-- Windowed: a spacer whose height only changes with MEASUREMENTS,
+			     rows placed by translateY. Scrolling moves and resizes nothing,
+			     which is what keeps a scrollbar thumb drag mapped 1:1 to the
+			     mouse — pad-based windowing relaid the list out on every window
+			     move and the drag mapping drifted. -->
+			<ul style:position="relative" style:height="{win.height}px">
 				{#each windowed as r, i (r.key)}
-					{@const isSelected = openKey === r.key}
-					<li data-index={win.start + i} {@attach win.item}>
-						{#if row}
-							{@render row(r, isSelected)}
-						{:else if r.href}
-							<!-- Split rather than <svelte:element>: an anchor and a button carry
-							     different implicit roles, and a dynamic element leaves the
-							     compiler unable to check the a11y contract. -->
-							<a href={r.href} class={rowClass(isSelected)} onclick={() => onselect?.(r)}>
-								{@render body(r)}
-							</a>
-						{:else}
-							<button type="button" class={rowClass(isSelected)} onclick={() => onselect?.(r)}>
-								{@render body(r)}
-							</button>
-						{/if}
+					<li
+						data-index={win.start + i}
+						{@attach win.item}
+						style:position="absolute"
+						style:left="0"
+						style:right="0"
+						style:top="0"
+						style:transform="translateY({win.tops[i]}px)"
+					>
+						{@render entry(r)}
+					</li>
+				{/each}
+			</ul>
+		{:else}
+			<ul>
+				{#each windowed as r (r.key)}
+					<li>
+						{@render entry(r)}
 					</li>
 				{/each}
 			</ul>

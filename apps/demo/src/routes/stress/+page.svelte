@@ -280,14 +280,22 @@
 				Safe because these rows carry no per-row component state and no
 				transitions: position IS the identity. A row with an input in it
 				would need the key back.
+
+				The spacer + translateY layout (not padding) is what keeps a
+				scrollbar drag mapped 1:1 to the mouse — see createWindow's note.
+				This list is always past the threshold, so no plain-flow branch.
 			-->
-			<ul style:padding-top="{win.padTop}px" style:padding-bottom="{win.padBottom}px">
+			<ul style:position="relative" style:height="{win.height}px">
 				{#each shown as r, i}
 					<li
 						data-index={win.start + i}
 						{@attach win.item}
-						class="flex items-baseline gap-3 border-b border-border px-3 py-1.5 text-sm
-						       last:border-b-0"
+						style:position="absolute"
+						style:left="0"
+						style:right="0"
+						style:top="0"
+						style:transform="translateY({win.tops[i]}px)"
+						class="flex items-baseline gap-3 border-b border-border px-3 py-1.5 text-sm"
 					>
 						<span class="w-16 shrink-0 tabular-nums text-xs text-muted-foreground">{r.id}</span>
 						<span class="w-24 shrink-0 tabular-nums text-xs text-muted-foreground">{r.date}</span>
