@@ -131,6 +131,18 @@ export function createCollection<
 	 */
 	const scopeIndex = new Map<string, Set<string>>();
 	/**
+	 * ⚑ ONE version signal for all live rows, at COLLECTION level — deliberately
+	 * not per live set. A per-instance signal dies with its instance: the
+	 * lifecycle forgets an unobserved set and recreates it on the next read, and
+	 * any derived that captured the dead instance's signal is permanently
+	 * disconnected — bumps land on the new instance, the old dependents never
+	 * wake, so nobody re-reads, so the new instance is never observed either.
+	 * Measured as a whole surface freezing mid-fill with zero errors: the header
+	 * stopped at a page boundary and the pipeline never woke at all. A signal
+	 * that outlives instances is what makes forget-and-recreate SAFE.
+	 */
+	let liveVersion = $state(0);
+	/**
 	 * ⚑ `$state.raw`, because a set holds a key array up to the cap.
 	 *
 	 * Plain `$state` deep-proxies it, so slicing 100 000 keys becomes 100 000
@@ -234,8 +246,9 @@ export function createCollection<
 
 	function createLive(setKey: string, sk: string, query: SetQuery): Live {
 		let rows: T[] = [];
-		let version = $state(0);
-		let deriving = $state(false);
+		// No per-instance signals — see `liveVersion`. `deriving` is plain for
+		// the same reason: readers learn of its flips through the outer bump.
+		let deriving = false;
 		const have = new Set<string>();
 		const match = options.matches;
 		const base = options.compare?.(query.order);
@@ -342,25 +355,26 @@ export function createCollection<
 				rows = rows.filter((r) => !s.has(String(io.keyOf(r))));
 			}
 			merge(adds);
-			if (strip || adds.length) version += 1;
+			if (strip || adds.length) liveVersion += 1;
 		}
 
 		const self: Live = {
 			sk,
 			get rows() {
 				subscribe();
-				void version;
+				void liveVersion;
 				return rows;
 			},
 			get deriving() {
 				subscribe();
+				void liveVersion;
 				return deriving;
 			},
 			applyBatch,
 			drop(key: string) {
 				if (!have.delete(key)) return;
 				rows = rows.filter((r) => String(io.keyOf(r)) !== key);
-				version += 1;
+				liveVersion += 1;
 			},
 			/**
 			 * The one irreducible O(cache) cost, and the only place a set is built
@@ -369,10 +383,19 @@ export function createCollection<
 			 * beats a spinner. Each chunk goes through `applyBatch`, so building IS
 			 * maintaining: sort the chunk, merge once.
 			 */
+			/**
+			 * ⚑ NOTHING SYNCHRONOUS in here may write a signal. `derive()` runs
+			 * from `liveFor`, which runs from view getters, which run inside the
+			 * consumer's `$derived` — and `liveVersion` pre-exists that
+			 * evaluation, so a synchronous bump is `state_unsafe_mutation`. (The
+			 * old per-instance `version` dodged this by accident: Svelte permits
+			 * writing state CREATED during the current evaluation, which is the
+			 * only reason derive-on-first-read was ever legal.) The reset below
+			 * is plain-variable work; every bump happens in the async chunks.
+			 */
 			derive() {
 				rows = [];
 				have.clear();
-				version += 1;
 				// Only THIS scope's records — scope membership is structural (which
 				// fill produced the record), not something `match` can decide.
 				const all = [...(scopeIndex.get(sk) ?? [])];
@@ -390,9 +413,12 @@ export function createCollection<
 					}
 					applyBatch(batch);
 					if (i < all.length) setTimeout(step, 0);
-					else deriving = false;
+					else {
+						deriving = false;
+						liveVersion += 1;
+					}
 				};
-				step();
+				setTimeout(step, 0);
 			}
 		};
 		return self;
@@ -533,12 +559,16 @@ export function createCollection<
 				return t !== undefined && performance.now() - t < 1_000;
 			};
 			let everRead = false;
+			let halted = false;
 			while (keys.length < limit && !exhausted && !stalled) {
 				const wanted = readRecently();
 				everRead ||= wanted;
 				// The final patch reports this as `capped`, which is exactly what it
 				// is: we stopped ourselves, more exists, and a later read extends.
-				if (everRead && !wanted) break;
+				if (everRead && !wanted) {
+					halted = true;
+					break;
+				}
 				const page: FetchPage<T> = await io.fetchPage({
 					scope,
 					query,
@@ -604,6 +634,25 @@ export function createCollection<
 				status: 'ready',
 				error: undefined
 			});
+
+			/**
+			 * ⚑ A halt must not silently truncate an OBSERVED set. Fine-grained
+			 * reactivity means a page that settles stops re-reading — so a fill
+			 * halted during a main-thread stall (a route compiling, a long task)
+			 * would stay at 6 000 of 10 000 forever with nothing left to extend
+			 * it. The patch above re-renders any surface still showing this set,
+			 * and that render stamps a fresh read — so a short recheck can tell
+			 * "still watched" (resume) from "abandoned" (stay halted). An
+			 * abandoned set gets no post-halt read and terminates for good.
+			 */
+			if (halted) {
+				const haltedAt = performance.now();
+				setTimeout(() => {
+					if ((lastRead.get(k) ?? 0) > haltedAt) {
+						void ensure(scope, query, false, true, limit);
+					}
+				}, 300);
+			}
 		} catch (e) {
 			patchSet(k, { status: 'error', error: toKitError(e, io.classifyError) });
 		}
