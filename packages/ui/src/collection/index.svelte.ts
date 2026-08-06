@@ -71,7 +71,7 @@ export function createCollection<
 	K extends string | number,
 	S = void,
 	B extends Record<string, unknown> = Partial<T> & Record<string, unknown>
->(io: CollectionIO<T, K, S, B>, options: CollectionOptions<S> = {}) {
+>(io: CollectionIO<T, K, S, B>, options: CollectionOptions<T, S> = {}) {
 	/**
 	 * ⚑ TWO tracked objects, and separating them is the whole design.
 	 *
@@ -113,6 +113,17 @@ export function createCollection<
 	 * lets us discard such a result instead of letting it clobber.
 	 */
 	let writeEpoch = 0;
+	/**
+	 * ⚑ The last set that reached `ready`, so a NEW set can show it while it
+	 * loads.
+	 *
+	 * `refreshing` already stops a revalidation from blanking good data, but it
+	 * only covers the same set. Changing a filter makes a DIFFERENT set, which is
+	 * legitimately cold — and the user, who just narrowed a list they were
+	 * reading, sees it vanish. Keeping the previous rows visible is the same
+	 * principle one level up; `stale` is what keeps it honest.
+	 */
+	let lastReady = $state<string | null>(null);
 	let pendingInvalidation: ChangeInfo<K, S> | null | undefined;
 	let unsubscribe: Unsubscribe | null = null;
 	let subscribing = false;
@@ -259,6 +270,7 @@ export function createCollection<
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				cache(data);
+				lastReady = k;
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
@@ -340,6 +352,7 @@ export function createCollection<
 				}
 			}
 
+			lastReady = k;
 			patchSet(k, {
 				keys,
 				fetchedCount: fetched,
@@ -416,11 +429,58 @@ export function createCollection<
 		 * going back up is instant rather than a refetch.
 		 */
 		const limit = query.cap ?? cap;
+		const slice = (ks: K[]) => (ks.length > limit ? ks.slice(0, limit) : ks);
+
+		/**
+		 * Rows we can show RIGHT NOW for this query, drawn from what we already
+		 * hold, while the server answers.
+		 *
+		 * Two ways to be sure a held row is a valid answer:
+		 *  - `options.preview` says so (the app knows what `search`/`where` mean);
+		 *  - or the query differs from the previous one only in `order`/`cap`, in
+		 *    which case every held row matches by construction.
+		 *
+		 * Anything else stays blank rather than guessing.
+		 */
+		const previewRows = (): T[] | null => {
+			const s = set();
+			if (s && s.keys.length > 0) return null;
+			if (s && s.status !== 'loading' && s.status !== 'idle') return null;
+			if (!lastReady || lastReady === k) return null;
+			const prevSet = sets[lastReady];
+			const prevDecl = declarations.get(lastReady);
+			if (!prevSet || !prevDecl) return null;
+
+			const held = hydrate(lastReady, prevSet.keys);
+			if (options.preview) {
+				const out: T[] = [];
+				for (const r of held) {
+					if (options.preview(r, query)) out.push(r);
+					if (out.length >= limit) break;
+				}
+				return out;
+			}
+			// No predicate: only safe when the predicates themselves did not change.
+			const samePredicates =
+				queryKey({ ...prevDecl.query, order: undefined, cap: undefined }) ===
+				queryKey({ ...query, order: undefined, cap: undefined });
+			return samePredicates ? held.slice(0, limit) : null;
+		};
+
 		return {
 			get all() {
 				void ensure(scope, query);
-				const ks = set()?.keys ?? [];
-				return hydrate(k, ks.length > limit ? ks.slice(0, limit) : ks);
+				const p = previewRows();
+				if (p) return p;
+				return hydrate(k, slice(set()?.keys ?? []));
+			},
+			/**
+			 * These rows answer a DIFFERENT query — the one you were looking at
+			 * before. Render them, but say so; silently showing the old answer to a
+			 * new question is worse than a spinner.
+			 */
+			get preview() {
+				return previewRows() !== null;
 			},
 			get status() {
 				void ensure(scope, query);

@@ -39,9 +39,29 @@ export const entries = createCollection<Entry, number, void>(
 			}),
 		fetchOne: (id) => invoke('stress_get', { id })
 	},
-	// Cap and page size are the two knobs the page exposes; these are the
-	// starting guesses the note says should be measured rather than picked.
-	{ cap: 2000, pageSize: 500 }
+	{
+		cap: 10_000,
+		pageSize: 500,
+		/**
+		 * ⚑ The same predicate the backend applies, evaluated locally.
+		 *
+		 * Without it, typing "Greta" over a list that visibly contains a Greta
+		 * blanks to a spinner while the server round-trips — hiding the row you
+		 * were looking at. With it, the rows we already hold that match appear
+		 * instantly as a partial answer, and the server's fuller answer replaces
+		 * them when it lands.
+		 *
+		 * It MUST agree with the server: `party` substring, id equality, exact
+		 * kind. A predicate that disagrees shows rows the real answer will not
+		 * contain, which is worse than showing nothing.
+		 */
+		preview: (e, q) => {
+			if (q.where?.kind && e.kind !== q.where.kind) return false;
+			const needle = (q.search ?? '').trim().toLowerCase();
+			if (!needle) return true;
+			return e.party.toLowerCase().includes(needle) || String(e.id) === needle;
+		}
+	}
 );
 
 /** Force generation so the one-off build cost is attributable to itself

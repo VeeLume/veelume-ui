@@ -28,8 +28,8 @@
 	let kind = $state('');
 	let order = $state('date');
 	let desc = $state(false);
-	const CAPS = [200, 1000, 2000, 5000, 20000, 100000];
-	let cap = $state(2000);
+	const CAPS = [200, 1000, 2000, 5000, 10000, 20000, 100000];
+	let cap = $state(10000);
 
 	/** Debounced, because it is server-stage and fires per keystroke. */
 	let applied = $state({ search: '', kind: '', order: 'date', desc: false });
@@ -211,7 +211,23 @@
 			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>
 	</dl>
 
-	{#if !view.complete && view.status === 'ready'}
+	{#if view.preview}
+		<!--
+			⚑ A different axis from `complete`. These rows are held records filtered
+			LOCALLY to the current query — a correct partial answer produced without
+			waiting, not the previous query's list. Typing "Greta" over a list that
+			visibly contains a Greta should not blank the row you were looking at.
+		-->
+		<div
+			class="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm
+			       text-muted-foreground"
+		>
+			<span class="size-2 animate-pulse rounded-full bg-primary"></span>
+			Showing matches from what is already loaded, while the full result arrives…
+		</div>
+	{/if}
+
+	{#if !view.complete && view.status === 'ready' && !view.preview}
 		<!-- The truncation band, hand-rolled here until it exists in the kit. -->
 		<div
 			class="flex items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
@@ -237,7 +253,10 @@
 	{/if}
 
 	<div class="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card">
-		{#if view.status === 'loading'}
+		{#if view.status === 'loading' && rows.length === 0}
+			<!-- Only when there is genuinely nothing to show. With `stale` in play
+			     that is now rare: a filter change keeps the previous rows up as a
+			     bridge until page one of the new set lands. -->
 			<p class="p-4 text-sm text-muted-foreground">{kit.labels.loading()}</p>
 		{:else if view.status === 'error'}
 			<p class="p-4 text-sm text-destructive">{view.error?.message ?? kit.labels.errorTitle()}</p>

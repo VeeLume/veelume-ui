@@ -178,7 +178,7 @@ export type CollectionIO<T, K extends string | number, S = void, B = Partial<T>>
 	classifyError?: (e: unknown) => KitError | undefined;
 };
 
-export type CollectionOptions<S> = {
+export type CollectionOptions<T, S> = {
 	/**
 	 * Reactive scope. Read INSIDE the accessors, so Svelte tracks it and a scope
 	 * change re-renders into a different cache entry. Omit for a single-scope
@@ -187,6 +187,22 @@ export type CollectionOptions<S> = {
 	scope?: () => S;
 	/** Required when scope is not already a usable key (compound scopes). */
 	scopeKey?: (scope: S) => string;
+	/**
+	 * Evaluate a pushed-down query against a record we already hold, locally.
+	 *
+	 * ⚑ This is what stops a search blanking a list that visibly already contains
+	 * matches. Type "Greta" over a list with a Greta in it and the server round
+	 * trip should not hide the row you were looking at — the rows we hold that
+	 * match ARE a correct partial answer to the new query, arriving instantly.
+	 *
+	 * The kit cannot do this itself: `search` and `where` are opaque strings it
+	 * only forwards, and which fields they mean is the app's knowledge.
+	 *
+	 * Omit it and a cold set stays blank, except when the new query differs from
+	 * the old only in `order` or `cap` — there every held row still matches by
+	 * construction, so no predicate is needed.
+	 */
+	preview?: (record: T, query: SetQuery) => boolean;
 	/**
 	 * How many records to accumulate before stopping and reporting the set
 	 * incomplete. A **row count, not a time budget** — a time budget makes the
@@ -251,6 +267,17 @@ export type ScopedView<T, K extends string | number> = {
 	readonly hasData: boolean;
 	/** False while the set is capped short of everything matching its query. */
 	readonly complete: boolean;
+	/**
+	 * The rows being returned are what we already held, filtered locally to the
+	 * current query, because the server has not answered yet.
+	 *
+	 * ⚑ Not the same axis as `complete`. `complete: false` is a partial answer
+	 * from the SERVER; `preview` is a partial answer from what the client already
+	 * held, filtered locally. Both are correct answers to the current query — the
+	 * preview is simply the subset we could produce without waiting. It drops the
+	 * moment page one arrives.
+	 */
+	readonly preview: boolean;
 	readonly fetchedCount: number;
 	readonly total: number | undefined;
 	/** Whether another accumulation step would yield more. */
