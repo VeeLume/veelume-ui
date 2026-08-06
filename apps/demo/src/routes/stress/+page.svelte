@@ -245,8 +245,20 @@
 			<!-- Rows still all land in the DOM eventually; what changed is that they
 			     arrive across frames when they exceed the budget, so the page never
 			     stalls waiting for one enormous commit. -->
+			<!--
+				⚑ UNKEYED, deliberately.
+
+				Keyed by id, changing the sort order destroys and recreates every row
+				— thousands of nodes in one commit, which is the chug. Unkeyed, the
+				each-block reuses the DOM and updates text in place, so a reorder
+				costs property writes rather than allocation.
+
+				Safe here because these rows carry no per-row component state and no
+				transitions: position IS the identity. A row with an input in it
+				would need the key back.
+			-->
 			<ul>
-				{#each shown as r (r.id)}
+				{#each shown as r}
 					<li
 						class="flex items-baseline gap-3 border-b border-border px-3 py-1.5 text-sm
 						       last:border-b-0"

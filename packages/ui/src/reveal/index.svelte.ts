@@ -1,24 +1,25 @@
 /**
  * Time-sliced reveal — render to a **paint budget**, never to a row count.
  *
- * The usual answer is a fixed step (Starlume reveals 60 rows at a time). That
- * is a guess about row cost, and the guess is wrong in both directions:
- * measured here, 100 000 simple rows paint fine and stay responsive, while a
- * few thousand expensive ones would not. A constant cannot know which list it
- * is in.
+ * A fixed step (Starlume reveals 60 at a time) is a guess about row cost, and
+ * the guess is wrong in both directions: 100 000 simple rows paint fine and
+ * stay responsive, while a few thousand expensive ones would not. A constant
+ * cannot know which list it is in. So this measures, then either renders
+ * everything at once when the estimate fits the budget — no slicing, no
+ * bookkeeping, indistinguishable from not using it — or hands the browser as
+ * many rows as fit one frame, repeatedly.
  *
- * So this measures instead. It renders a small probe, learns the actual cost
- * per row, and from then on either:
+ * ⚑ It budgets REPLACEMENT as well as growth, which the first version did not.
+ * Dropping from 5 000 rendered rows to a 100-row probe destroys ~4 900 DOM
+ * nodes in one blocking commit — the same freeze this exists to prevent, at the
+ * other end. Observed directly: switching sort order made the UI chug and sent
+ * ms/row from ~5 to ~250. So a list that is *replaced* keeps its rendered count
+ * and lets the each-block update rows in place; only a genuinely shorter list
+ * shrinks.
  *
- *   - renders everything at once, when the estimate fits the budget — no
- *     slicing, no bookkeeping, no behavioural difference from not using this
- *     at all; or
- *   - hands the browser as many rows as fit one frame, repeatedly, so the page
- *     stays interactive throughout instead of freezing once.
- *
- * ⚑ The important property is that **it never blocks past the budget**. A list
- * too big to paint does not become a stall to sit through; it becomes a list
- * that fills in. That is the difference between "slow" and "broken".
+ * ⚑ Consumers should render the sliced rows **unkeyed**. A keyed block destroys
+ * and recreates every row when identity changes, which is exactly the cost this
+ * is trying not to pay; positional rendering reuses the nodes and updates text.
  *
  * `.svelte.ts` — it holds runes.
  */
@@ -59,6 +60,13 @@ export type Reveal = {
 	readonly slicing: boolean;
 };
 
+/**
+ * Above this, a sample is not a row render — it is a teardown, a GC pause or a
+ * backgrounded tab. Folding it into the average makes every later chunk tiny
+ * and the reveal crawls, which is how a transient stall becomes permanent.
+ */
+const IMPLAUSIBLE_MS_PER_ROW = 20;
+
 export function createReveal(getTotal: () => number, options: RevealOptions = {}): Reveal {
 	const read = (v: Reactive | undefined, fallback: number): number =>
 		typeof v === 'function' ? v() : (v ?? fallback);
@@ -71,35 +79,37 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 
 	/**
 	 * ⚑ The learned cost is a PLAIN variable, mirrored into `$state` only for
-	 * display.
-	 *
-	 * As `$state` it would be read by the effect below and written by the frame
-	 * callback — so every measurement would retrigger the effect, reset `count`
-	 * to zero and start over. A reveal primitive whose whole purpose is to avoid
-	 * freezing, looping forever.
+	 * display. As `$state` it would be read by the effect below and written by
+	 * the frame callback — so every measurement would retrigger the effect,
+	 * reset `count` and start over. A reveal primitive whose whole purpose is to
+	 * avoid freezing, looping forever.
 	 */
 	let learned = 0;
 	let msPerRow = $state(0);
 
 	const total = $derived(getTotal());
 
-	// A frame is scheduled at most once; `pending` is plain (not $state) because
-	// it is bookkeeping read and written inside the callback, never rendered.
 	let pending = false;
 	let markedAt = 0;
 	let markedCount = 0;
+	/** Whether the pending commit is worth measuring. A transition frame is not:
+	 *  it carries teardown that has nothing to do with per-row cost. */
+	let measurable = false;
 	/**
-	 * ⚑ Plain, and the guard is load-bearing.
+	 * ⚑ Plain mirror of `count`, and plain guard for `total`.
 	 *
-	 * `total` comes from a getter the caller supplies, and in practice that getter
-	 * reads a collection view — whose read LAZILY FETCHES. So `total` recomputes
-	 * on every set mutation, the effect reruns, resets `count` to zero, and the
-	 * reveal restarts forever: `effect_update_depth_exceeded`.
-	 *
-	 * Only an actual change in length is a reason to re-plan. Recomputing to the
-	 * same number is not.
+	 * `total` comes from a getter that in practice reads a collection view —
+	 * whose read lazily FETCHES. So it recomputes on every set mutation and the
+	 * effect reruns; reading `count` inside it would close the read/write loop.
+	 * Both of these exist so the effect reads no `$state` it also writes.
 	 */
+	let rendered = 0;
 	let lastTotal = -1;
+
+	function show(n: number): void {
+		rendered = n;
+		count = n;
+	}
 
 	function schedule(): void {
 		if (pending) return;
@@ -107,67 +117,82 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 		requestAnimationFrame(() => {
 			pending = false;
 
-			// Measure what the last commit actually cost, and learn from it. Two
-			// rAFs would be more precise about paint specifically; one is enough to
-			// size the next chunk and costs a frame less latency.
-			if (markedCount > 0) {
+			if (measurable && markedCount > 0) {
 				const per = (performance.now() - markedAt) / markedCount;
-				// Smooth, so one janky frame (a GC, a background tab) does not
-				// permanently shrink every later chunk.
-				learned = learned ? learned * 0.6 + per * 0.4 : per;
-				msPerRow = learned;
+				// Discard implausible samples rather than smoothing them in — one
+				// janky frame should not permanently shrink every later chunk.
+				if (per < IMPLAUSIBLE_MS_PER_ROW) {
+					learned = learned ? learned * 0.6 + per * 0.4 : per;
+					msPerRow = learned;
+				}
 			}
 			markedCount = 0;
+			measurable = false;
 
-			if (count >= total) return;
+			if (rendered >= lastTotal) return;
 
-			const remaining = total - count;
+			const remaining = lastTotal - rendered;
 			const perRow = learned || 0.02;
-			// Everything left fits the budget → finish in one commit.
 			const next =
-				remaining * perRow <= budget()
-					? remaining
-					: Math.max(1, Math.floor(frame() / perRow));
+				remaining * perRow <= budget() ? remaining : Math.max(1, Math.floor(frame() / perRow));
 
 			markedAt = performance.now();
 			markedCount = next;
-			count = Math.min(total, count + next);
-			if (count < total) schedule();
+			// A pure append is the only commit that measures cleanly, and this is
+			// the only place one happens — every commit from the effect carries a
+			// list change with it.
+			measurable = true;
+			show(Math.min(lastTotal, rendered + next));
+			if (rendered < lastTotal) schedule();
 		});
 	}
 
 	$effect(() => {
-		// Re-reading `total` is what makes this restart when the list changes.
 		const n = total;
 		if (n === lastTotal) return;
+		const first = lastTotal < 0;
 		lastTotal = n;
-		count = 0;
 		slicing = false;
-		if (n === 0) return;
 
-		// ⚑ Nothing paints in a hidden document, and `requestAnimationFrame` does
-		// not fire there — so slicing would stall at the probe until the tab came
-		// forward. Slicing exists to protect the frame rate; with no frames there
-		// is nothing to protect, so render the lot. Found because the whole
-		// primitive sat at 100 rows in a background tab.
-		if (typeof document !== 'undefined' && document.hidden) {
-			count = n;
+		if (n === 0) {
+			show(0);
 			return;
 		}
 
-		// `learned` survives list changes deliberately: row cost is a property of
-		// the ROW, so a second list of the same shape should not re-probe.
+		// ⚑ Nothing paints in a hidden document and `requestAnimationFrame` does
+		// not fire there, so slicing would stall at the probe until the tab came
+		// forward. Slicing protects the frame rate; with no frames there is
+		// nothing to protect, so render the lot.
+		if (typeof document !== 'undefined' && document.hidden) {
+			show(n);
+			return;
+		}
+
+		// ⚑ A REPLACED list keeps what is already on screen.
+		//
+		// Resetting to the probe would destroy every rendered row in one commit —
+		// 5 000 nodes going away so 100 can appear — which is the stall this
+		// primitive exists to avoid. Holding the count lets an unkeyed each-block
+		// update those rows in place instead, and the reveal continues from where
+		// it was. Only a genuinely shorter list shrinks, and only to its length.
+		const keep = first ? 0 : Math.min(rendered, n);
+
 		const perRow = learned;
 		if (perRow && n * perRow <= budget()) {
-			// Known to be cheap: render it all, no slicing, no frames.
-			count = n;
+			show(n);
 			return;
 		}
+
 		slicing = true;
+		const start = keep > 0 ? keep : Math.min(n, probe);
 		markedAt = performance.now();
-		markedCount = Math.min(n, probe);
-		count = markedCount;
-		if (count < n) schedule();
+		markedCount = start;
+		// The transition frame carries teardown or a wholesale data swap, so it
+		// says nothing about per-row cost. Measuring it is what sent ms/row from
+		// ~5 to ~250 and then throttled every later chunk to a crawl.
+		measurable = false;
+		show(start);
+		if (start < n) schedule();
 	});
 
 	return {
