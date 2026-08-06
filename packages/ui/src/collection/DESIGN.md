@@ -329,11 +329,19 @@ So the tension is resolved by commitment, not cleverness:
 | `exhausted` (answer fit in ≤10k) | **local** — the pipeline over in-memory rows | sort-once derive is ~ms, per-keystroke filter sub-ms, ~5MB per set |
 | `capped` (answer exceeds 10k) | **pushed down** — refinement goes into `SetQuery`, counts come from the server's filtered `total` | UI shows "10 000 of 1.4M — refine to narrow" |
 
-The escalation is mechanical, in the descriptor-driven spirit: the surface
-reads the base set's `stopped` and routes search either into the pipeline
-(local) or into `SetQuery.search` (a new set, a deliberate server round-trip).
-No consumer flag. This also ends the search-set explosion measured under E:
-within the envelope, typing never creates sets.
+The escalation is mechanical — and it landed one layer LOWER than first
+planned: the *collection* routes, not the surface. A query carrying `search`
+resolves against its **base** (same declaration, search stripped); if the base
+set is `exhausted` and the app supplied `matches`, the search is answered by
+narrowing the base's live rows — no set minted, no fetch, `total` exact. If
+the base is capped, the search pushes down into the set key as before, and the
+base is ensured alongside so a deep-linked search still converges to the local
+regime once the base proves it exhausts. Consumers pass `search` in the query
+either way and cannot get the routing wrong. This ends the search-set
+explosion measured under E: within the envelope, typing never creates sets.
+The deterministic test bed is the **paged rig on `/probes`** — 40 records,
+cap 20 vs cap 100, a `sets` counter that climbs per pushed term and stands
+still per local one.
 
 **Consequence: the D/E arms race is over.** At 10k rows there is nothing left
 for incremental merges or IVM to win. The fixes listed above suffice.
@@ -371,14 +379,12 @@ one `COUNT(*)`; change events are emitted by our own write path.
 
 ### Build order
 
-1. Fix E within the envelope: batch merge per page, plain arrays + version
-   counter, sort-once derive (the three fixes above).
-2. Split search: local search leaves `queryKey` and moves into the pipeline;
-   `SetQuery.search` is reserved for push-down. Wire the `stopped` escalation
-   into the surface descriptor.
-3. Set lifecycle: tie live-set maintenance to `createSubscriber`
-   (`svelte/reactivity`) so unobserved sets demote to declarations instead of
-   being maintained forever.
+1. ✅ Fix E within the envelope: batch merge per page, plain arrays + version
+   counter, sort-once derive (the three fixes above). Landed as E′.
+2. ✅ Split search — landed in the collection itself, see the regime section
+   above. `SetQuery.search` only reaches a set key when it must push down.
+3. ✅ Set lifecycle: live-set maintenance tied to `createSubscriber`
+   (`svelte/reactivity`); unobserved sets demote to declarations.
 4. Litestar adapter: the same `CollectionIO` over fetch + SSE — the piece that
    proves the contract is transport-neutral, as mockIPC did for Tauri.
 5. Deletion via `ChangeInfo.keys`, now that both backends relay keyed events.

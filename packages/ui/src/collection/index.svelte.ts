@@ -48,6 +48,9 @@ const DEFAULT_PAGE = 500;
  */
 function queryKey(q: SetQuery): string {
 	const parts: string[] = [];
+	// `search` in a key means a PUSHED-DOWN search — one the server must answer.
+	// A search served locally (base set exhausted) never reaches this function:
+	// the escalation answers it from the base's rows without minting a set.
 	if (q.search) parts.push(`q=${q.search}`);
 	if (q.order) parts.push(`o=${q.order.by}:${q.order.dir ?? 'asc'}`);
 	// ⚑ `cap` is deliberately NOT in the key. Identity is what the set MATCHES —
@@ -225,11 +228,13 @@ export function createCollection<
 				}
 			: undefined;
 
-		/** Merge a sorted run of new rows into `rows` — one pass, one allocation. */
+		/** Merge a sorted run of new rows into `rows` — one pass, one allocation.
+		 *  Always a NEW array, never a push: version bump ⇔ identity change is
+		 *  what the local-search memo keys on. */
 		function merge(adds: T[]): void {
 			if (adds.length === 0) return;
 			if (!cmp) {
-				for (const r of adds) rows.push(r);
+				rows = rows.concat(adds);
 				return;
 			}
 			adds.sort(cmp);
@@ -623,6 +628,106 @@ export function createCollection<
 		};
 	}
 
+	// ── search escalation ──────────────────────────────────────────────────────
+
+	/** The declaration minus transient search — the corpus a search narrows. */
+	function baseOf(query: SetQuery): SetQuery {
+		const { search: _search, ...base } = query;
+		return base;
+	}
+
+	/**
+	 * ⚑ THE ESCALATION RULE — the envelope's two regimes, decided per read.
+	 *
+	 * A search can be answered without minting a set exactly when the base set
+	 * (same declaration, search stripped) holds everything its query matches AND
+	 * the app supplied `matches` to narrow it locally. Then typing never
+	 * creates sets, never fetches, and the answer is exact. Otherwise the search
+	 * is a different question than the rows we hold can answer, and it pushes
+	 * down into the set key as before — a deliberate server round-trip.
+	 *
+	 * Reads tracked state, so a consumer's getters re-route the moment the base
+	 * fill reports `exhausted`.
+	 */
+	function servesLocally(scope: S, query: SetQuery): boolean {
+		if (!query.search || !options.matches) return false;
+		return sets[setKeyFor(scope, baseOf(query))]?.stopped === 'exhausted';
+	}
+
+	/**
+	 * The view consumers actually get: `view()` plus the escalation. A query
+	 * without search IS its own base and passes straight through.
+	 *
+	 * In the push-down branch the base is ensured too — otherwise a deep link
+	 * that lands with a search active would fill search sets forever and never
+	 * learn that the base exhausts. One extra fill, once, buys convergence to
+	 * the local regime wherever the data permits it.
+	 */
+	function scopedView(scope: S, query: SetQuery = {}): ScopedView<T, K> {
+		if (!query.search || !options.matches) return view(scope, query);
+
+		const base = baseOf(query);
+		const match = options.matches;
+
+		/** Local narrowing, memoised on the rows array identity — which changes
+		 *  exactly when the base live set's version bumps. */
+		let memoIn: T[] | null = null;
+		let memoOut: T[] = [];
+		const narrowed = (rows: T[]): T[] => {
+			if (rows !== memoIn) {
+				memoOut = rows.filter((r) => match(r, query));
+				memoIn = rows;
+			}
+			return memoOut;
+		};
+
+		const local = () => servesLocally(scope, query);
+		const baseView = () => view(scope, base);
+		const pushView = () => {
+			void ensure(scope, base);
+			return view(scope, query);
+		};
+
+		return {
+			get all() {
+				return local() ? narrowed(baseView().all) : pushView().all;
+			},
+			get status() {
+				return local() ? baseView().status : pushView().status;
+			},
+			get error() {
+				return local() ? baseView().error : pushView().error;
+			},
+			get hasData() {
+				return local() ? narrowed(baseView().all).length > 0 : pushView().hasData;
+			},
+			/** Locally served means exactly answered: we hold the whole corpus. */
+			get stopped() {
+				return local() ? ('exhausted' as const) : pushView().stopped;
+			},
+			get fetching() {
+				return local() ? baseView().fetching : pushView().fetching;
+			},
+			get complete() {
+				return local() ? true : pushView().complete;
+			},
+			get fetchedCount() {
+				return local() ? baseView().fetchedCount : pushView().fetchedCount;
+			},
+			/** Local total is the narrowed count — the true answer, not the
+			 *  base's server total, which counts the wider corpus. */
+			get total() {
+				return local() ? narrowed(baseView().all).length : pushView().total;
+			},
+			get hasMore() {
+				return local() ? false : pushView().hasMore;
+			},
+			byKey(key: K) {
+				return (local() ? baseView() : pushView()).byKey(key);
+			}
+		};
+	}
+
 	/**
 	 * Fold a record into the cache and into any set that already lists it.
 	 *
@@ -808,9 +913,10 @@ export function createCollection<
 		 * pushed-down filter, a different order. `at(scope)` with no query is the
 		 * plain cross-scope read it always was.
 		 */
-		at: (scope: S, query: SetQuery = {}) => view(scope, query),
-		/** The ambient scope, narrowed by a pushed-down declaration. */
-		query: (query: SetQuery) => view(scopeOf(), query),
+		at: (scope: S, query: SetQuery = {}) => scopedView(scope, query),
+		/** The ambient scope, narrowed by a declaration. Search escalates: local
+		 *  over an exhausted base, pushed down over a capped one. */
+		query: (query: SetQuery) => scopedView(scopeOf(), query),
 
 		/** Whether this collection can page at all — a surface needs to know
 		 *  whether an incomplete set is even reachable. */
@@ -824,12 +930,19 @@ export function createCollection<
 		 *  warm-up can — and so a measurement of it is not accidentally timing
 		 *  the call instead of the fetch. */
 		prefetch(scope?: S, query: SetQuery = {}): Promise<void> {
-			return ensure(arguments.length ? (scope as S) : scopeOf(), query);
+			const s = arguments.length ? (scope as S) : scopeOf();
+			// Same routing as a read: a locally-served search warms its base; a
+			// pushed-down one warms both, so the base can report whether it
+			// exhausts and flip the regime.
+			if (servesLocally(s, query)) return ensure(s, baseOf(query));
+			if (query.search && options.matches) void ensure(s, baseOf(query));
+			return ensure(s, query);
 		},
 
 		/** Force a refetch of a set, keeping its data visible meanwhile. */
 		refresh(scope?: S, query: SetQuery = {}): Promise<void> {
-			return ensure(arguments.length ? (scope as S) : scopeOf(), query, true);
+			const s = arguments.length ? (scope as S) : scopeOf();
+			return ensure(s, servesLocally(s, query) ? baseOf(query) : query, true);
 		},
 
 		/**

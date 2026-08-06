@@ -11,7 +11,9 @@
 
 use tauri::State;
 
-use crate::demo::{DemoState, Edition, Loan, LoanPage, Preferences, Probe, ProbePatch, ShelfEntry};
+use crate::demo::{
+    DemoState, Edition, Loan, LoanPage, Preferences, Probe, ProbePage, ProbePatch, ShelfEntry,
+};
 
 // ── probes ─────────────────────────────────────────────────────────────────
 
@@ -75,7 +77,57 @@ pub fn probes_reset(state: State<'_, DemoState>) {
     let fresh = crate::demo::DemoData::seeded();
     data.probes_alpha = fresh.probes_alpha;
     data.probes_beta = fresh.probes_beta;
+    data.probes_paged = fresh.probes_paged;
     data.hijack = None;
+}
+
+/// The paged rig: keyset paging plus a pushed-down search over a corpus small
+/// enough to exhaust. This is the deterministic test bed for the collection's
+/// search escalation — a 100 cap exhausts the 40-record base and search stays
+/// local; a 20 cap leaves it capped and every term pushes down.
+#[tauri::command]
+#[specta::specta]
+pub fn probes_page(
+    state: State<'_, DemoState>,
+    search: String,
+    limit: i32,
+    cursor: Option<String>,
+) -> ProbePage {
+    let data = state.0.lock().unwrap();
+    let needle = search.trim().to_lowercase();
+    let hits: Vec<&Probe> = data
+        .probes_paged
+        .iter()
+        .filter(|p| {
+            needle.is_empty()
+                || p.name.to_lowercase().contains(&needle)
+                || p.id.to_lowercase().contains(&needle)
+        })
+        .collect();
+
+    let after = match cursor {
+        Some(c) => hits.iter().position(|p| p.id == c).map_or(0, |i| i + 1),
+        None => 0,
+    };
+    let take = limit.max(0) as usize;
+    let slice: Vec<Probe> = hits
+        .iter()
+        .skip(after)
+        .take(take)
+        .map(|p| (*p).clone())
+        .collect();
+    let more = after + slice.len() < hits.len();
+
+    ProbePage {
+        cursor: if more {
+            slice.last().map(|p| p.id.clone())
+        } else {
+            None
+        },
+        total: hits.len() as i32,
+        done: !more,
+        records: slice,
+    }
 }
 
 // ── library ────────────────────────────────────────────────────────────────

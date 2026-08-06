@@ -97,6 +97,40 @@
 	async function hijackNext() {
 		await invoke('probes_hijack', { patch: { note: 'OTHER WRITER' } });
 	}
+
+	// ── the paged rig: search escalation, observable ───────────────────────────
+	//
+	// Same primitive as /stress, scaled down to 40 records so BOTH regimes of
+	// the search escalation are reachable deterministically:
+	//
+	//   cap 20  → the base set stops `capped`, so every search term is a
+	//             pushed-down set — watch `sets` climb per keystroke.
+	//   cap 100 → raising the cap EXTENDS the same base set (cap is depth, not
+	//             identity) until it exhausts; from then on typing narrows
+	//             locally and mints nothing.
+	//
+	// "Forget all" drops sets and cache so the sequence can be replayed.
+	const paged = createCollection<Probe, string>(
+		{
+			keyOf: (p) => p.id,
+			fetchPage: ({ query, limit, cursor }) =>
+				invoke('probes_page', { search: query.search ?? '', limit, cursor: cursor ?? null })
+		},
+		{
+			pageSize: 10,
+			matches: (p, q) => {
+				const needle = (q.search ?? '').trim().toLowerCase();
+				return (
+					!needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)
+				);
+			},
+			compare: () => (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+		}
+	);
+
+	let rigCap = $state(20);
+	let rigSearch = $state('');
+	const rig = $derived(paged.query({ search: rigSearch.trim() || undefined, cap: rigCap }));
 </script>
 
 <div class="flex h-full flex-col gap-3 p-4">
@@ -159,4 +193,60 @@
 			{/snippet}
 		</Surface.Split>
 	</Surface.Root>
+
+	<!-- The paged rig. Not part of the surface above on purpose: it exercises
+	     the collection's search escalation directly, without the pipeline. -->
+	<section class="rounded-lg border border-border bg-card p-3">
+		<div class="flex flex-wrap items-center gap-2">
+			<h2 class="text-sm font-medium">Paged rig · search escalation</h2>
+			<input
+				class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm"
+				placeholder="Search paged probes…"
+				bind:value={rigSearch}
+			/>
+			<div class="flex rounded-md border border-input p-0.5 text-sm">
+				{#each [20, 100] as c (c)}
+					<button
+						type="button"
+						class="rounded px-2 py-1 {rigCap === c ? 'bg-accent text-accent-foreground' : ''}"
+						onclick={() => (rigCap = c)}>cap {c}</button
+					>
+				{/each}
+			</div>
+			<button
+				type="button"
+				class="h-9 rounded-md border border-input px-3 text-sm hover:bg-muted"
+				onclick={() => {
+					paged.evictAll();
+					paged.clearCache();
+				}}>Forget all</button
+			>
+		</div>
+		<dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-sm sm:grid-cols-6">
+			<div><dt class="text-xs text-muted-foreground">rows</dt>
+				<dd class="tabular-nums">{rig.all.length}</dd></div>
+			<div><dt class="text-xs text-muted-foreground">total</dt>
+				<dd class="tabular-nums">{rig.total ?? '—'}</dd></div>
+			<div><dt class="text-xs text-muted-foreground">stopped</dt>
+				<dd>{rig.stopped ?? '—'}</dd></div>
+			<div><dt class="text-xs text-muted-foreground">status</dt>
+				<dd>{rig.status}</dd></div>
+			<!-- The metric that IS the demonstration: pushed-down search mints a
+			     set per term; locally-served search mints none. -->
+			<div><dt class="text-xs text-muted-foreground">sets</dt>
+				<dd class="tabular-nums">{paged.debug.sets.length}</dd></div>
+			<div><dt class="text-xs text-muted-foreground">live</dt>
+				<dd class="tabular-nums">{paged.debug.liveSets.length}</dd></div>
+		</dl>
+		<p class="mt-1 text-xs text-muted-foreground">
+			At cap 20 the base stays capped and every term is a pushed-down set — “sets” climbs per
+			keystroke. Switch to cap 100: the base extends until it exhausts, and typing then narrows
+			locally, minting nothing. “Forget all” replays it.
+		</p>
+		<ul class="mt-2 flex flex-wrap gap-1">
+			{#each rig.all as p (p.id)}
+				<li class="rounded bg-muted px-2 py-0.5 text-xs">{p.name}</li>
+			{/each}
+		</ul>
+	</section>
 </div>

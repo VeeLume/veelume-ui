@@ -50,6 +50,15 @@ async probesHijack(patch: ProbePatch) : Promise<void> {
 async probesReset() : Promise<void> {
     await TAURI_INVOKE("probes_reset");
 },
+/**
+ * The paged rig: keyset paging plus a pushed-down search over a corpus small
+ * enough to exhaust. This is the deterministic test bed for the collection's
+ * search escalation — a 100 cap exhausts the 40-record base and search stays
+ * local; a 20 cap leaves it capped and every term pushes down.
+ */
+async probesPage(search: string, limit: number, cursor: string | null) : Promise<ProbePage> {
+    return await TAURI_INVOKE("probes_page", { search, limit, cursor });
+},
 async editionsList() : Promise<Edition[]> {
     return await TAURI_INVOKE("editions_list");
 },
@@ -243,6 +252,10 @@ export type Loan = { id: string; title: string; borrower: string; lent_on: strin
 export type LoanPage = { records: Loan[]; cursor: string | null; total: number; done: boolean }
 export type Preferences = { id: string; display_name: string; default_loan_days: number; fine_per_day_cents: number; preferred_format: string; notes: string }
 export type Probe = { id: string; name: string; note: string }
+/**
+ * One accumulation step over the paged probes. Mirrors the kit's `FetchPage`.
+ */
+export type ProbePage = { records: Probe[]; cursor: string | null; total: number; done: boolean }
 export type ProbePatch = { note: string | null }
 export type ShelfEntry = { edition_id: string; state: string }
 

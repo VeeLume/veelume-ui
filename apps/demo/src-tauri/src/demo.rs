@@ -40,6 +40,35 @@ fn seed_probes(scope: &str) -> Vec<Probe> {
         .collect()
 }
 
+/// One accumulation step over the paged probes. Mirrors the kit's `FetchPage`.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ProbePage {
+    pub records: Vec<Probe>,
+    pub cursor: Option<String>,
+    pub total: i32,
+    pub done: bool,
+}
+
+/// 8 × 5 cycling with period 40 → every name distinct, every word shared by
+/// several rows — so a one-word search has a small, countable answer.
+const PAGED_GIVEN: [&str; 8] = [
+    "amber", "birch", "cedar", "fjord", "garnet", "heron", "juniper", "krill",
+];
+const PAGED_KIND: [&str; 5] = ["array", "beacon", "circuit", "dynamo", "filament"];
+
+/// The paged-rig corpus: 40 records — big enough to page, small enough to
+/// exhaust under a 100 cap, which is what makes the search escalation's two
+/// regimes reachable deterministically.
+fn seed_probes_paged() -> Vec<Probe> {
+    (0..40usize)
+        .map(|i| Probe {
+            id: format!("paged-{:02}", i + 1),
+            name: format!("{} {} {}", PAGED_GIVEN[i % 8], PAGED_KIND[i % 5], i + 1),
+            note: "initial".into(),
+        })
+        .collect()
+}
+
 // ── library: reference data + overlay ──────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -202,6 +231,8 @@ impl Default for Preferences {
 pub struct DemoData {
     pub probes_alpha: Vec<Probe>,
     pub probes_beta: Vec<Probe>,
+    /// Read-only corpus for the paged rig — never mutated, reset with probes.
+    pub probes_paged: Vec<Probe>,
     /// Applied INSTEAD of the requested body on the next probe save — the
     /// deterministic write conflict the record-store spike had to race for.
     pub hijack: Option<ProbePatch>,
@@ -216,6 +247,7 @@ impl DemoData {
         Self {
             probes_alpha: seed_probes("alpha"),
             probes_beta: seed_probes("beta"),
+            probes_paged: seed_probes_paged(),
             hijack: None,
             editions: seed_editions(),
             shelf: seed_shelf(),

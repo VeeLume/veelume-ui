@@ -41,6 +41,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         demo_commands::probes_save,
         demo_commands::probes_hijack,
         demo_commands::probes_reset,
+        demo_commands::probes_page,
         demo_commands::editions_list,
         demo_commands::shelf_list,
         demo_commands::shelf_toggle,
