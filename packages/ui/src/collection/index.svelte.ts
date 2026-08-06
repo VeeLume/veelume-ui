@@ -157,9 +157,22 @@ export function createCollection<
 
 
 	/** Put records in the cache. The one way anything enters it. */
+	/**
+	 * Put records in the cache WITHOUT notifying.
+	 *
+	 * ⚑ Notification is separate because every bump re-derives every set, and a
+	 * derivation is O(cache): scan, filter, sort. Bumping per page made a 20-page
+	 * fill do twenty full derivations over a growing cache — 21s for a 10 000-row
+	 * query, with the main thread blocked throughout. The publish cadence already
+	 * decides when the user should see progress; invalidation belongs on the same
+	 * beat.
+	 */
 	function cache(list: T[]): void {
 		for (const r of list) records.set(String(io.keyOf(r)), r);
-		// One notification for the whole page, not one per record.
+	}
+
+	/** Make cached records visible to derivations. Call at a publish point. */
+	function publishCache(): void {
 		recordsVersion += 1;
 	}
 
@@ -262,6 +275,7 @@ export function createCollection<
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				cache(data);
+				publishCache();
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
@@ -329,6 +343,7 @@ export function createCollection<
 				// So: publish on a cadence, and hand the browser a real task each
 				// time so it can actually draw what was published.
 				if (pages === 1 || pages % PUBLISH_EVERY === 0) {
+					publishCache();
 					patchSet(k, {
 						keys: [...keys],
 						fetchedCount: fetched,
@@ -343,6 +358,7 @@ export function createCollection<
 				}
 			}
 
+			publishCache();
 			patchSet(k, {
 				keys,
 				fetchedCount: fetched,
@@ -479,7 +495,7 @@ export function createCollection<
 	function upsert(record: T): void {
 		const key = String(io.keyOf(record));
 		records.set(key, record);
-		recordsVersion += 1;
+		publishCache();
 	}
 
 	/** Append a record to a set it is known to belong to (a local create). */
