@@ -33,6 +33,8 @@
  * (`state_referenced_locally`), which is more than it does for most of the
  * kit's reactivity traps.
  */
+import { tick } from 'svelte';
+
 type Reactive = number | (() => number);
 
 export type RevealOptions = {
@@ -47,8 +49,9 @@ export type RevealOptions = {
 	 * huge per-row cost, which shrinks the next chunk further.
 	 */
 	overrunMs?: Reactive;
-	/** Rows in the first render, before anything has been measured. Small
-	 *  enough to be cheap on any row, large enough to time reliably. */
+	/** Rows in the first render, before anything has been measured. Big enough
+	 *  that a cheap list is essentially done after one commit, small enough that
+	 *  an expensive one does not stall on it. */
 	probe?: number;
 };
 
@@ -64,20 +67,25 @@ export type Reveal = {
 };
 
 /**
- * A frame this long or longer means we overran and the user saw jank. Under it,
- * we came in on time and can afford more. ~20ms allows 50fps.
+ * Work allowed per frame. Deliberately under a 16.7ms frame: the commit cost we
+ * measure covers JS and DOM mutation but NOT the layout and paint the browser
+ * does afterwards, so the remainder is headroom for the part we cannot see.
  */
-const FRAME_OVERRUN_MS = 20;
+const FRAME_OVERRUN_MS = 10;
 
-/** Never shrink below this — one row per frame is indistinguishable from a
+/** Never shrink below this — a few rows per frame is indistinguishable from a
  *  hang, which is the failure this primitive is supposed to prevent. */
-const MIN_CHUNK = 25;
+const MIN_CHUNK = 50;
+
+/** Never hand more than this to one commit, however cheap the rows measure. A
+ *  bad estimate should cost one long frame, not a lockup. */
+const MAX_CHUNK = 20_000;
 
 export function createReveal(getTotal: () => number, options: RevealOptions = {}): Reveal {
 	const read = (v: Reactive | undefined, fallback: number): number =>
 		typeof v === 'function' ? v() : (v ?? fallback);
 	const overrunMs = () => read(options.overrunMs, FRAME_OVERRUN_MS);
-	const probe = options.probe ?? 100;
+	const probe = options.probe ?? 400;
 
 	let count = $state(0);
 	let slicing = $state(false);
@@ -92,30 +100,8 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 	let learned = 0;
 	let msPerRow = $state(0);
 
-	/**
-	 * ⚑ Chunk size is adapted directly; it is NOT derived from a per-row cost.
-	 *
-	 * Deriving it was a death spiral. The only thing measurable across
-	 * `requestAnimationFrame` callbacks is the FRAME INTERVAL, which is ~16.7ms
-	 * whatever the chunk size — so a small chunk measures a whole frame, reports
-	 * a huge ms/row, and shrinks the next chunk further. Observed live: 19.17
-	 * ms/row and a chunk of one row per frame, i.e. a list that never finishes.
-	 *
-	 * So: did we hold the frame or not? Under budget, grow. Over, shrink. The
-	 * signal is the thing actually cared about — dropped frames — and it cannot
-	 * run away, because overrunning is what shrinks it.
-	 */
-	let chunk = 0;
-	let lastFrameAt = 0;
-
 	const total = $derived(getTotal());
 
-	let pending = false;
-	let markedAt = 0;
-	let markedCount = 0;
-	/** Whether the pending commit is worth measuring. A transition frame is not:
-	 *  it carries teardown that has nothing to do with per-row cost. */
-	let measurable = false;
 	/**
 	 * ⚑ Plain mirror of `count`, and plain guard for `total`.
 	 *
@@ -132,50 +118,65 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 		count = n;
 	}
 
-	function schedule(): void {
-		if (pending) return;
-		pending = true;
-		requestAnimationFrame(() => {
-			pending = false;
+	/**
+	 * ⚑ Fill by MEASURED COMMIT COST, packing as many chunks into a frame as fit.
+	 *
+	 * The previous version did one chunk per `requestAnimationFrame` and sized it
+	 * from the frame interval. Both halves were wrong. The interval is ~16.7ms
+	 * whatever the chunk contains, so it measures the browser's clock rather than
+	 * our work; and one chunk per frame wastes whatever is left of the frame,
+	 * which for cheap rows is most of it. 20 000 rows took dozens of frames to
+	 * appear when the actual DOM work was a fraction of that.
+	 *
+	 * `await tick()` resolves once Svelte has flushed to the DOM, so the elapsed
+	 * time around it is the real cost of that commit — a per-row figure that is
+	 * about the rows. With it, chunk size is arithmetic rather than a guess, and
+	 * the loop keeps going until the frame's allowance is spent.
+	 *
+	 * The frame-overrun check survives as a safety net, because `tick()` does not
+	 * cover layout and paint: if the previous frame ran long anyway, the
+	 * allowance is cut for the next one.
+	 */
+	let pumping = false;
+	let penalty = 1;
 
-			const now = performance.now();
-			const delta = lastFrameAt ? now - lastFrameAt : overrunMs();
-			lastFrameAt = now;
+	const nextFrame = () => new Promise<number>((r) => requestAnimationFrame(r));
 
-			if (measurable && markedCount > 0) {
-				// Additive-ish growth, halving on overrun. Grows fast enough to reach
-				// thousands of rows within a few frames on a cheap list, and backs off
-				// immediately on an expensive one.
-				chunk =
-					delta < overrunMs()
-						? Math.min(markedCount * 2, 20_000)
-						: Math.max(MIN_CHUNK, Math.floor(markedCount / 2));
-				// Reported only. Nothing sizes itself from this any more.
-				const per = delta / markedCount;
-				learned = learned ? learned * 0.6 + per * 0.4 : per;
-				msPerRow = learned;
+	async function pump(): Promise<void> {
+		if (pumping) return;
+		pumping = true;
+		try {
+			while (rendered < lastTotal) {
+				const frameStarted = await nextFrame();
+				const allowance = overrunMs() * penalty;
+				let spent = 0;
+
+				while (rendered < lastTotal && spent < allowance) {
+					const perRow = learned || 0.005;
+					const size = Math.max(
+						MIN_CHUNK,
+						Math.min(MAX_CHUNK, lastTotal - rendered, Math.floor((allowance - spent) / perRow))
+					);
+
+					const t0 = performance.now();
+					show(Math.min(lastTotal, rendered + size));
+					await tick();
+					const cost = performance.now() - t0;
+
+					spent += cost;
+					learned = learned ? learned * 0.6 + (cost / size) * 0.4 : cost / size;
+					msPerRow = learned;
+				}
+
+				// What the frame ACTUALLY cost, layout and paint included. If the
+				// browser is struggling, take less next time even though our own
+				// measurements looked fine.
+				const frameCost = performance.now() - frameStarted;
+				penalty = frameCost > overrunMs() * 3 ? Math.max(0.25, penalty / 2) : Math.min(1, penalty * 1.5);
 			}
-			markedCount = 0;
-			measurable = false;
-
-			if (rendered >= lastTotal) return;
-
-			// One adapted chunk. Nothing here consults ms/row: doubling reaches
-			// 20 000 rows within ~8 healthy frames from a 100-row probe, so a cheap
-			// list finishes in well under the budget without needing a cost model,
-			// and an expensive one halves back without one either.
-			const remaining = lastTotal - rendered;
-			const next = Math.min(remaining, chunk || probe);
-
-			markedAt = performance.now();
-			markedCount = next;
-			// A pure append is the only commit that measures cleanly, and this is
-			// the only place one happens — every commit from the effect carries a
-			// list change with it.
-			measurable = true;
-			show(Math.min(lastTotal, rendered + next));
-			if (rendered < lastTotal) schedule();
-		});
+		} finally {
+			pumping = false;
+		}
 	}
 
 	$effect(() => {
@@ -216,19 +217,13 @@ export function createReveal(getTotal: () => number, options: RevealOptions = {}
 		}
 
 		slicing = true;
-		// A fresh list re-probes rather than trusting a chunk size learned against
-		// different rows; a continued one keeps its pace.
-		if (keep === 0) chunk = probe;
-		lastFrameAt = 0;
+		// A fresh list re-probes rather than trusting a cost learned against
+		// different rows; a continued one keeps what it knows.
+		if (keep === 0) learned = 0;
+		penalty = 1;
 		const start = keep > 0 ? keep : Math.min(n, probe);
-		markedAt = performance.now();
-		markedCount = start;
-		// The transition frame carries teardown or a wholesale data swap, so it
-		// says nothing about per-row cost. Measuring it is what sent ms/row from
-		// ~5 to ~250 and then throttled every later chunk to a crawl.
-		measurable = false;
 		show(start);
-		if (start < n) schedule();
+		if (start < n) void pump();
 	});
 
 	return {
