@@ -25,6 +25,10 @@ Those three are in tension, and every design below is an attempt to resolve it.
 The test bed is `apps/demo/src/routes/stress`, a real 1.5M-record dataset over
 both transports.
 
+*(Resolved 2026-08: the tension is not resolvable in plain JS on the main
+thread, and nobody else resolves it there either. The commitment that replaces
+it is at the end — [The envelope](#the-envelope--committed-goals-2026-08).)*
+
 ---
 
 ## A — scope-keyed entries *(original)*
@@ -245,3 +249,105 @@ Recorded so the next attempt does not rediscover them:
 - **Do not use `$state` for the rows array.** Use a plain array with a version
   counter, exactly as `records` already does — mutation stays a memmove and
   reactivity is one signal instead of a proxy per record.
+- **Apply batches, not records.** `cache()` hands each record to `apply()`
+  individually, so every arrival pays its own binary search + splice + reindex —
+  design D already had the O(n + k) shape: filter the page, sort the page, one
+  merge pass. D's algorithm was right; only its reactivity (fresh array per
+  publish) was wrong. Keep the merge, mutate the target, bump the version.
+- **`derive()` must sort once, not insert sorted.** Building a 10 000-row set
+  via per-record sorted insert is itself quadratic — filter matches into a plain
+  buffer per chunk, sort at the end.
+
+---
+
+## The envelope — committed goals (2026-08)
+
+The five designs above churned because the requirement was over-scoped, not
+because the implementations were wrong. "Client-side filtering + contextual
+counts over 1.5M rows, responsive, in plain JS objects on the main thread" is a
+constraint set nobody satisfies — at that scale the industry weakens one of the
+three: push queries to a server (AG Grid server-side model, faceted search),
+hold the data in an indexed engine (SQLite WASM, PowerSync, RxDB), or maintain
+views with real incremental view maintenance (TanStack DB, Rocicorp Zero —
+which is what C→E were reinventing, badly). Even Linear, the poster child for
+"sync everything, filter locally", is bounded (~10⁵ objects) and grew partial
+sync when workspaces outgrew it.
+
+So the tension is resolved by commitment, not cleverness:
+
+### The goals
+
+- **View cap: 10 000 rows.** Not a tunable — the envelope. `DEFAULT_CAP`
+  becomes 10 000 and the two regimes below hang off `stopped`.
+- **Architecture: frontend → backend → DB.** Svelte talks only to *our*
+  backend — Tauri/Rust or Litestar/Python — which talks to SQLite (local) or
+  TrailBase (remote). The frontend wire contract is therefore ours to define;
+  DB quirks are the backend's problem.
+
+### The two regimes
+
+| `stopped` | filtering / search / counts | mechanism |
+|---|---|---|
+| `exhausted` (answer fit in ≤10k) | **local** — the pipeline over in-memory rows | sort-once derive is ~ms, per-keystroke filter sub-ms, ~5MB per set |
+| `capped` (answer exceeds 10k) | **pushed down** — refinement goes into `SetQuery`, counts come from the server's filtered `total` | UI shows "10 000 of 1.4M — refine to narrow" |
+
+The escalation is mechanical, in the descriptor-driven spirit: the surface
+reads the base set's `stopped` and routes search either into the pipeline
+(local) or into `SetQuery.search` (a new set, a deliberate server round-trip).
+No consumer flag. This also ends the search-set explosion measured under E:
+within the envelope, typing never creates sets.
+
+**Consequence: the D/E arms race is over.** At 10k rows there is nothing left
+for incremental merges or IVM to win. The fixes listed above suffice.
+
+### The wire contract (frontend ↔ backend, both transports)
+
+- `fetchPage({ scope, query: { where, search, order }, limit, cursor })`
+  → `{ records, cursor?, total?, done? }`, where `total` is the count of the
+  **filtered** query, never the table.
+- **The backend appends the PK as an order tiebreak**, so every order is total.
+  (The client comparator needs the same tiebreak for local sorting.)
+- `subscribe` delivers `{ kind: create | update | delete, keys, scope? }` —
+  Tauri event emit on one side, SSE from Litestar on the other. This populates
+  `ChangeInfo.keys` and unlocks tier-2 deletion.
+
+### Backend obligations, per DB
+
+**SQLite (Rust or Litestar):** trivial. Keyset paging is
+`WHERE (ord, pk) > (:ord, :pk) ORDER BY ord, pk LIMIT :n`; filtered count is
+one `COUNT(*)`; change events are emitted by our own write path.
+
+**TrailBase (the proxy case)** — verified against its docs 2026-08:
+
+- Cursor pagination is **PK-order only** (INTEGER/UUIDv4/UUIDv7 PKs). For any
+  other sort the backend falls back to **offset paging** — safe *because* the
+  envelope bounds offset at 10k.
+- `limit` max is **1024** → a full fill is ~10 upstream requests; use
+  `pageSize` ≈ 1000 against TrailBase-backed backends.
+- Filters: `filter[col][$op]=v`, AND-only, `$eq/$ne/$gt/$gte/$lt/$lte/$like/$in`.
+  Covers facets and prefix search; OR is the backend's job to compose.
+- `count=true` returns the filtered `total_count` → maps onto `total`.
+- SSE subscriptions carry insert/update/delete with keys, **but are per-table
+  opt-in in TrailBase config** — a disabled subscription looks exactly like
+  broken invalidation, so the adapter docs must name the prerequisite.
+
+### Build order
+
+1. Fix E within the envelope: batch merge per page, plain arrays + version
+   counter, sort-once derive (the three fixes above).
+2. Split search: local search leaves `queryKey` and moves into the pipeline;
+   `SetQuery.search` is reserved for push-down. Wire the `stopped` escalation
+   into the surface descriptor.
+3. Set lifecycle: tie live-set maintenance to `createSubscriber`
+   (`svelte/reactivity`) so unobserved sets demote to declarations instead of
+   being maintained forever.
+4. Litestar adapter: the same `CollectionIO` over fetch + SSE — the piece that
+   proves the contract is transport-neutral, as mockIPC did for Tauri.
+5. Deletion via `ChangeInfo.keys`, now that both backends relay keyed events.
+   Tier-3 (interval reconciliation via `FetchPage.from`) stays designed-not-
+   built until a backend actually cannot send keys.
+
+**Open doc debt:** `packages/ui/CLAUDE.md`'s "Deliberately not built — fetch
+paging" now reads as contradicting the fill, which does page. The rule it
+means: *the client never exposes pages; below 10k it holds the set, above 10k
+it narrows the query.* Rephrase it there when the envelope lands.
