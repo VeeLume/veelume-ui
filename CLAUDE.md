@@ -42,8 +42,14 @@ with `/stress/list` and `/stress/catalog` running both archetypes at that scale.
 The five failed designs behind this are in `packages/ui/src/collection/DESIGN.md`
 — read it before touching that primitive.
 
-What is NOT built, deliberately: TrailBase as a third transport, a Litestar
-adapter (the wire contract is defined for it, so it stays cheap to add),
+**Two transports, named by shape: Tauri IPC and HTTP + SSE.** The backend's
+language sits below that line and is an app choice — Axum, Litestar, anything —
+so "Litestar" and "Axum" are one case, not two. Only the first is built; the
+fixture backend stands in as a third IO adapter for the browser.
+
+What is NOT built, deliberately: the HTTP + SSE adapter (the wire contract is
+defined for it, and its one open design decision — reconnects must re-invalidate
+— is settled in `CollectionIO.subscribe`), TrailBase behind a backend,
 user-visible pages, and a `Picker`/`StatusBadge`. See `Deliberately not built`
 in the kit's rulebook and the vault note's Next list.
 

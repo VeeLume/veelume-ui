@@ -173,9 +173,10 @@ export type CollectionIO<T, K extends string | number, S = void, B = Partial<T>>
 	 *
 	 * An adapter supplying this is expected to honour the whole request. There is
 	 * no capability negotiation, because every backend here is one we write —
-	 * Tauri or Litestar over SQLite, TrailBase or Postgres. Whether a predicate
-	 * can be pushed down is knowledge the *app* has, and it belongs in the
-	 * surface descriptor that declares the predicate, not in a handshake.
+	 * reached over Tauri IPC or HTTP, backed by SQLite, TrailBase or Postgres.
+	 * Whether a predicate can be pushed down is knowledge the *app* has, and it
+	 * belongs in the surface descriptor that declares the predicate, not in a
+	 * handshake.
 	 */
 	fetchPage?: (req: FetchRequest<S>) => Promise<FetchPage<T>>;
 	/** One record by key — a deep link, or a hit from a server-side search that
@@ -189,6 +190,20 @@ export type CollectionIO<T, K extends string | number, S = void, B = Partial<T>>
 	 * Backend invalidation. stibu emits a Tauri event per write; TrailBase
 	 * pushes realtime; a plain request/response API has none, and the collection
 	 * is then simply fetch-once.
+	 *
+	 * ⚑ AN ADAPTER OVER A LOSSY CHANNEL MUST CALL `onChange()` WITH NO ARGUMENT
+	 * ON EVERY RECONNECT. This is the whole contract for SSE/WebSocket
+	 * transports and it is not optional: a dropped connection means missed
+	 * events, so a silent reconnect leaves the cache stale *with no way to know
+	 * it is* — the silent staleness this primitive exists to prevent. No new
+	 * API is needed because every field of `ChangeInfo` is optional: an
+	 * argument-less call already means "something changed, I cannot say what",
+	 * and the collection reloads every declaration it holds. What began as a
+	 * concession to a backend with uninformative events is exactly the right
+	 * recovery primitive for a connection that can drop.
+	 *
+	 * In-process transports (Tauri IPC) cannot lose an event and have nothing
+	 * to do here.
 	 */
 	subscribe?: (onChange: (info?: ChangeInfo<K, S>) => void) => Unsubscribe | Promise<Unsubscribe>;
 

@@ -414,9 +414,19 @@ So the tension is resolved by commitment, not cleverness:
 - **View cap: 10 000 rows.** Not a tunable — the envelope. `DEFAULT_CAP`
   becomes 10 000 and the two regimes below hang off `stopped`.
 - **Architecture: frontend → backend → DB.** Svelte talks only to *our*
-  backend — Tauri/Rust or Litestar/Python — which talks to SQLite (local) or
-  TrailBase (remote). The frontend wire contract is therefore ours to define;
-  DB quirks are the backend's problem.
+  backend, which talks to SQLite (local) or TrailBase (remote). The frontend
+  wire contract is therefore ours to define; DB quirks are the backend's
+  problem.
+- **⚑ TWO TRANSPORTS, named by shape rather than by language: Tauri IPC and
+  HTTP + SSE.** The kit is designed for exactly these two. The backend's
+  *language* is a free variable below that line — Axum, Litestar, anything —
+  and choosing it is an app decision, not a kit one. Naming the axis this way
+  is what keeps it from multiplying: "Litestar" and "Axum" are one case.
+
+  For a fleet already writing Rust for Tauri, the cheap web deployment is a
+  second adapter over the same domain crate (the demo's own `demo.rs` /
+  `demo_commands.rs` split is exactly this shape) — one implementation of the
+  logic, two entry points.
 
 ### The two regimes
 
@@ -450,12 +460,57 @@ for incremental merges or IVM to win. The fixes listed above suffice.
 - **The backend appends the PK as an order tiebreak**, so every order is total.
   (The client comparator needs the same tiebreak for local sorting.)
 - `subscribe` delivers `{ kind: create | update | delete, keys, scope? }` —
-  Tauri event emit on one side, SSE from Litestar on the other. This populates
+  a Tauri event emit on one side, an SSE message on the other. This populates
   `ChangeInfo.keys` and unlocks tier-2 deletion.
+
+`CollectionIO` is already the whole abstraction: both transports implement the
+same four functions, and nothing above the adapter can tell them apart. What
+differs is not the *shape* but the *physics*, and those differences are what
+the kit has to absorb:
+
+| | Tauri IPC | HTTP + SSE |
+|---|---|---|
+| round trip | ~1–13 ms | 20–300 ms |
+| event delivery | guaranteed (same process) | **lossy** — reconnects drop events |
+| auth | none | sessions expire (`auth-expired`) |
+| concurrent writers | rare | normal (`write-diverged`) |
+| failure | command `Result` | status codes *and* network loss |
+
+**Consequences, in the order they bite:**
+
+1. **⚑ A reconnect must be reported as a change.** This is the one genuinely
+   new problem, and it is the dangerous kind: a dropped SSE connection means
+   missed events, so the cache goes stale *with no way to know it did* —
+   silent staleness, which is the failure this primitive exists to prevent.
+   The fix needs no new API, and that is the point: `ChangeInfo` is
+   all-optional precisely because stibu's events carry neither keys nor scope,
+   so **an SSE adapter calls `onChange()` with no argument after every
+   reconnect** and the existing degradation path reloads every declaration.
+   What was a concession to a poor backend turns out to be the correct
+   recovery primitive. An adapter that reconnects *silently* is the bug.
+2. **`pageSize` is transport-scaled, not one number.** 500 is right when a
+   round trip is free; over HTTP a 10k fill at 500 is 20 sequential requests,
+   so ~1000 (TrailBase's ceiling anyway) is the floor to start from. It is
+   already per-collection via `options.pageSize` — this is guidance, not a
+   change.
+3. **The envelope is per-transport too.** Every number in this file was
+   measured over free transport. Over real latency the push-down regime
+   becomes attractive *below* 10k, so a web surface should expect to pick a
+   smaller `cap` than a desktop one. Re-measure before assuming 10k transfers.
+4. **Fill halting earns more.** Abandoned fills cost bandwidth and a server's
+   attention, not just local CPU.
+5. **Two error paths become real** rather than theoretical: `auth-expired` and
+   `write-diverged` have had slots in the typed union since the start and have
+   never been exercised against a backend that actually produces them.
+
+**Deliberately still open:** the collection cannot express "I am currently
+disconnected". The adapter knows; the surface may want to show it. That is
+plausibly app-level state rather than a sixth `Status`, and it should not be
+decided until a real surface needs it.
 
 ### Backend obligations, per DB
 
-**SQLite (Rust or Litestar):** trivial. Keyset paging is
+**SQLite (whatever the backend is written in):** trivial. Keyset paging is
 `WHERE (ord, pk) > (:ord, :pk) ORDER BY ord, pk LIMIT :n`; filtered count is
 one `COUNT(*)`; change events are emitted by our own write path.
 
@@ -481,13 +536,23 @@ one `COUNT(*)`; change events are emitted by our own write path.
    above. `SetQuery.search` only reaches a set key when it must push down.
 3. ✅ Set lifecycle: live-set maintenance tied to `createSubscriber`
    (`svelte/reactivity`); unobserved sets demote to declarations.
-4. Litestar adapter: the same `CollectionIO` over fetch + SSE — the piece that
-   proves the contract is transport-neutral, as mockIPC did for Tauri.
-5. Deletion via `ChangeInfo.keys`, now that both backends relay keyed events.
-   Tier-3 (interval reconciliation via `FetchPage.from`) stays designed-not-
-   built until a backend actually cannot send keys.
+4. ✅ Deletion via `ChangeInfo.keys`, now that both backends relay keyed
+   events. Tier-3 (interval reconciliation via `FetchPage.from`) stays
+   designed-not-built until a backend actually cannot send keys.
+5. ✅ Windowed rendering — see the `createWindow` entry above.
+6. **The HTTP + SSE adapter.** Not yet built, and deliberately not urgent: the
+   fixture backend already proves the frontend is not coupled to Tauri, so
+   this one's value is different — it is the first transport with real
+   latency, real auth, real concurrency and *lossy events*, which is where the
+   contract above stops being theory. Two things settle before the code:
+   the reconnect convention (item 1 of the consequences — the adapter must
+   call `onChange()` on every reconnect) and a re-measured envelope over
+   realistic latency. Needs a consumer in `apps/demo` per the kit's rules,
+   which is a scope decision (a server in-tree vs. out) rather than a
+   technical one.
 
-**Open doc debt:** `packages/ui/CLAUDE.md`'s "Deliberately not built — fetch
-paging" now reads as contradicting the fill, which does page. The rule it
-means: *the client never exposes pages; below 10k it holds the set, above 10k
-it narrows the query.* Rephrase it there when the envelope lands.
+   Kit-vs-app split, when it happens: the kit ships the SSE plumbing,
+   reconnect policy and HTTP `classifyError` defaults; the **app** supplies
+   the URL/param builder, because that is exactly what differs between Axum,
+   Litestar and TrailBase. Those axes are nameable, which is what makes an L1
+   helper legitimate rather than generalising instance #1.

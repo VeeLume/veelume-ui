@@ -119,7 +119,26 @@ deliberately rather than discovered.
   reload-on-every-event starts a fetch before the write commits and can serve pre-write state.
   Invalidation must be idempotent under event storms (one write can emit several events).
 
-#### The envelope (the five-design casebook is `collection/DESIGN.md` — read it before changing `index.svelte.ts`)
+#### Two transports, named by shape (the five-design casebook is `collection/DESIGN.md` — read it before changing `index.svelte.ts`)
+
+The kit is designed for exactly two: **Tauri IPC** and **HTTP + SSE**. The backend's
+*language* sits below that line and is an app choice (Axum, Litestar, …) — naming the axis by
+shape is what stops it multiplying. `CollectionIO` is the whole abstraction; both implement the
+same four functions and nothing above the adapter can tell them apart.
+
+What differs is physics, not shape: round trips cost 20–300ms instead of ~1–13ms, sessions
+expire, concurrent writers are normal, and **events are lossy**.
+
+- **⚑ An adapter over a lossy channel MUST call `onChange()` with no argument on every
+  reconnect.** A dropped connection means missed events, so a silent reconnect leaves the cache
+  stale with no way to know it is. No new API: every `ChangeInfo` field is optional, so an
+  argument-less call already means "something changed, I cannot say what" and reloads every
+  declaration.
+- **`pageSize` and `cap` are transport-scaled.** 500/10k were measured over free transport;
+  over HTTP start at ~1000 pages and expect the push-down regime to pay off below 10k.
+  Re-measure rather than assuming the desktop numbers transfer.
+
+#### The envelope
 
 - **`cap` is a fetch and memory budget, not a render budget.** Windowing removed the rendering
   cost, so the cap now bounds only how deep a fill reads and how fast the cache grows. Default
