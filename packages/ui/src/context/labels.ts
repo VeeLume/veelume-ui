@@ -49,6 +49,8 @@ export type LabelBag = {
 	/** Heading above a read failure. */
 	errorTitle: () => string;
 	retry: () => string;
+	/** Extend a truncated set — shown only when the source has more. */
+	loadMore: () => string;
 
 	// ── actions ──────────────────────────────────────────────────────────────
 	create: () => string;
@@ -86,6 +88,7 @@ export const defaultLabels: LabelBag = {
 	empty: () => 'Nothing matches',
 	errorTitle: () => 'Could not load',
 	retry: () => 'Try again',
+	loadMore: () => 'Load more',
 
 	create: () => 'New',
 	save: () => 'Save',

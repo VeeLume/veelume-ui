@@ -4,5 +4,6 @@
 	"home_subtitle": "Erzeugt aus VeeLume template-tauri. Diese Seite ersetzen.",
 	"kit_search": "Suchen…",
 	"kit_empty": "Keine Treffer",
-	"kit_loading": "Wird geladen…"
+	"kit_loading": "Wird geladen…",
+	"kit_load_more": "Mehr laden"
 }

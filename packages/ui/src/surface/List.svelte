@@ -24,6 +24,9 @@
 
 	let {
 		status = 'ready',
+		fetching = undefined,
+		hasMore = false,
+		onloadmore = undefined,
 		selected = undefined,
 		action = undefined,
 		onselect,
@@ -34,6 +37,18 @@
 		class: klass = ''
 	}: {
 		status?: Status;
+		/**
+		 * A background fetch is running — drives the throbber above the rows.
+		 * Passed like `status`, and for the same reason: only the caller knows
+		 * which source's activity the list should reflect. `undefined` means the
+		 * caller has no fetch activity to report and no throbber track renders;
+		 * a boolean reserves the track so its appearance never shifts layout.
+		 */
+		fetching?: boolean;
+		/** The source stopped at its cap — more exists. Enables "Load more". */
+		hasMore?: boolean;
+		/** Extend the truncated set. Without it, `hasMore` renders nothing. */
+		onloadmore?: () => void;
 		/** Overrides Root's `selected` for the rare surface with two lists. */
 		selected?: string | null;
 		/** The list's one forward action — "New …". Rendered in the header. */
@@ -112,23 +127,41 @@
 
 	{#if s.narrowing}
 		<!-- Only while narrowing. Unnarrowed this row would restate the list and
-		     cost 28px on every surface forever; narrowed it answers the question the
-		     user just asked, and carries the way out. -->
+		     cost 28px on every surface forever; narrowed it answers the question
+		     the user just asked. The trailing slot carries LOAD MORE, not reset:
+		     reset lives in the filter panel already, while a narrowed count over
+		     a truncated set is exactly where "there may be more matches than
+		     these" needs its remedy next to it. -->
 		<div
 			class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1
 			       text-xs text-muted-foreground"
 		>
 			<span class="tabular-nums">{kit.labels.narrowedCount({ shown: s.shown, total: s.total })}</span>
-			<button
-				type="button"
-				class="ml-auto rounded px-1 underline-offset-2 hover:underline"
-				onclick={() => s.browse.reset()}>{kit.labels.resetFilters()}</button
-			>
+			{#if hasMore && onloadmore}
+				<button
+					type="button"
+					class="ml-auto rounded px-1 underline-offset-2 hover:underline"
+					onclick={onloadmore}>{kit.labels.loadMore()}</button
+				>
+			{/if}
+		</div>
+	{/if}
+
+	{#if fetching !== undefined}
+		<!-- The throbber. The track is reserved whenever the caller reports fetch
+		     activity at all, so the bar appearing never shifts the rows below. -->
+		<div class="relative h-0.5 shrink-0 overflow-hidden" aria-hidden="true">
+			{#if fetching}
+				<div class="throb absolute inset-y-0 w-1/3 rounded-full bg-primary"></div>
+			{/if}
 		</div>
 	{/if}
 
 	<div class="min-h-0 flex-1 overflow-auto" {@attach win.container}>
-		{#if status === 'loading'}
+		{#if status === 'loading' && s.visible.length === 0}
+			<!-- Only when there is genuinely nothing to show yet — a filling set
+			     streams rows while `loading`, and hiding them behind this label
+			     would be the spinner the whole model exists to avoid. -->
 			<p class="p-4 text-sm text-muted-foreground">{kit.labels.loading()}</p>
 		{:else if status === 'error'}
 			<p class="p-4 text-sm text-destructive">{kit.labels.errorTitle()}</p>
@@ -170,3 +203,21 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	/* Indeterminate sweep. A scoped keyframe rather than a Tailwind utility:
+	   the consumer's Tailwind build cannot be relied on for custom keyframes
+	   (the kit arrives via symlink — see the `@source` gotcha), while component
+	   CSS compiles wherever the component does. */
+	.throb {
+		animation: throb 1.2s ease-in-out infinite;
+	}
+	@keyframes throb {
+		from {
+			left: -35%;
+		}
+		to {
+			left: 100%;
+		}
+	}
+</style>

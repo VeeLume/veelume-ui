@@ -29,7 +29,8 @@
 		labels: {
 			search: () => m.kit_search(),
 			empty: () => m.kit_empty(),
-			loading: () => m.kit_loading()
+			loading: () => m.kit_loading(),
+			loadMore: () => m.kit_load_more()
 		}
 	});
 

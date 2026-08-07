@@ -4,5 +4,6 @@
 	"home_subtitle": "Scaffolded from VeeLume template-tauri. Replace this page.",
 	"kit_search": "Search…",
 	"kit_empty": "Nothing matches",
-	"kit_loading": "Loading…"
+	"kit_loading": "Loading…",
+	"kit_load_more": "Load more"
 }

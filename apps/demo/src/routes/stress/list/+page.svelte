@@ -78,6 +78,11 @@
 	</header>
 
 	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1">
-		<Surface.List status={view.status} />
+		<Surface.List
+			status={view.status}
+			fetching={view.fetching}
+			hasMore={view.hasMore}
+			onloadmore={() => entries.loadMore({ cap: 10_000 })}
+		/>
 	</Surface.Root>
 </div>

@@ -212,6 +212,9 @@
 				     rather than in the toolbar above. -->
 				<Surface.List
 					status={loans.status}
+					fetching={loans.status === 'loading' || loans.status === 'refreshing'}
+					hasMore={loans.hasMore}
+					onloadmore={() => loans.loadMore()}
 					action={{ label: 'New loan', icon: Plus, onclick: newLoan }}
 				/>
 			{/snippet}

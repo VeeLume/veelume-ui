@@ -211,8 +211,10 @@ space" is therefore a mechanism, not a rule someone has to remember.
 
 Same principle for the count strip: it appears **only while narrowing**. Against
 an unfiltered list "34 results" restates the list and costs vertical space on
-every surface forever; against a narrowed one it answers the question just asked,
-so it also carries the reset.
+every surface forever; against a narrowed one it answers the question just asked.
+Its trailing slot carries **Load more** (only when the source reports more) —
+reset lives in the filter panel, while a narrowed count over a truncated set is
+exactly where "there may be more matches than these" needs its remedy beside it.
 
 `selected` lives on `Surface.Root`, not on three parts. Which pane a narrow
 screen shows, which row the list highlights, and whether the toolbar steps aside
