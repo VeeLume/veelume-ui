@@ -286,6 +286,177 @@ impl DemoData {
     }
 }
 
+// ── the loans domain, transport-free ───────────────────────────────────────
+//
+// ⚑ Every operation lives HERE, not in an adapter, and each mutation returns
+// the `LoanChange` it caused rather than announcing it. That split is what
+// makes one implementation serve two transports: the domain decides *what
+// changed*, the adapter decides *how to say so* — a Tauri `emit` on one side,
+// an SSE broadcast on the other. The logic used to live in `demo_commands.rs`,
+// which meant the HTTP server would have had to duplicate it — and a
+// duplicated closer is exactly the drift the demo exists to catch.
+
+impl LoanChange {
+    fn new(year: &str, kind: &str, keys: Vec<String>) -> Self {
+        Self {
+            kind: kind.into(),
+            keys,
+            year: year.into(),
+        }
+    }
+}
+
+impl DemoData {
+    /// Keyset paging — the shape you write over SQLite, TrailBase or Postgres.
+    /// The cursor is the last row's id and the next page starts *after* it, so a
+    /// row inserted mid-accumulation cannot shift a window or be re-emitted,
+    /// which is exactly what offset paging gets wrong.
+    pub fn loan_page(
+        &mut self,
+        year: &str,
+        limit: i32,
+        cursor: Option<String>,
+    ) -> Result<LoanPage, String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let after = match cursor {
+            Some(c) => list.iter().position(|l| l.id == c).map_or(0, |i| i + 1),
+            None => 0,
+        };
+        let take = limit.max(0) as usize;
+        let slice: Vec<Loan> = list.iter().skip(after).take(take).cloned().collect();
+        let more = after + slice.len() < list.len();
+
+        Ok(LoanPage {
+            cursor: if more {
+                slice.last().map(|l| l.id.clone())
+            } else {
+                None
+            },
+            // Cheap here, and cheap in reality: a COUNT(*) over an indexed predicate.
+            total: list.len() as i32,
+            done: !more,
+            records: slice,
+        })
+    }
+
+    pub fn loan_list(&mut self, year: &str) -> Vec<Loan> {
+        self.loans_mut(year).map(|l| l.clone()).unwrap_or_default()
+    }
+
+    /// One record by key — what a deep link or a server-side search hit needs.
+    pub fn loan_get(&mut self, year: &str, id: &str) -> Result<Loan, String> {
+        self.loans_mut(year)
+            .ok_or("unknown year")?
+            .iter()
+            .find(|l| l.id == id)
+            .cloned()
+            .ok_or_else(|| "loan not found".into())
+    }
+
+    /// The record-shaped edit — the only loan operation that belongs to the
+    /// collection's write layer.
+    pub fn loan_save(&mut self, year: &str, body: Loan) -> Result<(Loan, LoanChange), String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let i = list
+            .iter()
+            .position(|l| l.id == body.id)
+            .ok_or_else(|| format!("loan {} not found", body.id))?;
+        list[i] = body.clone();
+        let change = LoanChange::new(year, "update", vec![body.id.clone()]);
+        Ok((body, change))
+    }
+
+    /// 1 — soft delete. Returns the record.
+    pub fn loan_return(&mut self, year: &str, id: &str) -> Result<(Loan, LoanChange), String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let loan = list
+            .iter_mut()
+            .find(|l| l.id == id)
+            .ok_or("loan not found")?;
+        loan.status = "returned".into();
+        let out = loan.clone();
+        Ok((out, LoanChange::new(year, "update", vec![id.into()])))
+    }
+
+    /// 2 — hard delete. Drafts only, returns nothing. The keyed `delete` change
+    /// is tier-2 deletion: any OTHER client holding this record learns of its
+    /// absence without a refetch.
+    pub fn loan_cancel(&mut self, year: &str, id: &str) -> Result<LoanChange, String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let i = list
+            .iter()
+            .position(|l| l.id == id)
+            .ok_or("loan not found")?;
+        if list[i].status != "draft" {
+            return Err("only a draft can be cancelled".into());
+        }
+        list.remove(i);
+        Ok(LoanChange::new(year, "delete", vec![id.into()]))
+    }
+
+    /// 3 — counter-document. Closes the original and issues a REPLACEMENT, which
+    /// is what makes this impossible to model as a deletion.
+    pub fn loan_mark_lost(&mut self, year: &str, id: &str) -> Result<(Loan, LoanChange), String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let i = list
+            .iter()
+            .position(|l| l.id == id)
+            .ok_or("loan not found")?;
+
+        let mut replacement = list[i].clone();
+        replacement.id = format!("{id}-R");
+        replacement.status = "draft".into();
+        replacement.replaced_by = None;
+        replacement.fine_cents = 0;
+        replacement.note = format!("Replacement for {id}");
+
+        list[i].status = "lost".into();
+        list[i].replaced_by = Some(replacement.id.clone());
+        list.push(replacement.clone());
+        // Both ids: the closed original AND the issued replacement — which is
+        // what makes the counter-document work over keyed refresh.
+        let change = LoanChange::new(year, "update", vec![id.into(), replacement.id.clone()]);
+        Ok((replacement, change))
+    }
+
+    /// 4 — soft, terminal. Returns nothing.
+    pub fn loan_archive(&mut self, year: &str, id: &str) -> Result<LoanChange, String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let loan = list
+            .iter_mut()
+            .find(|l| l.id == id)
+            .ok_or("loan not found")?;
+        loan.status = "archived".into();
+        Ok(LoanChange::new(year, "update", vec![id.into()]))
+    }
+
+    /// The create path. Archetype B is "list + detail + form", and a demo built
+    /// only from seeded data never exercises the third of those.
+    pub fn loan_create(&mut self, year: &str) -> Result<(Loan, LoanChange), String> {
+        let list = self.loans_mut(year).ok_or("unknown year")?;
+        let loan = Loan {
+            // Seeded ids are `loan-<year>-<n>`; a `new` segment keeps a created
+            // record from colliding with one a reset would re-seed.
+            id: format!("loan-{year}-new-{}", list.len() + 1),
+            title: "Untitled loan".into(),
+            borrower: String::new(),
+            lent_on: format!("{year}-01-01"),
+            due_on: format!("{year}-01-31"),
+            status: "draft".into(),
+            replaced_by: None,
+            fine_cents: 0,
+            note: String::new(),
+        };
+        list.push(loan.clone());
+        let change = LoanChange::new(year, "create", vec![loan.id.clone()]);
+        Ok((loan, change))
+    }
+
+    pub fn loans_reset(&mut self) {
+        self.loans = DemoData::seeded().loans;
+    }
+}
+
 pub struct DemoState(pub Mutex<DemoData>);
 
 impl Default for DemoState {

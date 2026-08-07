@@ -44,14 +44,17 @@ The five failed designs behind this are in `packages/ui/src/collection/DESIGN.md
 
 **Two transports, named by shape: Tauri IPC and HTTP + SSE.** The backend's
 language sits below that line and is an app choice — Axum, Litestar, anything —
-so "Litestar" and "Axum" are one case, not two. Only the first is built; the
-fixture backend stands in as a third IO adapter for the browser.
+so "Litestar" and "Axum" are one case, not two. **Both are built**: Tauri
+commands in `src-tauri/src/demo_commands.rs`, an Axum server in
+`demo_http.rs` (`just serve`, consumed by `/http`), and the browser fixtures as
+a third IO adapter. All three call the *same* domain in `demo.rs` — each
+mutation returns the change it caused, and the adapter decides how to announce
+it. A closer that behaves differently on one transport means logic leaked into
+an adapter.
 
-What is NOT built, deliberately: the HTTP + SSE adapter (the wire contract is
-defined for it, and its one open design decision — reconnects must re-invalidate
-— is settled in `CollectionIO.subscribe`), TrailBase behind a backend,
-user-visible pages, and a `Picker`/`StatusBadge`. See `Deliberately not built`
-in the kit's rulebook and the vault note's Next list.
+What is NOT built, deliberately: TrailBase behind a backend, user-visible
+pages, and a `Picker`/`StatusBadge`. See `Deliberately not built` in the kit's
+rulebook and the vault note's Next list.
 
 ## Running it
 

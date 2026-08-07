@@ -1,6 +1,10 @@
 mod commands;
 mod demo;
 mod demo_commands;
+/// The HTTP + SSE transport. Public so `bin/serve.rs` can mount it; gated so a
+/// Tauri build never compiles the web stack.
+#[cfg(feature = "serve")]
+pub mod demo_http;
 mod settings;
 mod state;
 mod store;

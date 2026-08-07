@@ -24,6 +24,14 @@ name = "export-bindings"
 path = "src/bin/export_bindings.rs"
 required-features = ["bindgen"]
 
+# The HTTP + SSE backend — the demo's second transport. Same `required-features`
+# reasoning as above: Tauri compiles and bundles every [[bin]] it can build, and
+# an app installer has no business shipping a web server.
+[[bin]]
+name = "demo-server"
+path = "src/bin/serve.rs"
+required-features = ["serve"]
+
 [lib]
 # `_lib` suffix: on mobile the app is a cdylib and the bin name would collide.
 name = "veelume_ui_demo_lib"
@@ -32,6 +40,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [features]
 default = []
 bindgen = []
+# Pulls in the whole HTTP stack, so it stays off for `tauri dev` / `tauri build`.
+serve = ["dep:axum", "dep:tokio", "dep:tower-http", "dep:tokio-stream"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -47,6 +57,12 @@ serde_json = "1"
 specta = "=2.0.0-rc.22"
 specta-typescript = "0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+
+# The `serve` feature only. Optional so a Tauri build never sees them.
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "signal"], optional = true }
+tokio-stream = { version = "0.1", features = ["sync"], optional = true }
+tower-http = { version = "0.6", features = ["cors"], optional = true }
 
 # Desktop-only: the signed auto-updater and the relaunch that follows it.
 # Mobile has no Tauri updater (Android ships its own APK flow).

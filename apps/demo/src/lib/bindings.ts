@@ -79,12 +79,6 @@ async libraryReset() : Promise<void> {
 async loansList(year: string) : Promise<Loan[]> {
     return await TAURI_INVOKE("loans_list", { year });
 },
-/**
- * Keyset paging — the shape you write over SQLite, TrailBase or Postgres.
- * The cursor is the last row's id and the next page starts *after* it, so a row
- * inserted mid-accumulation cannot shift a window or be re-emitted, which is
- * exactly what offset paging gets wrong.
- */
 async loansPage(year: string, limit: number, cursor: string | null) : Promise<Result<LoanPage, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("loans_page", { year, limit, cursor }) };
@@ -93,10 +87,6 @@ async loansPage(year: string, limit: number, cursor: string | null) : Promise<Re
     else return { status: "error", error: e  as any };
 }
 },
-/**
- * One record by key — what a deep link or a server-side search hit needs, since
- * neither belongs to a working set the client already holds.
- */
 async loansGet(id: string, year: string) : Promise<Result<Loan, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("loans_get", { id, year }) };
@@ -129,9 +119,7 @@ async loansReturn(id: string, year: string) : Promise<Result<Loan, string>> {
 }
 },
 /**
- * 2 — hard delete. Drafts only, returns nothing. The keyed `delete` event is
- * tier-2 deletion: any OTHER client holding this record learns of its absence
- * without a refetch.
+ * 2 — hard delete. Drafts only, returns nothing.
  */
 async loansCancel(id: string, year: string) : Promise<Result<null, string>> {
     try {
@@ -142,8 +130,7 @@ async loansCancel(id: string, year: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * 3 — counter-document. Closes the original and issues a REPLACEMENT, which is
- * what makes this impossible to model as a deletion.
+ * 3 — counter-document. Closes the original and issues a REPLACEMENT.
  */
 async loansMarkLost(id: string, year: string) : Promise<Result<Loan, string>> {
     try {
@@ -165,9 +152,7 @@ async loansArchive(id: string, year: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * The create path. Archetype B is "list + detail + form", and a demo built only
- * from seeded data never exercises the third of those — nor the list header's
- * one forward action, which is what create is reached by.
+ * The create path — reached by the list header's one forward action.
  */
 async loansCreate(year: string) : Promise<Result<Loan, string>> {
     try {

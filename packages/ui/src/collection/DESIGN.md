@@ -540,19 +540,44 @@ one `COUNT(*)`; change events are emitted by our own write path.
    events. Tier-3 (interval reconciliation via `FetchPage.from`) stays
    designed-not-built until a backend actually cannot send keys.
 5. ✅ Windowed rendering — see the `createWindow` entry above.
-6. **The HTTP + SSE adapter.** Not yet built, and deliberately not urgent: the
-   fixture backend already proves the frontend is not coupled to Tauri, so
-   this one's value is different — it is the first transport with real
-   latency, real auth, real concurrency and *lossy events*, which is where the
-   contract above stops being theory. Two things settle before the code:
-   the reconnect convention (item 1 of the consequences — the adapter must
-   call `onChange()` on every reconnect) and a re-measured envelope over
-   realistic latency. Needs a consumer in `apps/demo` per the kit's rules,
-   which is a scope decision (a server in-tree vs. out) rather than a
-   technical one.
+6. ✅ **The HTTP + SSE adapter** — `collection/http.ts`, with an Axum backend
+   in `apps/demo/src-tauri/src/demo_http.rs` (`just serve`) and `/http` as the
+   consumer. The split held exactly as designed: the kit ships
+   `sseInvalidation` (the reconnect discipline), `classifyHttpError`
+   (status → `KitError`) and the fetch/JSON plumbing; the app supplies
+   `routes`, because URL and param building is what differs between Axum,
+   Litestar and TrailBase.
 
-   Kit-vs-app split, when it happens: the kit ships the SSE plumbing,
-   reconnect policy and HTTP `classifyError` defaults; the **app** supplies
-   the URL/param builder, because that is exactly what differs between Axum,
-   Litestar and TrailBase. Those axes are nameable, which is what makes an L1
-   helper legitimate rather than generalising instance #1.
+   **The reconnect contract took four lines.** `EventSource` reconnects on its
+   own and fires `open` each time it succeeds, so every open *after the first*
+   is a gap: `if (everOpened) onChange()`. Deliberately no `onerror` handling —
+   closing there would turn a blip into a permanently stale cache. Errors are
+   pre-classified in `send()` rather than through `CollectionIO.classifyError`,
+   because reading a validation body is async and that hook is sync; the store
+   passes through anything carrying a `kind`.
+
+   **Making the recovery testable was the other half.** An untestable recovery
+   path is an unimplemented one, so the server exposes
+   `POST /api/debug/drop-streams`, which ends every open stream — the same
+   trick `probes_hijack` plays for write divergence: turn a rare failure into
+   a button. Verified three times in the browser: drop the stream, mutate from
+   a second client while the first is disconnected, and the missed change
+   appears once `EventSource` reconnects (recovery latency is the browser's
+   retry, ~3s in Chrome — not something the kit sets).
+
+   Also verified over the wire: keyset paging by cursor, `{records, cursor,
+   total, done}` exactly as the contract specifies, keyed SSE events driving
+   tier-2 deletion, and tier-1 `discard` composing with them.
+
+   **What building it caught:** the loans *logic* still lived in
+   `demo_commands.rs`, so "one domain, two entry points" was not yet true. It
+   moved to `demo.rs`, where each mutation now returns the `LoanChange` it
+   caused rather than announcing it — the domain decides *what changed*, the
+   adapter decides *how to say so* (a Tauri `emit`, an SSE broadcast). That
+   refactor immediately exposed a twin divergence the demo exists to catch:
+   `loans_create` emitted no event on either backend, so create was the one
+   operation still needing a manual `refresh()`.
+
+   **Still deliberately open:** the collection cannot express "currently
+   disconnected", and the envelope has not been re-measured over real latency —
+   the demo's LAN-local server is not the test that would settle it.

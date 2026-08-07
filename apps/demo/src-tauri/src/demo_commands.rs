@@ -16,18 +16,15 @@ use crate::demo::{
     ShelfEntry,
 };
 
-/// Emit the invalidation event the loans collection subscribes to. Mirrors the
-/// fixture backend's `changed()` — fire-and-forget, a command's response must
-/// not couple to event delivery.
-fn loans_changed(app: &AppHandle, year: &str, kind: &str, keys: Vec<String>) {
-    let _ = app.emit(
-        "loans-changed",
-        LoanChange {
-            kind: kind.into(),
-            keys,
-            year: year.into(),
-        },
-    );
+/// Announce a change the domain reported. Fire-and-forget: a command's response
+/// must not couple to event delivery.
+///
+/// ⚑ This is the Tauri half of the transport split. The domain in `demo.rs`
+/// decides WHAT changed and hands back a `LoanChange`; this decides how to say
+/// so. `demo_http.rs` does the same job with an SSE broadcast, over the exact
+/// same domain calls.
+fn announce(app: &AppHandle, change: LoanChange) {
+    let _ = app.emit("loans-changed", change);
 }
 
 // ── probes ─────────────────────────────────────────────────────────────────
@@ -192,13 +189,7 @@ pub fn library_reset(state: State<'_, DemoState>) {
 #[tauri::command]
 #[specta::specta]
 pub fn loans_list(state: State<'_, DemoState>, year: String) -> Vec<Loan> {
-    state
-        .0
-        .lock()
-        .unwrap()
-        .loans_mut(&year)
-        .map(|l| l.clone())
-        .unwrap_or_default()
+    state.0.lock().unwrap().loan_list(&year)
 }
 
 /// The record-shaped edit — the only loan operation that belongs to the
@@ -211,15 +202,9 @@ pub fn loans_save(
     body: Loan,
     year: String,
 ) -> Result<Loan, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let i = list
-        .iter()
-        .position(|l| l.id == body.id)
-        .ok_or_else(|| format!("loan {} not found", body.id))?;
-    list[i] = body.clone();
-    loans_changed(&app, &year, "update", vec![body.id.clone()]);
-    Ok(body)
+    let (saved, change) = state.0.lock().unwrap().loan_save(&year, body)?;
+    announce(&app, change);
+    Ok(saved)
 }
 
 /// 1 — soft delete. Returns the record.
@@ -231,21 +216,12 @@ pub fn loans_return(
     id: String,
     year: String,
 ) -> Result<Loan, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let loan = list
-        .iter_mut()
-        .find(|l| l.id == id)
-        .ok_or("loan not found")?;
-    loan.status = "returned".into();
-    let out = loan.clone();
-    loans_changed(&app, &year, "update", vec![id]);
-    Ok(out)
+    let (loan, change) = state.0.lock().unwrap().loan_return(&year, &id)?;
+    announce(&app, change);
+    Ok(loan)
 }
 
-/// 2 — hard delete. Drafts only, returns nothing. The keyed `delete` event is
-/// tier-2 deletion: any OTHER client holding this record learns of its absence
-/// without a refetch.
+/// 2 — hard delete. Drafts only, returns nothing.
 #[tauri::command]
 #[specta::specta]
 pub fn loans_cancel(
@@ -254,22 +230,12 @@ pub fn loans_cancel(
     id: String,
     year: String,
 ) -> Result<(), String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let i = list
-        .iter()
-        .position(|l| l.id == id)
-        .ok_or("loan not found")?;
-    if list[i].status != "draft" {
-        return Err("only a draft can be cancelled".into());
-    }
-    list.remove(i);
-    loans_changed(&app, &year, "delete", vec![id]);
+    let change = state.0.lock().unwrap().loan_cancel(&year, &id)?;
+    announce(&app, change);
     Ok(())
 }
 
-/// 3 — counter-document. Closes the original and issues a REPLACEMENT, which is
-/// what makes this impossible to model as a deletion.
+/// 3 — counter-document. Closes the original and issues a REPLACEMENT.
 #[tauri::command]
 #[specta::specta]
 pub fn loans_mark_lost(
@@ -278,26 +244,8 @@ pub fn loans_mark_lost(
     id: String,
     year: String,
 ) -> Result<Loan, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let i = list
-        .iter()
-        .position(|l| l.id == id)
-        .ok_or("loan not found")?;
-
-    let mut replacement = list[i].clone();
-    replacement.id = format!("{id}-R");
-    replacement.status = "draft".into();
-    replacement.replaced_by = None;
-    replacement.fine_cents = 0;
-    replacement.note = format!("Replacement for {id}");
-
-    list[i].status = "lost".into();
-    list[i].replaced_by = Some(replacement.id.clone());
-    list.push(replacement.clone());
-    // Both ids: the closed original AND the issued replacement — which is what
-    // makes the counter-document work over keyed refresh.
-    loans_changed(&app, &year, "update", vec![id, replacement.id.clone()]);
+    let (replacement, change) = state.0.lock().unwrap().loan_mark_lost(&year, &id)?;
+    announce(&app, change);
     Ok(replacement)
 }
 
@@ -310,21 +258,11 @@ pub fn loans_archive(
     id: String,
     year: String,
 ) -> Result<(), String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let loan = list
-        .iter_mut()
-        .find(|l| l.id == id)
-        .ok_or("loan not found")?;
-    loan.status = "archived".into();
-    loans_changed(&app, &year, "update", vec![id]);
+    let change = state.0.lock().unwrap().loan_archive(&year, &id)?;
+    announce(&app, change);
     Ok(())
 }
 
-/// Keyset paging — the shape you write over SQLite, TrailBase or Postgres.
-/// The cursor is the last row's id and the next page starts *after* it, so a row
-/// inserted mid-accumulation cannot shift a window or be re-emitted, which is
-/// exactly what offset paging gets wrong.
 #[tauri::command]
 #[specta::specta]
 pub fn loans_page(
@@ -333,72 +271,32 @@ pub fn loans_page(
     limit: i32,
     cursor: Option<String>,
 ) -> Result<LoanPage, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-
-    let after = match cursor {
-        Some(c) => list.iter().position(|l| l.id == c).map_or(0, |i| i + 1),
-        None => 0,
-    };
-    let take = limit.max(0) as usize;
-    let slice: Vec<Loan> = list.iter().skip(after).take(take).cloned().collect();
-    let more = after + slice.len() < list.len();
-
-    Ok(LoanPage {
-        cursor: if more {
-            slice.last().map(|l| l.id.clone())
-        } else {
-            None
-        },
-        // Cheap here, and cheap in reality: a COUNT(*) over an indexed predicate.
-        total: list.len() as i32,
-        done: !more,
-        records: slice,
-    })
+    state.0.lock().unwrap().loan_page(&year, limit, cursor)
 }
 
-/// One record by key — what a deep link or a server-side search hit needs, since
-/// neither belongs to a working set the client already holds.
 #[tauri::command]
 #[specta::specta]
 pub fn loans_get(state: State<'_, DemoState>, id: String, year: String) -> Result<Loan, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    list.iter()
-        .find(|l| l.id == id)
-        .cloned()
-        .ok_or_else(|| "loan not found".into())
+    state.0.lock().unwrap().loan_get(&year, &id)
 }
 
-/// The create path. Archetype B is "list + detail + form", and a demo built only
-/// from seeded data never exercises the third of those — nor the list header's
-/// one forward action, which is what create is reached by.
+/// The create path — reached by the list header's one forward action.
 #[tauri::command]
 #[specta::specta]
-pub fn loans_create(state: State<'_, DemoState>, year: String) -> Result<Loan, String> {
-    let mut data = state.0.lock().unwrap();
-    let list = data.loans_mut(&year).ok_or("unknown year")?;
-    let loan = Loan {
-        // Seeded ids are `loan-<year>-<n>`; a `new` segment keeps a created record
-        // from colliding with one a reset would re-seed.
-        id: format!("loan-{year}-new-{}", list.len() + 1),
-        title: "Untitled loan".into(),
-        borrower: String::new(),
-        lent_on: format!("{year}-01-01"),
-        due_on: format!("{year}-01-31"),
-        status: "draft".into(),
-        replaced_by: None,
-        fine_cents: 0,
-        note: String::new(),
-    };
-    list.push(loan.clone());
+pub fn loans_create(
+    app: AppHandle,
+    state: State<'_, DemoState>,
+    year: String,
+) -> Result<Loan, String> {
+    let (loan, change) = state.0.lock().unwrap().loan_create(&year)?;
+    announce(&app, change);
     Ok(loan)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub fn loans_reset(state: State<'_, DemoState>) {
-    state.0.lock().unwrap().loans = crate::demo::DemoData::seeded().loans;
+    state.0.lock().unwrap().loans_reset();
 }
 
 // ── preferences ────────────────────────────────────────────────────────────

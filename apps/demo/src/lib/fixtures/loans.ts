@@ -197,6 +197,7 @@ export const loanFixtures: FixtureModule = {
 			note: ''
 		};
 		list.push(loan);
+		changed(year, 'create', [loan.id]);
 		return { ...loan };
 	},
 

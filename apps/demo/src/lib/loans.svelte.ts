@@ -75,7 +75,8 @@ export const loans = createCollection<Loan, string, string>(
  */
 export async function createLoan(): Promise<string> {
 	const loan = await invoke<Loan>('loans_create', { year: currentYear });
-	await loans.refresh();
+	// No refresh: both backends emit a keyed `create`, so the event does it —
+	// and a refresh here would reload the whole set on top of that.
 	return loan.id;
 }
 

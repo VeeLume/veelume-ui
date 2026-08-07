@@ -78,6 +78,16 @@ export type {
 
 // ── L1: collections ────────────────────────────────────────────────────────
 export { createCollection } from './collection/index.svelte.js';
+// The HTTP + SSE transport, beside Tauri IPC. The kit owns the reconnect
+// discipline and status→KitError mapping; the app owns URL building, because
+// that is what differs between Axum, Litestar and TrailBase.
+export { createHttpIO, sseInvalidation, classifyHttpError } from './collection/http.js';
+export type {
+	HttpCall,
+	HttpIOOptions,
+	HttpRoutes,
+	SseOptions
+} from './collection/http.js';
 export type {
 	Collection,
 	CollectionIO,

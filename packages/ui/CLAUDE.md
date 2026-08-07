@@ -15,6 +15,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 |---|---|---|
 | `context/` | L1 | Label bag + **two locales** (message, formatting) + memoised `Intl` + derived `hourCycle`. No runes — reactivity comes from the app's getters. |
 | `collection/` | L1 | Scoped cache, keyset accumulation, optional write layer. `.svelte.ts`. |
+| `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
