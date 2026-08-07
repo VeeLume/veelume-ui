@@ -285,8 +285,13 @@ export type WorkingSet<K> = {
 	/** Matching records on the server, when the adapter supplies one. A snapshot
 	 *  from query time, deliberately not maintained as pages arrive. */
 	readonly total?: number;
-	/** Whether this set holds everything matching its query. */
-	readonly complete: boolean;
+	/**
+	 * ⚑ There is no `complete` here, deliberately. It was a required boolean
+	 * that nothing maintained once `stopped` replaced it — so it read `false`
+	 * forever, including on sets that held everything. A required field that
+	 * always lies is worse than an absent one: the next reader believes it.
+	 * Completeness is `stopped === 'exhausted'`, derived at the view.
+	 */
 	readonly status: Status;
 	readonly error?: KitError;
 	/** Continuation for the next accumulation step, when there is one. */

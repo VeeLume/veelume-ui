@@ -14,7 +14,8 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | Module | Layer | What it is |
 |---|---|---|
 | `context/` | L1 | Label bag + **two locales** (message, formatting) + memoised `Intl` + derived `hourCycle`. No runes — reactivity comes from the app's getters. |
-| `collection/` | L1 | Scoped cache, optional write layer. `.svelte.ts`. |
+| `collection/` | L1 | Scoped cache, keyset accumulation, optional write layer. `.svelte.ts`. |
+| `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
@@ -117,6 +118,32 @@ deliberately rather than discovered.
 - **Invalidation policy is defer-until-writes-settle**, collapsed to one reload. A naive
   reload-on-every-event starts a fetch before the write commits and can serve pre-write state.
   Invalidation must be idempotent under event storms (one write can emit several events).
+
+#### The envelope (the five-design casebook is `collection/DESIGN.md` — read it before changing `index.svelte.ts`)
+
+- **`cap` is a fetch and memory budget, not a render budget.** Windowing removed the rendering
+  cost, so the cap now bounds only how deep a fill reads and how fast the cache grows. Default
+  10k; apps tune per query via `SetQuery.cap`.
+- **Two regimes, and the collection picks — never the consumer.** A query carrying `search`
+  resolves against its base (same declaration, search stripped): base `exhausted` + `matches`
+  supplied → answered locally by narrowing the base's rows, no set minted, no fetch, exact
+  `total`. Base `capped` → the search pushes down into the set key. Consumers pass `search`
+  either way and cannot get the routing wrong.
+- **Maintenance is tied to observation.** Live sets are dropped when their last reactive reader
+  leaves (`createSubscriber`), after a **grace period** — the subscriber count transiently
+  crosses zero during re-renders, and dropping on that crossing splits the brain (the template
+  renders instance A while a recreated B takes its place in the map).
+- **⚑ Reactive signals must OUTLIVE the instances they describe.** A per-instance signal dies
+  with its instance, so every derived that captured it is permanently disconnected when the
+  lifecycle recreates the set — bumps land on the new instance, old dependents never wake,
+  nobody re-reads, so the new instance is never observed either. Silent, total deadlock with no
+  error. This is what makes forget-and-recreate safe at all.
+- **A fill halts when its set stops being read** (a `lastRead` stamp per set, checked between
+  pages) and self-resumes if a read arrives right after the halt. Superseded fills otherwise run
+  to completion behind the current one and thrash the backend's per-query state.
+- **Deletion has three tiers**, in order of what is known: we did it (`discard`) · the event
+  carries keys (`ChangeInfo.kind: 'delete'`) · neither, in which case the fill must reconcile
+  the key interval it covered. Absence is only meaningful inside a range the server enumerated.
 
 ### L1 — browse state
 
@@ -245,6 +272,27 @@ Each of these type-checks clean and fails at runtime, or fails silently:
 - **Verify against the artefact that fails.** A production build and the dev
   server scan sources differently — checking the wrong one "disproved" a correct
   fix once.
+- **⚑ A lazy read path must not write a PRE-EXISTING signal synchronously.**
+  Derive-on-first-read runs inside the consumer's `$derived`, and Svelte only
+  permits writing state *created during* that evaluation — which is the sole
+  reason a per-instance counter ever worked there. Any signal that outlives the
+  evaluation (as it must, see collections above) turns the same write into
+  `state_unsafe_mutation`. Do the work, defer the bump to a task.
+- **`requestAnimationFrame` is for ALIGNMENT, never for progress.** A hidden
+  document never fires it — and neither does a visible-but-not-compositing one,
+  where `document.hidden` is still `false`. Anything that must make progress
+  races a `setTimeout` alongside it.
+- **A windowed list must not relayout on scroll.** Pads (`padding-top`) rewritten
+  per window move relayout the whole list, and the browser's scrollbar-drag
+  mapping recalibrates against it — the thumb visibly drifts from the mouse. Use
+  a spacer whose height changes only with *measurements* plus `translateY` rows,
+  and `overflow-anchor: none` on the container.
+- **When a bisect reaches "identical code, different behaviour", stop bisecting
+  code.** A partial Vite dependency pre-bundle (from a killed dev server) serves
+  two Svelte runtime copies, which breaks every `getContext` lookup and mimics an
+  app-level regression perfectly — a commit verified working still failed. The
+  tell is kit labels falling back to English. Purge `.vite` and `.svelte-kit`,
+  reinstall, re-test before believing anything.
 
 ## Vocabulary
 
@@ -263,9 +311,11 @@ Each of these type-checks clean and fails at runtime, or fails silently:
 
 Adding any of these is a design decision, not an oversight:
 
-- **Fetch paging.** Client-side filtering and contextual counts require the whole set. The
-  partitioning strategy is *scope* — partition into units the user already thinks in (year,
-  channel, account), not into pages they do not.
+- **User-visible pages.** The collection *does* page the wire (accumulation, keyset), but the
+  client never exposes pages: no page numbers, no next/prev, no "page 3 of 40". Below the
+  envelope the set is held whole; above it the answer is to narrow the query, not to paginate
+  through it. Partitioning is *scope* — units the user already thinks in (year, channel,
+  account), never pages they do not.
 - **A shadcn-svelte dependency.** Copy-in has no version; a library cannot depend on it. Build
   on bits-ui directly. Token *names* still follow the shadcn convention deliberately.
 - **In-memory browse state.** See above — it forecloses back/forward.

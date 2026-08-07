@@ -79,6 +79,26 @@
 	</Case>
 
 	<Case
+		title="fetching — the throbber"
+		note="A background fill is running. The track above the rows is reserved whenever a caller reports fetch activity at all, so the bar arriving never shifts the rows — and rows stay on screen throughout, which is the same promise `refreshing` makes."
+		frame={false}
+	>
+		<Surface.Root {descriptor} browse={staticBrowse()}>
+			<Surface.List status="refreshing" fetching />
+		</Surface.Root>
+	</Case>
+
+	<Case
+		title="truncated — load more"
+		note="The count strip's trailing slot, shown only when the source reports more behind its cap. Reset is NOT here: it lives in the filter panel, while a narrowed count over a truncated set is where 'there may be more matches than these' needs its remedy."
+		frame={false}
+	>
+		<Surface.Root {descriptor} browse={staticBrowse({ q: 'a' })}>
+			<Surface.List status="ready" hasMore onloadmore={() => {}} />
+		</Surface.Root>
+	</Case>
+
+	<Case
 		title="custom row snippet"
 		note="The escape hatch. /catalog uses exactly this for expandable rows rather than forking the component."
 		frame={false}

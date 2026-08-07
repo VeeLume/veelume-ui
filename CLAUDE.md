@@ -28,15 +28,24 @@ are the rules.
 
 ## State
 
-The kit has all three L1 primitives (context, collections, browse state), the L2
-surfaces, form and action system, and the L3 shell. Every piece is exercised by
-a real surface in `apps/demo`, and `/gallery` shows each component in every
-state. Two transports are wired — fixtures in the browser, Rust over Tauri IPC —
-which is what keeps the frontend honest about not being coupled to either.
+The kit has the L1 primitives (context, collections, browse state, windowing),
+the L2 surfaces, form and action system, and the L3 shell. Every piece is
+exercised by a real surface in `apps/demo`, and `/gallery` shows each component
+in every state. Two transports are wired — fixtures in the browser, Rust over
+Tauri IPC — which is what keeps the frontend honest about not being coupled to
+either.
 
-What is NOT built, deliberately: TrailBase as a third transport, fetch paging,
-and a `Picker`/`StatusBadge`. See `Deliberately not built` below and the vault
-note's Next list.
+The collection settled on a **10k envelope**: below it a set is held whole and
+search/filter/counts are answered locally; above it the set reports `capped` and
+refinement pushes down to the backend. `/stress` (1.5M rows) is the instrument,
+with `/stress/list` and `/stress/catalog` running both archetypes at that scale.
+The five failed designs behind this are in `packages/ui/src/collection/DESIGN.md`
+— read it before touching that primitive.
+
+What is NOT built, deliberately: TrailBase as a third transport, a Litestar
+adapter (the wire contract is defined for it, so it stays cheap to add),
+user-visible pages, and a `Picker`/`StatusBadge`. See `Deliberately not built`
+in the kit's rulebook and the vault note's Next list.
 
 ## Running it
 

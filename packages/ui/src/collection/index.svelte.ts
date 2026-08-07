@@ -57,12 +57,19 @@ const DEFAULT_PAGE = 500;
  * different name.
  */
 function queryKey(q: SetQuery): string {
+	// ⚑ Every value is ESCAPED. The separators here (`&`, `=`, `,`, `:`) are all
+	// legal inside a user's search text and inside a facet value, so an
+	// unescaped `search: "a&kind=b"` produces exactly the key that `search: "a"`
+	// plus `where: { kind: "b" }` produces — two different questions collapsing
+	// onto one set, which serves one query's rows as the other's answer. The
+	// same reason the URL encoding is canonical.
+	const enc = encodeURIComponent;
 	const parts: string[] = [];
 	// `search` in a key means a PUSHED-DOWN search — one the server must answer.
 	// A search served locally (base set exhausted) never reaches this function:
 	// the escalation answers it from the base's rows without minting a set.
-	if (q.search) parts.push(`q=${q.search}`);
-	if (q.order) parts.push(`o=${q.order.by}:${q.order.dir ?? 'asc'}`);
+	if (q.search) parts.push(`q=${enc(q.search)}`);
+	if (q.order) parts.push(`o=${enc(q.order.by)}:${q.order.dir ?? 'asc'}`);
 	// ⚑ `cap` is deliberately NOT in the key. Identity is what the set MATCHES —
 	// scope, predicates, order. The cap is how far we have read into it, which is
 	// state, not identity: "newest 2 000" and "newest 5 000" are one query at two
@@ -71,7 +78,8 @@ function queryKey(q: SetQuery): string {
 	// first, which is how this was found.
 	for (const k of Object.keys(q.where ?? {}).sort()) {
 		const v = q.where![k];
-		parts.push(`${k}=${(Array.isArray(v) ? [...v].sort() : [v]).join(',')}`);
+		const values = (Array.isArray(v) ? [...v].sort() : [v]).map(enc);
+		parts.push(`${enc(k)}=${values.join(',')}`);
 	}
 	return parts.join('&');
 }
@@ -203,7 +211,6 @@ export function createCollection<
 	const EMPTY_SET: WorkingSet<K> = {
 		keys: [],
 		fetchedCount: 0,
-		complete: false,
 		status: 'idle'
 	};
 
@@ -538,7 +545,6 @@ export function createCollection<
 				return;
 			}
 
-			let pages = 0;
 			let exhausted = false;
 			// Distinct from `exhausted`: we stopped, but NOT because the source said
 			// so. Conflating them would report `complete` on a set we merely gave up
@@ -576,7 +582,6 @@ export function createCollection<
 					cursor
 				});
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
-				pages += 1;
 
 				cache(page.records, sk);
 				const before = keys.length;
@@ -602,23 +607,15 @@ export function createCollection<
 				// which would turn our bug into a silent truncation.
 				stalled = !exhausted && gained === 0;
 
-				// ⚑ Publish periodically AND yield, and the yield is the load-bearing
-				// half.
+				// ⚑ A YIELD, not a publish — and it is still load-bearing.
 				//
-				// Publishing every page is quadratic — each one rebuilds the whole
-				// key→record array downstream, so 40 pages of 500 cost ~800k record
-				// lookups (measured: 5.6s for an accumulation whose IPC cost was
-				// 13ms). But publishing rarely is not enough on its own, because
-				// every `await` here resolves into a MICROTASK: the browser paints
-				// between tasks, never between microtasks, so a loop of immediately-
-				// resolving fetches completes without a single frame. Rows were being
-				// published early and staying invisible until the end.
-				//
-				// So: publish on a cadence, and hand the browser a real task each
-				// time so it can actually draw what was published.
-				// Hand the browser a task between pages so it can paint what the live
-				// sets already picked up. The maintenance itself is O(page), so this
-				// is a yield, not a publish.
+				// There is no publish cadence left to tune: live sets pick each page
+				// up as it lands, at O(page). But every `await` here resolves into a
+				// MICROTASK, and the browser paints between TASKS, never between
+				// microtasks — so a loop of immediately-resolving fetches (fixtures,
+				// a warm backend) completes without a single frame, and rows that
+				// were maintained early stay invisible until the end. A real task
+				// between pages is what lets the browser draw them.
 				await new Promise((r) => setTimeout(r, 0));
 			}
 
