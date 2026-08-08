@@ -25,8 +25,14 @@ import Root from './Root.svelte';
 import Rail from './Rail.svelte';
 import Content from './Content.svelte';
 import BottomBar from './BottomBar.svelte';
+import SettingsFooter from './SettingsFooter.svelte';
+import AccountFooter from './AccountFooter.svelte';
 
-export const Shell = { Root, Rail, Content, BottomBar };
+// The two footers are the default occupants of the rail's bottom block —
+// SettingsFooter for apps without accounts, AccountFooter for apps with them.
+// Both host the settings entry; both are just snippet content, so an app with
+// a third idea writes its own.
+export const Shell = { Root, Rail, Content, BottomBar, SettingsFooter, AccountFooter };
 
 export { default as AppShell } from './AppShell.svelte';
 export { default as NavRail } from './NavRail.svelte';

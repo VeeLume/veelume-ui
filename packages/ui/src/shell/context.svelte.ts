@@ -76,6 +76,15 @@ export function setShellContext(ctx: ShellContext): void {
 	setContext(SHELL, ctx);
 }
 
+/**
+ * Non-throwing read, for parts that also work standalone — the gallery, or a
+ * bare `NavRail` outside any `Shell.Root`. Prefer {@link getShellContext} in
+ * parts that are meaningless without a frame.
+ */
+export function peekShellContext(): ShellContext | undefined {
+	return getContext<ShellContext | undefined>(SHELL);
+}
+
 export function getShellContext(): ShellContext {
 	const ctx = getContext<ShellContext | undefined>(SHELL);
 	if (!ctx) {

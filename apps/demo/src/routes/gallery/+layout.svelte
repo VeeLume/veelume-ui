@@ -43,7 +43,8 @@
 		{ path: '/gallery/toolbar', label: 'Surface.Toolbar' },
 		{ path: '/gallery/split', label: 'Surface.Split' },
 		{ path: '/gallery/form', label: 'RecordForm' },
-		{ path: '/gallery/number', label: 'NumberInput' }
+		{ path: '/gallery/number', label: 'NumberInput' },
+		{ path: '/gallery/shell-footer', label: 'Shell footers' }
 	];
 
 	const LOCALES = ['de-DE', 'en-US', 'en-GB', 'fr-FR', 'ja-JP'];

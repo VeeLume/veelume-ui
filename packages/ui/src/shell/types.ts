@@ -46,6 +46,14 @@ export type NavGroup = {
 export type NavStrategy = 'bottom' | 'rail-only';
 
 /**
+ * The rail row: one class string shared by `NavRail`'s items and the footer
+ * components, so their geometry cannot disagree — the same lesson `<Bar>`
+ * enforces for the three chrome bars (three copies once drifted by 13px).
+ */
+export const railRowClass =
+	'flex items-center gap-3 rounded-full px-3 text-sm font-medium transition-colors';
+
+/**
  * Longest-prefix match, so `/items/42` still lights up `/items` and a nested
  * route wins over its parent.
  */

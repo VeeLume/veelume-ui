@@ -21,7 +21,8 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
-| `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `AppShell` (the default arrangement), `NavRail`, `BottomNav`, `breakpoints`. |
+| `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `Shell.SettingsFooter`/`.AccountFooter` (default rail footers, without/with an account concept), `AppShell` (the default arrangement), `NavRail`, `BottomNav`, `breakpoints`. |
+| `settings/` | L2+L3 | The stibu-shaped settings scaffold: `Settings.Root` (three-state responsive list-detail), `.List`, `.Page` (`DetailHeader` + content column), `.Section`, `.Placeholder`. Categories are data (`SettingsCategory[]`); adding a setting is one entry plus one small routed page. |
 
 Everything is exercised by a real surface in `apps/demo` — Catalog (derive +
 overlay), Loans (scoped, four closers), Preferences (solo record), and

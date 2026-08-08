@@ -37,6 +37,13 @@ export {
 } from './shell/index.js';
 export type { NavGroup, NavIcon, NavItem, NavStrategy, ShellContext } from './shell/index.js';
 
+// ── L2/L3: settings scaffold ───────────────────────────────────────────────
+// The stibu-shaped settings section: categories as data, each category a
+// small routed page, and the kit owning the three-state responsive layout
+// (list+page · list full-screen · page full-screen with back).
+export { Settings, getSettingsContext } from './settings/index.js';
+export type { SettingsCategory, SettingsContext } from './settings/index.js';
+
 // ── L2: record form ────────────────────────────────────────────────────────
 // What archetype E actually reuses — connect-neo's wording is "the same
 // EDITOR", not the same surface. A solo record is this with nothing around it.

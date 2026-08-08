@@ -72,6 +72,12 @@ export type LabelBag = {
 	// ── rows ─────────────────────────────────────────────────────────────────
 	expandRow: () => string;
 	collapseRow: () => string;
+
+	// ── shell ────────────────────────────────────────────────────────────────
+	/** The settings entry in the rail footer, and the settings pane title. */
+	settings: () => string;
+	/** Desktop placeholder when no settings category is selected. */
+	selectCategory: () => string;
 };
 
 /**
@@ -108,5 +114,8 @@ export const defaultLabels: LabelBag = {
 	back: () => 'Back',
 
 	expandRow: () => 'Expand',
-	collapseRow: () => 'Collapse'
+	collapseRow: () => 'Collapse',
+
+	settings: () => 'Settings',
+	selectCategory: () => 'Select a category'
 };
