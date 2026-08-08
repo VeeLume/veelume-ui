@@ -30,7 +30,9 @@
 			search: () => m.kit_search(),
 			empty: () => m.kit_empty(),
 			loading: () => m.kit_loading(),
-			loadMore: () => m.kit_load_more()
+			loadMore: () => m.kit_load_more(),
+			updatedAt: ({ when }) => m.kit_updated_at({ when }),
+			refresh: () => m.kit_refresh()
 		}
 	});
 

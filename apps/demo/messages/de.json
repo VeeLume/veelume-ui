@@ -5,5 +5,7 @@
 	"kit_search": "Suchen…",
 	"kit_empty": "Keine Treffer",
 	"kit_loading": "Wird geladen…",
-	"kit_load_more": "Mehr laden"
+	"kit_load_more": "Mehr laden",
+	"kit_updated_at": "Aktualisiert {when}",
+	"kit_refresh": "Aktualisieren"
 }

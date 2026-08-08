@@ -301,6 +301,19 @@ export type WorkingSet<K> = {
 	 *  from query time, deliberately not maintained as pages arrive. */
 	readonly total?: number;
 	/**
+	 * When this set's fill last SUCCEEDED, as `Date.now()`.
+	 *
+	 * ⚑ A property of the set, not of the connection — which is what makes it
+	 * meaningful on every transport. Over SSE an event-driven refresh keeps
+	 * bumping it, so it stops advancing exactly when updates stop arriving;
+	 * over Tauri IPC it simply says how long ago the data was confirmed.
+	 *
+	 * Note what it does NOT mean: old is not the same as stale. A set nobody
+	 * has changed in an hour is an hour old and perfectly correct. Surfaces
+	 * should present it as "as of", never as a warning.
+	 */
+	readonly updatedAt?: number;
+	/**
 	 * ⚑ There is no `complete` here, deliberately. It was a required boolean
 	 * that nothing maintained once `stopped` replaced it — so it read `false`
 	 * forever, including on sets that held everything. A required field that
@@ -348,6 +361,9 @@ export type ScopedView<T, K extends string | number> = {
 	readonly complete: boolean;
 	readonly fetchedCount: number;
 	readonly total: number | undefined;
+	/** When this set's fill last succeeded — see `WorkingSet.updatedAt`. "As
+	 *  of", never a staleness warning. */
+	readonly updatedAt: number | undefined;
 	/** Whether another accumulation step would yield more. */
 	readonly hasMore: boolean;
 	byKey(key: K): T | undefined;

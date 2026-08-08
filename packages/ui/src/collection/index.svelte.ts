@@ -540,6 +540,7 @@ export function createCollection<
 					stopped: 'exhausted',
 					cursor: undefined,
 					status: 'ready',
+					updatedAt: Date.now(),
 					error: undefined
 				});
 				return;
@@ -629,6 +630,10 @@ export function createCollection<
 				// over-fetch-and-filter made `total` count the wider query.
 				stopped: exhausted ? 'exhausted' : 'capped',
 				status: 'ready',
+				// Stamped only on SUCCESS. A failed fill must leave the previous
+				// timestamp standing: the rows on screen really are as of then,
+				// and moving it would claim a freshness we did not get.
+				updatedAt: Date.now(),
 				error: undefined
 			});
 
@@ -760,6 +765,9 @@ export function createCollection<
 			get total() {
 				return set()?.total;
 			},
+			get updatedAt() {
+				return set()?.updatedAt;
+			},
 			/** More to be had: the fill stopped at our own cap. */
 			get hasMore() {
 				const s = set();
@@ -868,6 +876,10 @@ export function createCollection<
 			 *  base's server total, which counts the wider corpus. */
 			get total() {
 				return local() ? narrowed(baseView().all).length : pushView().total;
+			},
+			/** A locally-served search is as fresh as the base it narrows. */
+			get updatedAt() {
+				return local() ? baseView().updatedAt : pushView().updatedAt;
 			},
 			get hasMore() {
 				return local() ? false : pushView().hasMore;
@@ -1100,6 +1112,9 @@ export function createCollection<
 		},
 		get fetchedCount() {
 			return view(scopeOf()).fetchedCount;
+		},
+		get updatedAt() {
+			return view(scopeOf()).updatedAt;
 		},
 		get hasMore() {
 			return view(scopeOf()).hasMore;

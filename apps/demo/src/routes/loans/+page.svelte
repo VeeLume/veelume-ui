@@ -215,6 +215,8 @@
 					fetching={loans.status === 'loading' || loans.status === 'refreshing'}
 					hasMore={loans.hasMore}
 					onloadmore={() => loans.loadMore()}
+					updatedAt={loans.updatedAt}
+					onrefresh={() => loans.refresh()}
 					action={{ label: 'New loan', icon: Plus, onclick: newLoan }}
 				/>
 			{/snippet}

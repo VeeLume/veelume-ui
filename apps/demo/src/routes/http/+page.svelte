@@ -140,6 +140,8 @@
 			fetching={httpLoans.status === 'loading' || httpLoans.status === 'refreshing'}
 			hasMore={httpLoans.hasMore}
 			onloadmore={() => httpLoans.loadMore()}
+			updatedAt={httpLoans.updatedAt}
+			onrefresh={() => httpLoans.refresh()}
 			action={{ label: 'New loan', onclick: () => act('Create', createLoanHttp) }}
 			onselect={(r) => (selected = r.key)}
 		/>

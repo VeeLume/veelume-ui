@@ -51,6 +51,14 @@ export type LabelBag = {
 	retry: () => string;
 	/** Extend a truncated set — shown only when the source has more. */
 	loadMore: () => string;
+	/**
+	 * How old the data is — "as of", never a warning. `when` arrives already
+	 * formatted in the formatting locale ("5 minutes ago"), so the bag only
+	 * chooses the wording around it.
+	 */
+	updatedAt: (a: { when: string }) => string;
+	/** Re-read the current set on demand. */
+	refresh: () => string;
 
 	// ── actions ──────────────────────────────────────────────────────────────
 	create: () => string;
@@ -89,6 +97,8 @@ export const defaultLabels: LabelBag = {
 	errorTitle: () => 'Could not load',
 	retry: () => 'Try again',
 	loadMore: () => 'Load more',
+	updatedAt: ({ when }) => `Updated ${when}`,
+	refresh: () => 'Refresh',
 
 	create: () => 'New',
 	save: () => 'Save',

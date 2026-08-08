@@ -99,6 +99,21 @@
 	</Case>
 
 	<Case
+		title="aged — the 'as of' band"
+		note="'As of', never a warning: old is not stale, and a set nobody has changed in an hour is an hour old and correct. It appears only past `staleAfter` (a minute by default, forced here) so a surface keeping up spends nothing on it — an indicator that fires constantly is one people learn to ignore. Bottom, because it is ambient status rather than something you reach for."
+		frame={false}
+	>
+		<Surface.Root {descriptor} browse={staticBrowse()}>
+			<Surface.List
+				status="ready"
+				updatedAt={Date.now() - 8 * 60_000}
+				staleAfter={0}
+				onrefresh={() => {}}
+			/>
+		</Surface.Root>
+	</Case>
+
+	<Case
 		title="custom row snippet"
 		note="The escape hatch. /catalog uses exactly this for expandable rows rather than forking the component."
 		frame={false}

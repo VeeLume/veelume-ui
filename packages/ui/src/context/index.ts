@@ -50,6 +50,13 @@ export type KitContext = {
 	format: {
 		number: (value: number, options?: Intl.NumberFormatOptions) => string;
 		date: (value: Date | number | string, options?: Intl.DateTimeFormatOptions) => string;
+		/**
+		 * "5 minutes ago", in the formatting locale — the unit is picked from
+		 * the distance. Here rather than in a component because it is locale
+		 * work, and an English string baked into a kit component is the rule
+		 * this package exists to enforce.
+		 */
+		relativeTime: (value: Date | number) => string;
 	};
 };
 
@@ -78,6 +85,36 @@ function dateFormat(locale: string, options?: Intl.DateTimeFormatOptions): Intl.
 		dateFormats.set(key, f);
 	}
 	return f;
+}
+
+const relativeFormats = new Map<string, Intl.RelativeTimeFormat>();
+
+/** Largest unit that still yields a whole number ≥ 1 — "2 hours ago" beats
+ *  "120 minutes ago", and both beat "7200 seconds ago". */
+const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+	['year', 31_536_000_000],
+	['month', 2_592_000_000],
+	['week', 604_800_000],
+	['day', 86_400_000],
+	['hour', 3_600_000],
+	['minute', 60_000],
+	['second', 1000]
+];
+
+function relativeTime(locale: string, value: Date | number): string {
+	let f = relativeFormats.get(locale);
+	if (!f) {
+		f = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+		relativeFormats.set(locale, f);
+	}
+	const ms = (value instanceof Date ? value.getTime() : value) - Date.now();
+	const abs = Math.abs(ms);
+	for (const [unit, size] of RELATIVE_UNITS) {
+		if (abs >= size) return f.format(Math.round(ms / size), unit);
+	}
+	// Under a second. `numeric: 'auto'` turns this into "now" rather than
+	// "in 0 seconds", which is the only reading that is not faintly absurd.
+	return f.format(0, 'second');
 }
 
 /**
@@ -123,7 +160,8 @@ export function createKitContext(input: KitContextInput = {}): KitContext {
 			date: (value, options) =>
 				dateFormat(formattingLocale(), options).format(
 					typeof value === 'string' ? new Date(value) : value
-				)
+				),
+			relativeTime: (value) => relativeTime(formattingLocale(), value)
 		}
 	};
 }

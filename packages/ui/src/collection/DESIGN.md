@@ -578,6 +578,24 @@ one `COUNT(*)`; change events are emitted by our own write path.
    `loans_create` emitted no event on either backend, so create was the one
    operation still needing a manual `refresh()`.
 
+   **Freshness, and what it is NOT.** `WorkingSet.updatedAt` stamps every
+   *successful* fill (a failed one leaves the previous stamp standing — the
+   rows really are as of then), surfaced as `view.updatedAt` and rendered by
+   `Surface.List` as an "as of" band past a `staleAfter` threshold.
+
+   It is deliberately a property of the **set**, not of the connection, which
+   is what makes it meaningful on both transports: over SSE an event-driven
+   refresh keeps bumping it, so it stops advancing exactly when updates stop
+   arriving; over Tauri IPC it simply says how long ago the data was
+   confirmed. But **old is not stale** — a set nobody has changed in an hour is
+   an hour old and correct — so the band says "as of" and never warns. The
+   threshold is what keeps it honest rather than noisy: an indicator that fires
+   constantly is one people learn to ignore.
+
    **Still deliberately open:** the collection cannot express "currently
-   disconnected", and the envelope has not been re-measured over real latency —
-   the demo's LAN-local server is not the test that would settle it.
+   disconnected". A connection signal from `sseInvalidation` (delayed past the
+   ~3s retry so a blip is not an alarm) is the design, unbuilt — `updatedAt`
+   covers the *informational* half, but a client that is disconnected while
+   nothing changes is indistinguishable from one that is merely idle. Also
+   open: the envelope has not been re-measured over real latency — the demo's
+   LAN-local server is not the test that would settle it.

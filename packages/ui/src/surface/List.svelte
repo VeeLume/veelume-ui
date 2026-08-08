@@ -27,6 +27,9 @@
 		fetching = undefined,
 		hasMore = false,
 		onloadmore = undefined,
+		updatedAt = undefined,
+		staleAfter = 60_000,
+		onrefresh = undefined,
 		selected = undefined,
 		action = undefined,
 		onselect,
@@ -49,6 +52,25 @@
 		hasMore?: boolean;
 		/** Extend the truncated set. Without it, `hasMore` renders nothing. */
 		onloadmore?: () => void;
+		/**
+		 * When the data was last confirmed fresh (`view.updatedAt`). Rendered as
+		 * "as of", NOT as a warning — old is not stale, and a set nobody has
+		 * changed in an hour is an hour old and perfectly correct.
+		 */
+		updatedAt?: number;
+		/**
+		 * How old the data must be before the age is worth saying, in ms.
+		 *
+		 * ⚑ The threshold is the whole design. "Updated 2 seconds ago" on every
+		 * surface is chrome that says nothing, and an indicator that fires
+		 * constantly is one people learn to ignore — the casebook's
+		 * "conservative guards fire constantly" lesson. Below this the band does
+		 * not exist.
+		 */
+		staleAfter?: number;
+		/** Re-read on demand. Without it the band states the age and offers no
+		 *  remedy, which is just anxiety — so the button only renders with it. */
+		onrefresh?: () => void;
 		/** Overrides Root's `selected` for the rare surface with two lists. */
 		selected?: string | null;
 		/** The list's one forward action — "New …". Rendered in the header. */
@@ -74,6 +96,24 @@
 	// the kit's business, not a flag the consumer has to remember.
 	const win = createWindow(() => s.visible.length);
 	const windowed = $derived(s.visible.slice(win.start, win.end));
+
+	/**
+	 * A ticking "now", so "5 minutes ago" keeps being true without the consumer
+	 * re-rendering for other reasons.
+	 *
+	 * ⚑ The interval only exists once there is something to age. A permanent
+	 * timer on every list in the app would be a real cost for a band that, by
+	 * design, is usually absent — and `updatedAt` is undefined for every
+	 * consumer that never passes it.
+	 */
+	let now = $state(Date.now());
+	$effect(() => {
+		if (updatedAt === undefined) return;
+		const id = setInterval(() => (now = Date.now()), 30_000);
+		return () => clearInterval(id);
+	});
+
+	const aged = $derived(updatedAt !== undefined && now - updatedAt >= staleAfter);
 
 	const rowClass = (isSelected: boolean) =>
 		'flex w-full items-baseline gap-2 border-b border-border px-3 py-2 text-left text-sm ' +
@@ -202,6 +242,26 @@
 			</ul>
 		{/if}
 	</div>
+
+	{#if aged && updatedAt !== undefined}
+		<!-- "As of", at the BOTTOM. Ambient status, not a control you reach for —
+		     the top belongs to the things you act with. Absent until the data is
+		     old enough to be worth saying, so it costs nothing on a surface that
+		     is keeping up. -->
+		<div
+			class="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1
+			       text-xs text-muted-foreground"
+		>
+			<span>{kit.labels.updatedAt({ when: kit.format.relativeTime(updatedAt) })}</span>
+			{#if onrefresh}
+				<button
+					type="button"
+					class="ml-auto rounded px-1 underline-offset-2 hover:underline"
+					onclick={onrefresh}>{kit.labels.refresh()}</button
+				>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>

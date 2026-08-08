@@ -263,6 +263,21 @@ Its trailing slot carries **Load more** (only when the source reports more) —
 reset lives in the filter panel, while a narrowed count over a truncated set is
 exactly where "there may be more matches than these" needs its remedy beside it.
 
+And again for the **"as of" band**: `updatedAt` renders at the bottom of the list
+only once the data is older than `staleAfter`. Three rules hold it in place:
+
+- **It is "as of", never a warning.** Old is not stale — a set nobody has changed
+  in an hour is an hour old and perfectly correct. Wording that implies fault
+  ("out of date", "connection lost") claims knowledge the client does not have.
+- **The threshold is the design.** "Updated 2 seconds ago" is chrome that says
+  nothing, and an indicator that fires constantly is one people learn to
+  ignore — the same "conservative guards fire constantly" lesson the collection
+  learned the expensive way.
+- **Bottom, and paired with a remedy.** Ambient status goes below; the top is for
+  things you reach for. A band that states an age and offers no action is just
+  anxiety, so the refresh button renders only when the consumer supplies
+  `onrefresh`.
+
 `selected` lives on `Surface.Root`, not on three parts. Which pane a narrow
 screen shows, which row the list highlights, and whether the toolbar steps aside
 are one fact — passing it three times is three chances to disagree.
