@@ -21,7 +21,12 @@
 	} = $props();
 </script>
 
-<section class="grid gap-3 border-t border-border pt-6 pb-6 first:border-t-0 first:pt-0 last:pb-0">
+<!-- justify-items-start: grid items are blockified, so an inline-flex control
+     (Segmented) would silently stretch full-width and look unanchored. Rows
+     opt back into full width with their own w-full. -->
+<section
+	class="grid justify-items-start gap-3 border-t border-border pt-6 pb-6 first:border-t-0 first:pt-0 last:pb-0"
+>
 	<div>
 		<h2 class="text-sm font-semibold">{title}</h2>
 		{#if description}

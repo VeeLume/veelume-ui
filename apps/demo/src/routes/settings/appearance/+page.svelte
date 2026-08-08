@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { Settings } from '@veelume/ui';
-	import Segmented from '$lib/components/Segmented.svelte';
+	import { Settings, Segmented } from '@veelume/ui';
 	import { appearance, type Theme, type Density } from '$lib/stores/appearance.svelte';
 
 	const themes: { value: Theme; label: string }[] = [
@@ -17,7 +16,7 @@
 
 <Settings.Page title="Appearance">
 	<Settings.Section title="Theme" description="'System' follows the device's setting.">
-		<Segmented options={themes} current={appearance.theme} pick={(v) => appearance.setTheme(v as Theme)} />
+		<Segmented options={themes} value={appearance.theme} onchange={(v) => appearance.setTheme(v as Theme)} />
 	</Settings.Section>
 
 	<Settings.Section
@@ -26,8 +25,8 @@
 	>
 		<Segmented
 			options={densities}
-			current={appearance.density}
-			pick={(v) => appearance.setDensity(v as Density)}
+			value={appearance.density}
+			onchange={(v) => appearance.setDensity(v as Density)}
 		/>
 	</Settings.Section>
 </Settings.Page>

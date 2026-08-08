@@ -70,6 +70,13 @@
 				{ value: 'ebook', label: 'ebook' }
 			]
 		},
+		{
+			name: 'notify_overdue',
+			label: 'Overdue reminders',
+			kind: 'boolean',
+			section: 'Lending',
+			hint: 'Remind me when a loan falls overdue.'
+		},
 		{ name: 'notes', label: 'Notes', kind: 'textarea', section: 'Notes' }
 	];
 </script>

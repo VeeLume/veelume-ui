@@ -48,7 +48,14 @@ export type { SettingsCategory, SettingsContext } from './settings/index.js';
 // ── L2: record form ────────────────────────────────────────────────────────
 // What archetype E actually reuses — connect-neo's wording is "the same
 // EDITOR", not the same surface. A solo record is this with nothing around it.
-export { RecordForm, NumberInput, createRecordForm, sectionsOf } from './form/index.js';
+export {
+	RecordForm,
+	NumberInput,
+	Switch,
+	Segmented,
+	createRecordForm,
+	sectionsOf
+} from './form/index.js';
 export {
 	formatLocaleNumber,
 	localeSeparators,

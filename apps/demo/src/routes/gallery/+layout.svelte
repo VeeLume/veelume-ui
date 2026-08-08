@@ -45,7 +45,8 @@
 		{ path: '/gallery/form', label: 'RecordForm' },
 		{ path: '/gallery/number', label: 'NumberInput' },
 		{ path: '/gallery/shell-footer', label: 'Shell footers' },
-		{ path: '/gallery/badge', label: 'StatusBadge' }
+		{ path: '/gallery/badge', label: 'StatusBadge' },
+		{ path: '/gallery/controls', label: 'Switch & Segmented' }
 	];
 
 	const LOCALES = ['de-DE', 'en-US', 'en-GB', 'fr-FR', 'ja-JP'];

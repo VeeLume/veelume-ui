@@ -237,7 +237,12 @@ export type Loan = { id: string; title: string; borrower: string; lent_on: strin
  * token, the matching total, and an explicit end-of-data flag.
  */
 export type LoanPage = { records: Loan[]; cursor: string | null; total: number; done: boolean }
-export type Preferences = { id: string; display_name: string; default_loan_days: number; fine_per_day_cents: number; preferred_format: string; notes: string }
+export type Preferences = { id: string; display_name: string; default_loan_days: number; fine_per_day_cents: number; preferred_format: string; 
+/**
+ * The record's one boolean — exists to exercise the form's `boolean`
+ * field kind end to end (Rust contract → bindings → Switch).
+ */
+notify_overdue: boolean; notes: string }
 export type Probe = { id: string; name: string; note: string }
 /**
  * One accumulation step over the paged probes. Mirrors the kit's `FetchPage`.

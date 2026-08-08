@@ -24,9 +24,10 @@ import Root from './Root.svelte';
 import List from './List.svelte';
 import Page from './Page.svelte';
 import Section from './Section.svelte';
+import Row from './Row.svelte';
 import Placeholder from './Placeholder.svelte';
 
-export const Settings = { Root, List, Page, Section, Placeholder };
+export const Settings = { Root, List, Page, Section, Row, Placeholder };
 
 export { getSettingsContext, type SettingsContext } from './context.js';
 export type { SettingsCategory } from './types.js';

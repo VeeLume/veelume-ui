@@ -20,6 +20,7 @@ const initial: Preferences = {
 	default_loan_days: 28,
 	fine_per_day_cents: 150,
 	preferred_format: 'paperback',
+	notify_overdue: true,
 	notes: ''
 };
 

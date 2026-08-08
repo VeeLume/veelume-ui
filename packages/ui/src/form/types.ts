@@ -8,7 +8,7 @@
  * produces this list from the server; the list itself is the contract.
  */
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'select' | 'display';
+export type FieldKind = 'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'display';
 
 export type SelectOption = { value: string; label: string };
 

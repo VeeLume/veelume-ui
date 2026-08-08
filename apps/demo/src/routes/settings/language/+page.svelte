@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { Settings } from '@veelume/ui';
-	import Segmented from '$lib/components/Segmented.svelte';
+	import { Settings, Segmented } from '@veelume/ui';
 	import { locales, getLocale, selectLocale, hasExplicitLocale } from '$lib/i18n';
 
 	const options = [
@@ -16,8 +15,8 @@
 	>
 		<Segmented
 			{options}
-			current={hasExplicitLocale() ? getLocale() : 'system'}
-			pick={(v) => selectLocale(v as 'system')}
+			value={hasExplicitLocale() ? getLocale() : 'system'}
+			onchange={(v) => selectLocale(v as 'system')}
 		/>
 	</Settings.Section>
 </Settings.Page>

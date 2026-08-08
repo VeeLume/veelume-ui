@@ -220,6 +220,9 @@ pub struct Preferences {
     pub default_loan_days: i32,
     pub fine_per_day_cents: i32,
     pub preferred_format: String,
+    /// The record's one boolean — exists to exercise the form's `boolean`
+    /// field kind end to end (Rust contract → bindings → Switch).
+    pub notify_overdue: bool,
     pub notes: String,
 }
 
@@ -231,6 +234,7 @@ impl Default for Preferences {
             default_loan_days: 28,
             fine_per_day_cents: 150,
             preferred_format: "paperback".into(),
+            notify_overdue: true,
             notes: String::new(),
         }
     }

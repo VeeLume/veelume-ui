@@ -10,6 +10,7 @@
 	import type { Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import NumberInput from './NumberInput.svelte';
+	import Switch from './Switch.svelte';
 	import { sectionsOf, type FieldSpec } from './types.js';
 	import type { RecordForm } from './createRecordForm.svelte.js';
 
@@ -46,47 +47,62 @@
 			{#each section.fields as f (f.name)}
 				{@const diverged = divergedFields.includes(f.name)}
 				<div class="grid gap-1">
-					<label class="text-xs text-muted-foreground" for={f.name}>{f.label}</label>
-
-					{#if f.kind === 'display'}
-						<p class="text-sm">{f.render ? f.render(form.value as T) : String(form.value[f.name] ?? '—')}</p>
-					{:else if f.kind === 'number'}
-						<NumberInput
-							id={f.name}
-							value={(form.value[f.name] as number | null) ?? null}
-							format={f.format}
-							scale={f.scale ?? 1}
-							disabled={f.readonly}
-							onchange={(n) => form.set(f.name, n as T[typeof f.name])}
-						/>
-					{:else if f.kind === 'select'}
-						<select
-							id={f.name}
-							disabled={f.readonly}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-							value={String(form.value[f.name] ?? '')}
-							onchange={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
-						>
-							{#each f.options ?? [] as o (o.value)}
-								<option value={o.value}>{o.label}</option>
-							{/each}
-						</select>
-					{:else if f.kind === 'textarea'}
-						<textarea
-							id={f.name}
-							disabled={f.readonly}
-							class="h-24 rounded-md border border-input bg-background p-2 text-sm"
-							value={String(form.value[f.name] ?? '')}
-							oninput={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
-						></textarea>
+					{#if f.kind === 'boolean'}
+						<!-- A boolean is a ROW — label beside the control, not above it.
+						     A lone knob under a floating label reads as unanchored, and
+						     every donor lays toggles out label-first, control-trailing. -->
+						<div class="flex items-center justify-between gap-4">
+							<label class="text-sm" for={f.name}>{f.label}</label>
+							<Switch
+								id={f.name}
+								checked={Boolean(form.value[f.name])}
+								disabled={f.readonly}
+								onchange={(next) => form.set(f.name, next as T[typeof f.name])}
+							/>
+						</div>
 					{:else}
-						<input
-							id={f.name}
-							disabled={f.readonly}
-							class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-							value={String(form.value[f.name] ?? '')}
-							oninput={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
-						/>
+						<label class="text-xs text-muted-foreground" for={f.name}>{f.label}</label>
+
+						{#if f.kind === 'display'}
+							<p class="text-sm">{f.render ? f.render(form.value as T) : String(form.value[f.name] ?? '—')}</p>
+						{:else if f.kind === 'number'}
+							<NumberInput
+								id={f.name}
+								value={(form.value[f.name] as number | null) ?? null}
+								format={f.format}
+								scale={f.scale ?? 1}
+								disabled={f.readonly}
+								onchange={(n) => form.set(f.name, n as T[typeof f.name])}
+							/>
+						{:else if f.kind === 'select'}
+							<select
+								id={f.name}
+								disabled={f.readonly}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								value={String(form.value[f.name] ?? '')}
+								onchange={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
+							>
+								{#each f.options ?? [] as o (o.value)}
+									<option value={o.value}>{o.label}</option>
+								{/each}
+							</select>
+						{:else if f.kind === 'textarea'}
+							<textarea
+								id={f.name}
+								disabled={f.readonly}
+								class="h-24 rounded-md border border-input bg-background p-2 text-sm"
+								value={String(form.value[f.name] ?? '')}
+								oninput={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
+							></textarea>
+						{:else}
+							<input
+								id={f.name}
+								disabled={f.readonly}
+								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								value={String(form.value[f.name] ?? '')}
+								oninput={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
+							/>
+						{/if}
 					{/if}
 
 					{#if diverged}

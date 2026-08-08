@@ -6,6 +6,7 @@
 		name: string;
 		amount_cents: number;
 		format: string;
+		insured: boolean;
 		notes: string;
 		created: string;
 	} & Record<string, unknown>;
@@ -14,6 +15,7 @@
 		name: 'Valerie',
 		amount_cents: 123456,
 		format: 'paperback',
+		insured: false,
 		notes: '',
 		created: '2026-04-05'
 	};
@@ -46,6 +48,13 @@
 				{ value: 'paperback', label: 'paperback' },
 				{ value: 'ebook', label: 'ebook' }
 			]
+		},
+		{
+			name: 'insured',
+			label: 'Insured shipping',
+			kind: 'boolean',
+			section: 'Money',
+			hint: 'A boolean renders as a row — label beside the switch, never a floating knob.'
 		},
 		{ name: 'notes', label: 'Notes', kind: 'textarea', section: 'Notes' },
 		{ name: 'name', label: 'Read-only name', kind: 'text', section: 'Notes', readonly: true }
