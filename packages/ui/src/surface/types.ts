@@ -6,6 +6,8 @@
  * one craftable row); a 1:1 CRUD surface writes `rs => rs.map(toRow)`.
  */
 
+import type { StatusTone } from '../badge/types.js';
+
 export type Row = {
 	/** Stable across refetches — expansion state and keyed `{#each}` depend on
 	 *  it. A derived row needs a canonical composite, e.g. sorted member ids. */
@@ -14,7 +16,12 @@ export type Row = {
 	subtitle?: string;
 	/** Right-aligned secondary text (a count, a date). */
 	trailing?: string;
-	badge?: string;
+	/**
+	 * A status chip. A plain string renders neutral; pass the result of
+	 * `resolveStatus(map, status)` from derive for a toned one. Resolved
+	 * data, not a component — a windowed list renders thousands of these.
+	 */
+	badge?: string | { label: string; tone: StatusTone };
 	/** Where selecting the row leads. Omit for surfaces that select in place. */
 	href?: string;
 };

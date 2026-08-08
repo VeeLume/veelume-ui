@@ -17,12 +17,15 @@
 	import {
 		Actions,
 		DetailHeader,
+		StatusBadge,
 		Surface,
 		createBrowseState,
 		getKitContext,
+		resolveStatus,
 		type Action,
 		type Row
 	} from '@veelume/ui';
+	import { loanStatusMap } from '$lib/loanStatus';
 	import {
 		loans,
 		setLoanYear,
@@ -67,7 +70,7 @@
 				trailing: l.fine_cents
 					? kit.format.number(l.fine_cents / 100, { style: 'currency', currency: 'EUR' })
 					: undefined,
-				badge: l.status,
+				badge: resolveStatus(loanStatusMap, l.status) ?? undefined,
 				href: `/loans?${new URLSearchParams({ ...Object.fromEntries(page.url.searchParams), id: l.id })}`,
 				loan: l,
 				// Derived, not stored — so filtering on it requires derive-then-filter
@@ -82,7 +85,7 @@
 				mode: 'many' as const,
 				options: (['draft', 'out', 'returned', 'lost', 'archived'] as LoanStatus[]).map((s) => ({
 					value: s,
-					label: s,
+					label: loanStatusMap[s]?.label() ?? s,
 					test: (r: LoanRow) => r.loan.status === s
 				}))
 			},
@@ -251,7 +254,7 @@
 									})}
 								</dd>
 								<dt class="text-muted-foreground">Status</dt>
-								<dd>{selected.status}</dd>
+								<dd><StatusBadge status={selected.status} map={loanStatusMap} /></dd>
 								{#if selected.replaced_by}
 									<dt class="text-muted-foreground">Replaced by</dt>
 									<dd>

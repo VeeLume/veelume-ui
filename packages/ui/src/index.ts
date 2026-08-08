@@ -63,6 +63,13 @@ export type {
 	SelectOption
 } from './form/index.js';
 
+// ── L2: status badge ───────────────────────────────────────────────────────
+// One pill + a per-domain status→(label, tone) map — four stibu components
+// were this exact split with the map inlined. `Row.badge` accepts the
+// resolved form so windowed lists render it without a component per row.
+export { StatusBadge, resolveStatus } from './badge/index.js';
+export type { StatusMap, StatusStyle, StatusTone } from './badge/index.js';
+
 // ── L2: surface parts ──────────────────────────────────────────────────────
 export { Surface, createSurface } from './surface/index.js';
 export type {

@@ -12,7 +12,8 @@
 	 * reconnect contract can be watched rather than assumed.
 	 */
 	import { page } from '$app/state';
-	import { getKitContext, createBrowseState, Surface, type Row } from '@veelume/ui';
+	import { getKitContext, createBrowseState, Surface, resolveStatus, type Row } from '@veelume/ui';
+	import { loanStatusMap } from '$lib/loanStatus';
 	import {
 		API,
 		httpLoans,
@@ -51,7 +52,7 @@
 				trailing: l.fine_cents
 					? kit.format.number(l.fine_cents / 100, { style: 'currency', currency: 'EUR' })
 					: undefined,
-				badge: l.status,
+				badge: resolveStatus(loanStatusMap, l.status) ?? undefined,
 				loan: l
 			})),
 		searchIn: (r: LoanRow) => [r.title, r.loan.borrower],

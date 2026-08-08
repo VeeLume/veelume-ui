@@ -18,6 +18,7 @@
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 	import { createWindow } from '../window/index.svelte.js';
+	import { statusBadgeClass, statusToneClass } from '../badge/types.js';
 	import type { Row } from './types.js';
 	import type { Action } from '../actions/types.js';
 	import type { Status } from '../collection/index.svelte.js';
@@ -150,9 +151,9 @@
 		<span class="shrink-0 text-xs tabular-nums text-muted-foreground">{r.trailing}</span>
 	{/if}
 	{#if r.badge}
-		<span class="shrink-0 rounded-sm bg-muted px-1 py-px text-[0.65rem] text-muted-foreground"
-			>{r.badge}</span
-		>
+		<!-- One class source with StatusBadge — a string is just the neutral tone. -->
+		{@const b = typeof r.badge === 'string' ? { label: r.badge, tone: 'neutral' as const } : r.badge}
+		<span class="{statusBadgeClass} {statusToneClass[b.tone]}">{b.label}</span>
 	{/if}
 {/snippet}
 

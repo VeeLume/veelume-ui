@@ -21,6 +21,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
+| `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
 | `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `Shell.SettingsFooter`/`.AccountFooter` (default rail footers, without/with an account concept), `AppShell` (the default arrangement), `NavRail`, `BottomNav`, `breakpoints`. |
 | `settings/` | L2+L3 | The stibu-shaped settings scaffold: `Settings.Root` (three-state responsive list-detail), `.List`, `.Page` (`DetailHeader` + content column), `.Section`, `.Placeholder`. Categories are data (`SettingsCategory[]`); adding a setting is one entry plus one small routed page. |
 

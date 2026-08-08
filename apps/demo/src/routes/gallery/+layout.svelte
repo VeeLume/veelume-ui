@@ -44,7 +44,8 @@
 		{ path: '/gallery/split', label: 'Surface.Split' },
 		{ path: '/gallery/form', label: 'RecordForm' },
 		{ path: '/gallery/number', label: 'NumberInput' },
-		{ path: '/gallery/shell-footer', label: 'Shell footers' }
+		{ path: '/gallery/shell-footer', label: 'Shell footers' },
+		{ path: '/gallery/badge', label: 'StatusBadge' }
 	];
 
 	const LOCALES = ['de-DE', 'en-US', 'en-GB', 'fr-FR', 'ja-JP'];
