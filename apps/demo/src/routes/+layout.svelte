@@ -70,7 +70,10 @@
 				<UpdateBanner />
 			{/snippet}
 			{#snippet bottom()}
-				<Shell.BottomBar items={nav.bottomItems} />
+				<!-- No items: the kit's default split — Home centred as the hero,
+				     the overflow collected behind More. Settings is reachable only
+				     through /more at this width, so the collector claims it. -->
+				<Shell.BottomBar moreOwns={['/settings']} />
 			{/snippet}
 
 			{@render children()}

@@ -197,6 +197,15 @@ expire, concurrent writers are normal, and **events are lossy**.
   could disagree with what is rendered. `AppShell` is the default arrangement (its `strategy`
   prop gates the *mount*); an app with a frame opinion composes the parts itself, like
   apps/demo's root layout does.
+- **The bottom bar's default is stibu's arrangement**: the hero (start) item dead centre, and
+  when the nav overflows the slot count (five, the thumb rule) the outer-right slot becomes a
+  **More collector** — a link to a ROUTE (`moreHref`, default `/more`; compose `Shell.MoreList`
+  there), never a popup. The collector `owns` every path it collected (plus `moreOwns`, for
+  destinations only reachable from that page, like settings), so it stays lit inside them —
+  `NavItem.owns` is the general hub mechanism, stibu's Finanzen case. `splitBottomNav` is pure
+  and shared: the bar and the More page run the SAME computation and cannot disagree about what
+  overflowed. Escapes, in order: `hero`/`slots`/`moreHref`/`moreOwns` tune it; explicit `items`
+  replaces it.
 - **Absence must be neutral.** Root's defaults are "no filter, no sort override, no mode", so a
   missing part means nothing is applied — never a filter active with no UI to reach it.
 - **i18n via a context label bag** with English defaults. Paraglide is app-level and

@@ -24,8 +24,10 @@
 
 	// Exact-or-child match rather than the rail's longest-prefix: the bar shows a
 	// hand-picked subset, so "closest ancestor" would light up an entry the user
-	// never chose.
-	const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
+	// never chose. `owns` extends the claim for hub slots (Finanzen, More) that
+	// stand for destinations not in the bar.
+	const ownsPath = (path: string) => pathname === path || pathname.startsWith(path + '/');
+	const isActive = (item: NavItem) => ownsPath(item.path) || (item.owns ?? []).some(ownsPath);
 </script>
 
 <!-- The inset padding keeps the bar clear of the gesture handle on Android. -->
@@ -34,7 +36,7 @@
 	style="padding-bottom: env(safe-area-inset-bottom)"
 >
 	{#each items as item (item.path)}
-		{@const active = isActive(item.path)}
+		{@const active = isActive(item)}
 		{@const Icon = item.icon as IconOf}
 		<a
 			href={item.path}

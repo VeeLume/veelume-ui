@@ -34,8 +34,8 @@
 		children
 	}: {
 		groups: NavGroup[];
-		/** Shown in the bottom bar. Defaults to every item, which is right only
-		 *  for small navs — pick explicitly past four or five. */
+		/** Explicit bottom-bar slots. Omitted, the bar runs the default split:
+		 *  hero centred, overflow collected behind a trailing More slot. */
 		bottomItems?: NavItem[];
 		strategy?: NavStrategy;
 		activePath?: string;

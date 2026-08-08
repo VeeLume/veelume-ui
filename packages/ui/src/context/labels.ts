@@ -78,6 +78,8 @@ export type LabelBag = {
 	settings: () => string;
 	/** Desktop placeholder when no settings category is selected. */
 	selectCategory: () => string;
+	/** The bottom bar's overflow collector slot. */
+	more: () => string;
 };
 
 /**
@@ -117,5 +119,6 @@ export const defaultLabels: LabelBag = {
 	collapseRow: () => 'Collapse',
 
 	settings: () => 'Settings',
-	selectCategory: () => 'Select a category'
+	selectCategory: () => 'Select a category',
+	more: () => 'More'
 };

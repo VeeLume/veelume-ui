@@ -34,7 +34,8 @@ const coreItems: NavItem[] = [
 	{ label: 'Stress', icon: Gauge, path: '/stress' }
 ];
 
-const settingsItem: NavItem = {
+/** Not in `groups` — settings lives in the rail footer and on the More page. */
+export const settingsItem: NavItem = {
 	label: 'Settings',
 	icon: Settings,
 	path: '/settings'
@@ -48,11 +49,6 @@ class Nav {
 
 	get items(): NavItem[] {
 		return this.groups.flatMap((g) => g.items);
-	}
-
-	/** Bottom bar holds at most five slots; settings always takes the last one. */
-	get bottomItems(): NavItem[] {
-		return [...this.items.slice(0, 4), settingsItem];
 	}
 }
 

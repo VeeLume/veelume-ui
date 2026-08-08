@@ -33,7 +33,8 @@ export {
 	BottomNav,
 	breakpoints,
 	getShellContext,
-	activeNavPath
+	activeNavPath,
+	splitBottomNav
 } from './shell/index.js';
 export type { NavGroup, NavIcon, NavItem, NavStrategy, ShellContext } from './shell/index.js';
 
