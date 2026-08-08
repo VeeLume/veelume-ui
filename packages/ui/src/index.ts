@@ -21,12 +21,21 @@ export { Actions, ActionMenu, Bar, Button, DetailHeader } from './actions/index.
 export type { Action, ActionIcon, ButtonSize, ButtonVariant } from './actions/index.js';
 
 // ── L3: app shell ──────────────────────────────────────────────────────────
-// Rail + bottom bar + the responsive rules between them. The rail's collapse
-// behaviour and its bottom account block are settled (stibu and Starlume
-// derived both independently); the mobile strategy is the deliberate variation
-// point.
-export { AppShell, NavRail, BottomNav, breakpoints, activeNavPath } from './shell/index.js';
-export type { NavGroup, NavIcon, NavItem, NavStrategy } from './shell/index.js';
+// Compound parts on the Surface contract: Root owns the frame decisions
+// (rail vs bottom bar, labels, safe-area) in context, parts read them, and an
+// app's divergence slots in as its own part reading `getShellContext()` —
+// versioned like everything else, never copy-in. `AppShell` is the default
+// arrangement; composing `Shell.BottomBar` (or not) IS the mobile strategy.
+export {
+	Shell,
+	AppShell,
+	NavRail,
+	BottomNav,
+	breakpoints,
+	getShellContext,
+	activeNavPath
+} from './shell/index.js';
+export type { NavGroup, NavIcon, NavItem, NavStrategy, ShellContext } from './shell/index.js';
 
 // ── L2: record form ────────────────────────────────────────────────────────
 // What archetype E actually reuses — connect-neo's wording is "the same

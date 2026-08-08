@@ -21,7 +21,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, locale-aware number parsing. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
-| `shell/` | L3 | `AppShell`, `NavRail`, `BottomNav`, `breakpoints`. |
+| `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `AppShell` (the default arrangement), `NavRail`, `BottomNav`, `breakpoints`. |
 
 Everything is exercised by a real surface in `apps/demo` — Catalog (derive +
 overlay), Loans (scoped, four closers), Preferences (solo record), and
@@ -35,7 +35,7 @@ Every piece belongs to exactly one, decided by: **is there one right answer?**
 |---|---|---|---|
 | **L1** | logic, **no markup** — caches, state machines, derivations | versioned | must not drift; central fix reaches everyone |
 | **L2** | compound components; every part overridable via `Snippet` | versioned | must not drift |
-| **L3** | opinionated arrangements + theme | copy-in | drift is the *feature* |
+| **L3** | default arrangements of L2 parts + theme | versioned | divergence is legitimate, and it happens by **recomposition**: the app writes its own arrangement *in the app* from kit parts, which keep updating centrally. Never copy-in. |
 
 L1 cannot constrain the UI because it has no opinion about the DOM. That is what makes the
 split work: **the part with the most value has the least surface area.**
@@ -188,6 +188,14 @@ expire, concurrent writers are normal, and **events are lossy**.
 - **Composable by omission, never rearrangement.** `<Surface.Root>` owns state, parts read it
   from context. Omitting `<Surface.Toolbar>` is not merely supported, it is the
   default; moving it below the list is not supported at all.
+- **The shell follows the same contract.** `Shell.Root` owns the frame decisions (rail vs
+  bottom bar, labels, safe-area) in context; parts read them, and an app's custom part reads
+  `getShellContext()` and stays in sync with the frame for free. **There is no `strategy`
+  flag on the parts**: mounting `Shell.BottomBar` is what makes the rail yield the narrow
+  widths, so rail-only is the *omission* of a part — a mode flag would be a second fact that
+  could disagree with what is rendered. `AppShell` is the default arrangement (its `strategy`
+  prop gates the *mount*); an app with a frame opinion composes the parts itself, like
+  apps/demo's root layout does.
 - **Absence must be neutral.** Root's defaults are "no filter, no sort override, no mode", so a
   missing part means nothing is applied — never a filter active with no UI to reach it.
 - **i18n via a context label bag** with English defaults. Paraglide is app-level and

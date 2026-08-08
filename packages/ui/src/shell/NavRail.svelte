@@ -13,13 +13,14 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { activeNavPath, type NavGroup , type IconOf } from './types.js';
+	import { activeNavPath, type NavGroup, type NavItem, type IconOf } from './types.js';
 
 	let {
 		groups,
 		activePath = undefined,
 		showLabels = false,
 		footer,
+		item,
 		class: klass = ''
 	}: {
 		groups: NavGroup[];
@@ -28,6 +29,9 @@
 		showLabels?: boolean;
 		/** The bottom block — avatar, settings, whatever the app puts there. */
 		footer?: Snippet<[{ showLabels: boolean }]>;
+		/** Replaces a nav row's rendering — a `soon` flag, a badge count. The
+		 *  default `<a>` otherwise; grouping and geometry stay the rail's. */
+		item?: Snippet<[{ item: NavItem; active: boolean; showLabels: boolean }]>;
 		class?: string;
 	} = $props();
 
@@ -68,25 +72,29 @@
 				></div>
 			{/if}
 
-			{#each group.items as item (item.path)}
-				{@const isActive = active === item.path}
-				{@const Icon = item.icon as IconOf}
-				<a
-					href={item.path}
-					class={rowBase}
-					class:w-full={showLabels}
-					class:justify-center={!showLabels}
-					class:bg-accent={isActive}
-					class:text-accent-foreground={isActive}
-					class:text-muted-foreground={!isActive}
-					class:hover:bg-accent={!isActive}
-					style="height: var(--density-target)"
-					aria-current={isActive ? 'page' : undefined}
-					title={!showLabels ? item.label : undefined}
-				>
-					{#if item.icon}<Icon size={20} class="shrink-0" />{/if}
-					{#if showLabels}<span class="truncate">{item.label}</span>{/if}
-				</a>
+			{#each group.items as navItem (navItem.path)}
+				{@const isActive = active === navItem.path}
+				{@const Icon = navItem.icon as IconOf}
+				{#if item}
+					{@render item({ item: navItem, active: isActive, showLabels })}
+				{:else}
+					<a
+						href={navItem.path}
+						class={rowBase}
+						class:w-full={showLabels}
+						class:justify-center={!showLabels}
+						class:bg-accent={isActive}
+						class:text-accent-foreground={isActive}
+						class:text-muted-foreground={!isActive}
+						class:hover:bg-accent={!isActive}
+						style="height: var(--density-target)"
+						aria-current={isActive ? 'page' : undefined}
+						title={!showLabels ? navItem.label : undefined}
+					>
+						{#if navItem.icon}<Icon size={20} class="shrink-0" />{/if}
+						{#if showLabels}<span class="truncate">{navItem.label}</span>{/if}
+					</a>
+				{/if}
 			{/each}
 		{/each}
 	</div>

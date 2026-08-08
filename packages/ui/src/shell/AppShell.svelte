@@ -1,10 +1,12 @@
 <script lang="ts">
 	/**
-	 * The app frame: rail beside content, bottom bar underneath it on narrow
-	 * screens, with the safe-area insets a Tauri mobile build needs.
+	 * The default arrangement — `Shell.Root/Rail/Content/BottomBar` composed
+	 * the way most apps want them. Nothing here an app could not write itself;
+	 * that is the point. An app with a different frame composes the parts
+	 * directly (see apps/demo's root layout) and keeps every part it did not
+	 * replace updating with the kit.
 	 *
-	 * The responsive behaviour is the shell's, not each app's — that is the whole
-	 * reason it moved into the kit. What stays the app's:
+	 * What stays the app's:
 	 *   - `strategy`, because mobile nav is the one deliberate variation point
 	 *     (stibu is rail+bottom; Hearth and Starlume are rail-only)
 	 *   - `bottomItems`, because choosing what a phone user reaches for is a
@@ -16,9 +18,10 @@
 	 * `children` would let them scroll away.
 	 */
 	import type { Snippet } from 'svelte';
-	import NavRail from './NavRail.svelte';
-	import BottomNav from './BottomNav.svelte';
-	import { breakpoints } from './breakpoints.svelte.js';
+	import Root from './Root.svelte';
+	import Rail from './Rail.svelte';
+	import Content from './Content.svelte';
+	import BottomBar from './BottomBar.svelte';
 	import type { NavGroup, NavItem, NavStrategy } from './types.js';
 
 	let {
@@ -40,37 +43,18 @@
 		banner?: Snippet;
 		children: Snippet;
 	} = $props();
-
-	const flatItems = $derived(groups.flatMap((g) => g.items));
-	// rail-only keeps the rail at every width, so a narrow window gets icons
-	// rather than a bar the app never designed for.
-	const showRail = $derived(strategy === 'rail-only' || breakpoints.showRail);
-	const showBottom = $derived(strategy === 'bottom' && breakpoints.showBottomNav);
 </script>
 
-<div class="flex h-svh overflow-hidden bg-background">
-	{#if showRail}
-		<NavRail
-			{groups}
-			{activePath}
-			showLabels={breakpoints.showLabels}
-			footer={railFooter}
-		/>
-	{/if}
-
-	<div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-		<!-- Status bar / notch inset (0 on desktop). Non-scrolling, so sticky
-		     headers below it can never slide under the system bar. -->
-		<div class="shrink-0 bg-background" style="height: env(safe-area-inset-top)"></div>
-
-		{#if banner}{@render banner()}{/if}
-
-		<main class="min-h-0 flex-1 overflow-auto">
-			{@render children()}
-		</main>
-
-		{#if showBottom}
-			<BottomNav items={bottomItems ?? flatItems} {activePath} />
-		{/if}
-	</div>
-</div>
+<Root {groups} {activePath}>
+	<Rail footer={railFooter} />
+	<Content {banner}>
+		{#snippet bottom()}
+			<!-- Mounting BottomBar is what makes the rail yield narrow widths,
+			     so the strategy check must gate the mount, not the visibility. -->
+			{#if strategy === 'bottom'}
+				<BottomBar items={bottomItems} />
+			{/if}
+		{/snippet}
+		{@render children()}
+	</Content>
+</Root>
