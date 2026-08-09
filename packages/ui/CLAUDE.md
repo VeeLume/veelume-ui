@@ -18,7 +18,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
@@ -84,16 +84,46 @@ Corollary: **no hardcoded user-facing strings anywhere in this package.**
 
 ### The pipeline
 
-Every list surface, both archetypes, is the same five steps:
+Every list surface, both archetypes, is the same steps:
 
 ```
-scoped cache → derive rows → search/filter/sort → window → render
+scoped cache → derive rows → search/filter/sort → group → window → render
 ```
 
 **⚑ `derive` runs BEFORE `filter`, always.** A catalog filters on properties that only exist
 *after* derivation joins an overlay (Hearth filters on `owned`, which no raw record carries).
 A 1:1 CRUD surface cannot tell the difference — which is exactly why the order must be pinned
 deliberately rather than discovered.
+
+**Grouping is SECTIONS, not bundles.** `groupBy?: GroupDef[]` (levels, outermost first)
+partitions the flat sorted rows under headers — presentation only. N records collapsing into
+one row with members is a *bundle* and belongs to `derive` (Hearth's mission chains are
+bundles; its catalog taxonomy is sections). The rules, each load-bearing:
+
+- **After sort**, so header counts describe the narrowed population and the default group
+  order (first appearance) inherits the active sort. A taxonomy with its own order supplies
+  `compare` on the level.
+- **Empty groups do not exist** — sections are emitted from actual rows, so narrowing removes
+  headers with their rows and filter-to-nothing shows the empty state, never a header
+  skeleton. Absence stays neutral.
+- **Headers are not rows**: never selectable or expandable, skipped by `onselect`, not
+  counted by the count strip. The default renders label · visible count; the `group` snippet
+  on `Surface.List` replaces it (aggregates read the entry's `rows`).
+- **⚑ Hierarchy is typography PLUS one-directional indentation.** Each header sits at its
+  level's edge; **every row indents one step past the deepest level**, so content is always
+  right of its label and the nesting cannot read backwards. The row inset is a per-surface
+  CONSTANT (`groupDepth`) — legal because sections are uniform depth, which a tree could
+  never claim; per-row indent belongs to Expand. Typography still separates the species
+  (level 0 a small heading in the primary colour — Hearth's accent-heading move — deeper
+  levels uppercase kickers), because indent alone cannot tell a label from a row title.
+- **Toggleable grouping is the descriptor being `$derived` from app state** — no mode flag on
+  any part.
+- **The entry list is flat** (`ListEntry = R | GroupHeader`, branded by a private symbol —
+  rows are app-extended, so no property name could be reserved on them) because windowing
+  needs one indexable list; ungrouped surfaces get `visible` back unchanged, so flat lists
+  pay nothing. **⚑ Sticky headers are deliberately not offered**: `position: sticky` dies
+  inside a `translateY`-positioned entry (the transform is the containing block) — a
+  structural conflict with windowing, not an oversight.
 
 ### L1 — collections
 

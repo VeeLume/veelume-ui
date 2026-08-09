@@ -60,6 +60,75 @@ export function staticBrowse(initial: Record<string, string | string[]> = {}): S
 	};
 }
 
+// ── Grouping specimens ─────────────────────────────────────────────────────
+
+export type GroupedRow = DemoRow & { era: string; author: string };
+
+const g = (key: string, era: string, author: string, title: string): GroupedRow => ({
+	key,
+	title,
+	subtitle: author,
+	era,
+	author,
+	note: ''
+});
+
+/** Eight rows across three eras and six authors — enough that one-level and
+ *  two-level grouping produce visibly different structures (Le Guin spans two
+ *  eras, so "by author" merges what "by era → author" separates). */
+export const groupedRows: GroupedRow[] = [
+	g('g1', '1960s', 'Frank Herbert', 'Dune'),
+	g('g2', '1960s', 'Ursula K. Le Guin', 'A Wizard of Earthsea'),
+	g('g3', '1970s', 'Ursula K. Le Guin', 'The Dispossessed'),
+	g('g4', '1970s', 'Octavia Butler', 'Kindred'),
+	g('g5', '1970s', 'Larry Niven', 'Ringworld'),
+	g('g6', '1980s', 'Iain M. Banks', 'Consider Phlebas'),
+	g('g7', '1980s', 'Iain M. Banks', 'Use of Weapons'),
+	g('g8', '1980s', 'William Gibson', 'Neuromancer')
+];
+
+const groupedBase = {
+	sources: () => groupedRows,
+	derive: (rs: GroupedRow[]) => rs,
+	searchIn: (r: GroupedRow) => [r.title, r.author],
+	sorts: [
+		{
+			value: 'title',
+			label: 'Title',
+			compare: (a: GroupedRow, b: GroupedRow) => a.title.localeCompare(b.title)
+		}
+	]
+};
+
+export const groupedByAuthor = {
+	...groupedBase,
+	groupBy: [{ key: (r: GroupedRow) => r.author }]
+};
+
+/** Two levels, and the outer one supplies `compare`: rows are sorted by title,
+ *  so first-appearance would order the eras by whichever title sorts first —
+ *  a taxonomy wants its own order instead. */
+export const groupedByEraAuthor = {
+	...groupedBase,
+	groupBy: [
+		{ key: (r: GroupedRow) => r.era, compare: (a: string, b: string) => a.localeCompare(b) },
+		{ key: (r: GroupedRow) => r.author }
+	]
+};
+
+/** 600 deterministic rows in decade sections — past the windowing threshold,
+ *  so headers are proven to measure and position like any other entry. */
+export const bigGroupedRows: GroupedRow[] = Array.from({ length: 600 }, (_, i) => {
+	const decade = 1900 + Math.floor(i / 50) * 10;
+	return g(`big${i}`, `${decade}s`, `Author ${(i % 7) + 1}`, `Work no. ${i + 1} (${decade}s)`);
+});
+
+export const bigGroupedDescriptor = {
+	...groupedBase,
+	sources: () => bigGroupedRows,
+	groupBy: [{ key: (r: GroupedRow) => r.era }]
+};
+
 export const descriptor = {
 	sources: () => rows,
 	derive: (rs: DemoRow[]) => rs,

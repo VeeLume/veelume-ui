@@ -19,7 +19,8 @@
 	import { getSurfaceContext } from './context.js';
 	import { createWindow } from '../window/index.svelte.js';
 	import { statusBadgeClass, statusToneClass } from '../badge/types.js';
-	import type { Row } from './types.js';
+	import { isGroupHeader } from './types.js';
+	import type { GroupHeader, ListEntry, Row } from './types.js';
 	import type { Action } from '../actions/types.js';
 	import type { Status } from '../collection/index.svelte.js';
 
@@ -37,6 +38,7 @@
 		header,
 		headerLeading,
 		row,
+		group,
 		empty,
 		class: klass = ''
 	}: {
@@ -83,6 +85,9 @@
 		headerLeading?: Snippet;
 		/** Replace the default row rendering entirely. */
 		row?: Snippet<[R, boolean]>;
+		/** Replace the default section header — for aggregates the default
+		 *  can't know about (Hearth's owned x/y reads the entry's `rows`). */
+		group?: Snippet<[GroupHeader<R>]>;
 		empty?: Snippet;
 		class?: string;
 	} = $props();
@@ -95,8 +100,14 @@
 	// Viewport windowing — neutral below its threshold, so a short list renders
 	// exactly as before. Engages by size, not by prop: a rendering strategy is
 	// the kit's business, not a flag the consumer has to remember.
-	const win = createWindow(() => s.visible.length);
-	const windowed = $derived(s.visible.slice(win.start, win.end));
+	//
+	// Windowed over ENTRIES, not rows: section headers are entries like any
+	// other, measured by the same ResizeObserver — which is also why sticky
+	// headers are deliberately not offered. `position: sticky` dies inside a
+	// `translateY`-positioned entry (the transform establishes the containing
+	// block), so sticky and windowing conflict structurally, not by oversight.
+	const win = createWindow(() => s.entries.length);
+	const windowed = $derived(s.entries.slice(win.start, win.end));
 
 	/**
 	 * A ticking "now", so "5 minutes ago" keeps being true without the consumer
@@ -116,11 +127,52 @@
 
 	const aged = $derived(updatedAt !== undefined && now - updatedAt >= staleAfter);
 
+	/**
+	 * One-directional indentation: a header sits at its level's edge, every row
+	 * one step past the DEEPEST level — content always right of its label, so
+	 * the nesting can never read backwards. Legal without per-row depth because
+	 * sections are UNIFORM: `groupDepth` is a surface constant, which a tree
+	 * could never claim — per-row indent is Expand's business, not this list's.
+	 * Ungrouped surfaces get 0 and render byte-identical to before.
+	 */
+	const INDENT = 12;
+	const indentOf = (e: ListEntry<R>) => (isGroupHeader(e) ? e.level : s.groupDepth) * INDENT;
+
 	const rowClass = (isSelected: boolean) =>
 		'flex w-full items-baseline gap-2 border-b border-border px-3 py-2 text-left text-sm ' +
 		'transition-colors last:border-b-0 ' +
 		(isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted');
 </script>
+
+{#snippet section(h: GroupHeader<R>)}
+	<!-- A header is NOT a row: never selectable, never expandable, skipped by
+	     `onselect`. The default shows label · visible count; the `group`
+	     snippet replaces it when a consumer wants aggregates.
+
+	     ⚑ Hierarchy is typography PLUS one-directional indentation: the header
+	     sits at its level's edge and content indents PAST it (see indentOf).
+	     Header species still differ — level 0 a small heading in the primary
+	     colour (Hearth's accent-heading move), deeper levels tracked kickers —
+	     because indent alone cannot separate a label from a row title. -->
+	{#if group}
+		{@render group(h)}
+	{:else if h.level === 0}
+		<div class="flex items-baseline gap-2 px-3 pt-4 pb-1 text-sm font-semibold text-primary">
+			<span class="truncate">{h.label}</span>
+			<span class="shrink-0 text-xs font-normal tabular-nums text-muted-foreground"
+				>{h.rows.length}</span
+			>
+		</div>
+	{:else}
+		<div
+			class="flex items-baseline gap-2 px-3 pt-2.5 pb-1 text-xs font-medium
+			       tracking-wider text-muted-foreground uppercase"
+		>
+			<span class="truncate">{h.label}</span>
+			<span class="shrink-0 tabular-nums opacity-70">{h.rows.length}</span>
+		</div>
+	{/if}
+{/snippet}
 
 {#snippet entry(r: R)}
 	{@const isSelected = openKey === r.key}
@@ -222,7 +274,7 @@
 			     mouse — pad-based windowing relaid the list out on every window
 			     move and the drag mapping drifted. -->
 			<ul style:position="relative" style:height="{win.height}px">
-				{#each windowed as r, i (r.key)}
+				{#each windowed as e, i (e.key)}
 					<li
 						data-index={win.start + i}
 						{@attach win.item}
@@ -231,16 +283,25 @@
 						style:right="0"
 						style:top="0"
 						style:transform="translateY({win.tops[i]}px)"
+						style:padding-left="{indentOf(e)}px"
 					>
-						{@render entry(r)}
+						{#if isGroupHeader(e)}
+							{@render section(e)}
+						{:else}
+							{@render entry(e)}
+						{/if}
 					</li>
 				{/each}
 			</ul>
 		{:else}
 			<ul>
-				{#each windowed as r (r.key)}
-					<li>
-						{@render entry(r)}
+				{#each windowed as e (e.key)}
+					<li style:padding-left="{indentOf(e)}px">
+						{#if isGroupHeader(e)}
+							{@render section(e)}
+						{:else}
+							{@render entry(e)}
+						{/if}
 					</li>
 				{/each}
 			</ul>

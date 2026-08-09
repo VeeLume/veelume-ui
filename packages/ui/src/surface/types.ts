@@ -47,6 +47,66 @@ export type SortDef<R> = {
 	compare: (a: R, b: R) => number;
 };
 
+/**
+ * One grouping level — SECTIONS, a presentation partitioning of the flat row
+ * list under headers. Not to be confused with *bundles* (N records collapsing
+ * into one row with members), which are `derive`'s business: Hearth's mission
+ * chains are bundles, its catalog taxonomy is sections.
+ */
+export type GroupDef<R> = {
+	/** Partition key. Must be stable across refetches, like `Row.key`. */
+	key: (row: R) => string;
+	/** Header text. Default: the partition key itself. Receives the group's
+	 *  VISIBLE rows, so a label can carry an aggregate (Hearth's owned x/y). */
+	label?: (key: string, rows: R[]) => string;
+	/** Group order. Default: first appearance, which inherits the active sort —
+	 *  alphabetical rows give alphabetical groups for free. Supply this when the
+	 *  domain has its own order (a taxonomy). */
+	compare?: (a: string, b: string) => number;
+};
+
+/**
+ * A section header the pipeline interleaves into the entry list.
+ *
+ * Branded with a module-private symbol rather than a `kind` string so no app
+ * row shape can collide with it — rows are app-extended and the kit cannot
+ * reserve a property name on them.
+ */
+const HEADER = Symbol('veelume-ui:group-header');
+
+export type GroupHeader<R> = {
+	[HEADER]: true;
+	/** Unique among entries (headers and rows share one keyed {#each}). */
+	key: string;
+	/** 0 = outermost. Drives the default header's indent/emphasis. */
+	level: number;
+	label: string;
+	/** The group's visible rows — post-filter, so counts never lie. */
+	rows: R[];
+};
+
+/**
+ * What a grouped list renders: rows with headers interleaved, FLAT — windowing
+ * needs one indexable list, and headers are measured like any other entry.
+ * Ungrouped surfaces get `visible` back unchanged (same array, no per-row
+ * allocation — /stress republishes 1.5M rows per fill page).
+ */
+export type ListEntry<R> = R | GroupHeader<R>;
+
+export function isGroupHeader<R>(entry: ListEntry<R>): entry is GroupHeader<R> {
+	return HEADER in (entry as object);
+}
+
+/** Pipeline-internal factory — the symbol stays module-private. */
+export function makeGroupHeader<R>(
+	key: string,
+	level: number,
+	label: string,
+	rows: R[]
+): GroupHeader<R> {
+	return { [HEADER]: true, key, level, label, rows };
+}
+
 export type SurfaceDescriptor<Src, R extends Row> = {
 	/** Where the data comes from — one collection, or several when an overlay is
 	 *  joined during derivation. */
@@ -61,6 +121,12 @@ export type SurfaceDescriptor<Src, R extends Row> = {
 	searchIn?: (row: R) => (string | number | null | undefined)[];
 	facets?: FacetDef<R>[];
 	sorts?: SortDef<R>[];
+	/**
+	 * Section levels, outermost first — Hearth's taxonomy is two. Omit and the
+	 * list is flat; absence is neutral. Toggleable grouping is this being
+	 * derived from app state (rebuild the descriptor), not a mode on any part.
+	 */
+	groupBy?: GroupDef<R>[];
 };
 
 /**

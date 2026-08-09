@@ -30,9 +30,13 @@ export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split };
 
 export { createSurface } from './pipeline.svelte.js';
 export type { Surface as SurfaceState } from './pipeline.svelte.js';
+export { isGroupHeader } from './types.js';
 export type {
 	FacetDef,
 	FacetOption,
+	GroupDef,
+	GroupHeader,
+	ListEntry,
 	Row,
 	SortDef,
 	SurfaceBrowse,

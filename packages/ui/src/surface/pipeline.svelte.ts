@@ -2,16 +2,71 @@
  * The surface pipeline — logic, no markup, so it is L1 even though only L2
  * components consume it.
  *
- *   scoped cache → derive rows → search → filter → sort   (→ window → render)
+ *   scoped cache → derive rows → search → filter → sort → group  (→ window → render)
  *
  * ⚑ `derive` runs BEFORE `filter`, always. A catalog filters on properties that
  * only exist *after* derivation joins an overlay — Hearth filters on `owned`,
  * which no raw blueprint carries. A 1:1 CRUD surface cannot tell the two orders
  * apart, which is exactly why this has to be pinned deliberately rather than
  * discovered later by someone writing the first overlay filter.
+ *
+ * ⚑ `group` runs AFTER sort, for two reasons that are the same lesson again:
+ * after filter so header counts describe the narrowed population (a header
+ * claiming 8 rows above 3 visible ones lies the same way pre-derive facet
+ * counts did), and after sort so within-group order IS the sort order and the
+ * default group order (first appearance) inherits it — alphabetical rows give
+ * alphabetical groups with no second comparator.
  */
 
-import type { FacetDef, Row, SortDef, SurfaceBrowse, SurfaceDescriptor } from './types.js';
+import { makeGroupHeader } from './types.js';
+import type {
+	FacetDef,
+	GroupDef,
+	ListEntry,
+	Row,
+	SortDef,
+	SurfaceBrowse,
+	SurfaceDescriptor
+} from './types.js';
+
+/**
+ * Step 5 — partition sorted rows into sections, flattened for windowing.
+ *
+ * Recursive over levels (outermost first). Bucket insertion order is first
+ * appearance; `compare` reorders keys when the domain has its own order.
+ * Header keys are path-qualified with NUL separators so a "Misc" subgroup
+ * under two different parents cannot collide — NUL because no app-supplied
+ * partition key contains it, the same reasoning as canonical facet encoding.
+ *
+ * Empty groups DO NOT EXIST by construction: sections are emitted from actual
+ * rows, so a filter that empties a group removes its header, and filtering to
+ * nothing yields no header skeleton — absence stays neutral.
+ */
+function groupRows<R extends Row>(rows: R[], defs: GroupDef<R>[]): ListEntry<R>[] {
+	const build = (subset: R[], level: number, path: string): ListEntry<R>[] => {
+		const def = defs[level];
+		const buckets = new Map<string, R[]>();
+		for (const r of subset) {
+			const k = def.key(r);
+			const list = buckets.get(k);
+			if (list) list.push(r);
+			else buckets.set(k, [r]);
+		}
+		const keys = [...buckets.keys()];
+		if (def.compare) keys.sort(def.compare);
+
+		const out: ListEntry<R>[] = [];
+		for (const k of keys) {
+			const groupRows = buckets.get(k)!;
+			const entryKey = `\0group\0${path}${k}`;
+			out.push(makeGroupHeader(entryKey, level, def.label?.(k, groupRows) ?? k, groupRows));
+			if (level + 1 < defs.length) out.push(...build(groupRows, level + 1, `${path}${k}\0`));
+			else out.push(...groupRows);
+		}
+		return out;
+	};
+	return build(rows, 0, '');
+}
 
 /**
  * Both inputs arrive as ACCESSORS, not values.
@@ -94,6 +149,19 @@ export function createSurface<Src, R extends Row>(
 	const visible = $derived(sort ? [...filtered].sort(sort.compare) : filtered);
 
 	/**
+	 * Step 5 — group. Ungrouped surfaces get `visible` BACK — the same array,
+	 * not a wrapped copy. `ListEntry<R>` is a union rather than a wrapper for
+	 * exactly this: /stress republishes 1.5M rows per fill page, and a
+	 * per-row allocation here would tax every flat list to pay for sections
+	 * it doesn't have.
+	 */
+	const entries = $derived.by((): ListEntry<R>[] => {
+		const defs = descriptor.groupBy;
+		if (!defs?.length) return visible;
+		return groupRows(visible, defs);
+	});
+
+	/**
 	 * How many rows each option would leave — counted against search plus every
 	 * OTHER facet, never against its own.
 	 *
@@ -117,9 +185,23 @@ export function createSurface<Src, R extends Row>(
 		get rows() {
 			return rows;
 		},
-		/** After search + filter + sort — what a list renders. */
+		/** After search + filter + sort — the ROWS. Counts read this. */
 		get visible() {
 			return visible;
+		},
+		/** What a list renders: `visible` with section headers interleaved when
+		 *  the descriptor groups, `visible` itself when it doesn't. */
+		get entries() {
+			return entries;
+		},
+		/**
+		 * How many header levels sit above every row — the row indent, as a
+		 * per-surface CONSTANT. Sections are uniform depth (unlike a tree), which
+		 * is what lets rows indent past their headers without carrying any
+		 * per-row depth and without wrapping the row objects.
+		 */
+		get groupDepth() {
+			return descriptor.groupBy?.length ?? 0;
 		},
 		get counts() {
 			return counts;

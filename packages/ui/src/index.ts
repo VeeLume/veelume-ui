@@ -121,10 +121,13 @@ export { StatusBadge, resolveStatus } from './badge/index.js';
 export type { StatusMap, StatusStyle, StatusTone } from './badge/index.js';
 
 // ── L2: surface parts ──────────────────────────────────────────────────────
-export { Surface, createSurface } from './surface/index.js';
+export { Surface, createSurface, isGroupHeader } from './surface/index.js';
 export type {
 	FacetDef,
 	FacetOption,
+	GroupDef,
+	GroupHeader,
+	ListEntry,
 	Row,
 	SortDef,
 	SurfaceBrowse,

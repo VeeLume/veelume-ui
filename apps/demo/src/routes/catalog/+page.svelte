@@ -16,9 +16,10 @@
 	 * settles across a second surface it earns promotion to L2 — not before.
 	 */
 	import { SvelteSet } from 'svelte/reactivity';
-	import { Surface } from '@veelume/ui';
+	import { Surface, Segmented } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
+	import type { GroupDef } from '@veelume/ui';
 	import { editions, shelf, deriveWorks, toggleShelf, type WorkRow } from '$lib/library.svelte';
 
 	const kit = getKitContext();
@@ -26,12 +27,21 @@
 	const browse = createBrowseState({
 		q: { kind: 'text' },
 		shelf: { kind: 'many' },
-		sort: { kind: 'one', default: 'title', narrows: false }
+		sort: { kind: 'one', default: 'title', narrows: false },
+		// Grouping is view state like sort — history-worthy, non-narrowing. The
+		// TOGGLE lives here; the MECHANISM is the descriptor being $derived from
+		// it below. No part carries a grouping mode.
+		group: { kind: 'one', default: 'author', narrows: false }
 	});
 
 	const expanded = new SvelteSet<string>();
 
-	const descriptor = {
+	// One level. The label default is the key itself (the author); the count the
+	// default header renders is the group's VISIBLE rows, so narrowing the list
+	// renarrows every header for free.
+	const byAuthor: GroupDef<WorkRow>[] = [{ key: (r) => r.author }];
+
+	const base = {
 		// TWO sources. This is the structural difference.
 		sources: () => ({ editions: editions.all, shelf: shelf.all }),
 		derive: deriveWorks,
@@ -71,6 +81,15 @@
 		]
 	};
 
+	// Toggleable grouping IS this line: the descriptor derives from browse
+	// state, so switching rebuilds it and the pipeline follows. Sorting within
+	// groups still works — sort runs before group, so "Year" orders each
+	// author's works while the authors keep first-appearance order.
+	const descriptor = $derived({
+		...base,
+		groupBy: browse.values.group === 'author' ? byAuthor : undefined
+	});
+
 	// Reference data is browsable while the overlay is still arriving, so the
 	// list must not wait on both.
 	const status = $derived(editions.status);
@@ -88,6 +107,16 @@
 <div class="flex h-full min-h-0 flex-col">
 	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1 gap-0">
 		<Surface.List {status} class="m-3">
+			{#snippet headerLeading()}
+				<Segmented
+					options={[
+						{ value: 'author', label: 'By author' },
+						{ value: 'none', label: 'Flat' }
+					]}
+					value={browse.values.group}
+					onchange={(v) => browse.set('group', v)}
+				/>
+			{/snippet}
 			{#snippet row(r: WorkRow)}
 				{@const open = expanded.has(r.key)}
 				<div class="border-b border-border last:border-b-0">

@@ -1,7 +1,17 @@
 <script lang="ts">
-	import { Surface } from '@veelume/ui';
+	import { Surface, type GroupHeader } from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
-	import { descriptor, rows, staticBrowse, type DemoRow } from '$lib/gallery/fixtures.svelte';
+	import {
+		descriptor,
+		rows,
+		staticBrowse,
+		groupedRows,
+		groupedByAuthor,
+		groupedByEraAuthor,
+		bigGroupedDescriptor,
+		type DemoRow,
+		type GroupedRow
+	} from '$lib/gallery/fixtures.svelte';
 
 	const browse = staticBrowse();
 	const emptyDescriptor = { ...descriptor, sources: () => [] };
@@ -114,6 +124,76 @@
 				onrefresh={() => {}}
 			/>
 		</Surface.Root>
+	</Case>
+
+	<Case
+		title="grouped — one level"
+		note="Sections are presentation partitioning, run AFTER sort: rows keep title order inside each group, groups keep first-appearance order (which inherits the sort — these authors are alphabetical by their first title, not by name). The header count is the group's VISIBLE rows."
+		frame={false}
+	>
+		<Surface.Root descriptor={groupedByAuthor} browse={staticBrowse()}>
+			<Surface.List status="ready" />
+		</Surface.Root>
+	</Case>
+
+	<Case
+		title="grouped — two levels"
+		note="Hearth's taxonomy shape. The outer level supplies `compare` (chronological eras), the inner keeps first-appearance. Hierarchy = typography (heading vs kicker) + one-directional indentation: each header at its level's edge, every row one step past the DEEPEST level — content always right of its label. The row inset is a surface CONSTANT (sections are uniform depth, unlike trees), which is why rows never carry depth data. Le Guin appears under two eras here but was ONE group in the previous case."
+		frame={false}
+	>
+		<Surface.Root descriptor={groupedByEraAuthor} browse={staticBrowse()}>
+			<Surface.List status="ready" />
+		</Surface.Root>
+	</Case>
+
+	<Case
+		title="grouped — narrowing empties groups"
+		note="Empty groups DO NOT EXIST: sections are emitted from actual rows, so a search that excludes an author removes the header with the rows. {groupedRows.length} rows exist; only Butler's survives the query. Absence stays neutral — no header skeleton."
+		frame={false}
+	>
+		<Surface.Root descriptor={groupedByAuthor} browse={staticBrowse({ q: 'kindred' })}>
+			<Surface.List status="ready" />
+		</Surface.Root>
+	</Case>
+
+	<Case
+		title="grouped — custom header snippet"
+		note="The `group` snippet replaces the default header, for aggregates it can't know about — here a year span read from the entry's rows. The rows themselves keep the default rendering."
+		frame={false}
+	>
+		<Surface.Root descriptor={groupedByEraAuthor} browse={staticBrowse()}>
+			<Surface.List status="ready">
+				{#snippet group(h: GroupHeader<GroupedRow>)}
+					<div
+						class="flex items-baseline gap-2 border-b border-border/50 px-3 pb-1
+						       {h.level === 0 ? 'pt-4 text-sm' : 'pt-2 text-xs'}"
+					>
+						<span class="font-semibold {h.level === 0 ? 'text-primary' : ''}">{h.label}</span>
+						<span class="text-xs tabular-nums text-muted-foreground">
+							{h.rows.length}
+							{h.rows.length === 1 ? 'work' : 'works'}
+						</span>
+					</div>
+				{/snippet}
+			</Surface.List>
+		</Surface.Root>
+	</Case>
+
+	<Case
+		title="grouped + windowed — 600 rows"
+		note="Past the windowing threshold headers become windowed entries like any row, measured by the same ResizeObserver. This is also why sticky headers are deliberately not offered: position:sticky dies inside a translateY-positioned entry — a structural conflict, not an oversight."
+		frame={false}
+	>
+		<!-- Height bounded from OUTSIDE the surface: `h-80` on the List itself
+		     would lose to its own flex-1 (a non-auto flex-basis wins the main
+		     axis), the container would stretch to content, nothing would clip,
+		     and windowing — which engages only when it clips — would stay
+		     neutral. App layouts bound surfaces the same way. -->
+		<div class="h-80">
+			<Surface.Root descriptor={bigGroupedDescriptor} browse={staticBrowse()}>
+				<Surface.List status="ready" />
+			</Surface.Root>
+		</div>
 	</Case>
 
 	<Case
