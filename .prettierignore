@@ -1,0 +1,20 @@
+# Generated — owned by their generators, not the formatter.
+apps/demo/src/lib/bindings.ts
+apps/demo/src/lib/paraglide
+apps/demo/.svelte-kit
+apps/demo/build
+apps/demo/src-tauri/gen
+apps/demo/src-tauri/target
+target
+pnpm-lock.yaml
+
+# Template- or tool-owned files the formatter must not churn.
+.copier-answers.yml
+apps/demo/.copier-answers-tauri.yml
+.github
+
+# Prose and config formats stay hand-formatted — CLAUDE.md tables and the
+# copier/CI yaml have deliberate shapes prettier would rewrap.
+*.md
+*.yml
+*.yaml
