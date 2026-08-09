@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { Loading, Notify, Shell, setKitContext } from '@veelume/ui';
+	import { Loading, Notify, Shell, notifications, setKitContext } from '@veelume/ui';
 	import { Settings } from 'lucide-svelte';
 	import { m, getLocale } from '$lib/i18n';
 	import { nav } from '$lib/nav.svelte';
@@ -83,9 +83,14 @@
 			{/snippet}
 			{#snippet bottom()}
 				<!-- No items: the kit's default split — Home centred as the hero,
-				     the overflow collected behind More. Settings is reachable only
-				     through /more at this width, so the collector claims it. -->
-				<Shell.BottomBar moreOwns={['/settings']} />
+				     the overflow collected behind More. Settings and Notifications
+				     are reachable only through /more at this width, so the
+				     collector claims them — and carries the unread count, since
+				     the rail's bell is gone here. -->
+				<Shell.BottomBar
+					moreOwns={['/settings', '/notifications']}
+					moreBadge={() => notifications.unread || null}
+				/>
 			{/snippet}
 
 			{@render children()}

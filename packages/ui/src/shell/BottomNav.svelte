@@ -38,6 +38,7 @@
 	{#each items as item (item.path)}
 		{@const active = isActive(item)}
 		{@const Icon = item.icon as IconOf}
+		{@const count = item.badge?.()}
 		<a
 			href={item.path}
 			class="flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium transition-colors"
@@ -46,10 +47,19 @@
 			aria-current={active ? 'page' : undefined}
 		>
 			<span
-				class="flex h-8 w-16 items-center justify-center rounded-full transition-colors"
+				class="relative flex h-8 w-16 items-center justify-center rounded-full transition-colors"
 				class:bg-accent={active}
 			>
 				{#if item.icon}<Icon size={20} />{/if}
+				{#if count}
+					<span
+						class="absolute -top-0.5 right-3 flex h-4 min-w-4 items-center justify-center
+						       rounded-full bg-destructive px-1 text-[10px] font-semibold
+						       text-destructive-foreground"
+					>
+						{count > 99 ? '99+' : count}
+					</span>
+				{/if}
 			</span>
 			<span>{item.label}</span>
 		</a>

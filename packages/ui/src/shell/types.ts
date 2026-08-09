@@ -34,6 +34,14 @@ export type NavItem = {
 	 * collected. Matching is exact-or-child per path.
 	 */
 	owns?: string[];
+	/**
+	 * A live count bubble on the item — a FUNCTION, so reading it in a
+	 * template tracks whatever store it derives from (the label-bag rule).
+	 * Falsy renders nothing; counts above 99 render as 99+. The bar-width
+	 * case: the rail's bell is gone, so the More slot carries the unread
+	 * count into view.
+	 */
+	badge?: () => number | null | undefined;
 };
 
 export type NavGroup = {

@@ -30,6 +30,7 @@
 		slots = 5,
 		moreHref = '/more',
 		moreOwns = undefined,
+		moreBadge = undefined,
 		moreIcon = undefined,
 		class: klass = ''
 	}: {
@@ -46,6 +47,11 @@
 		/** Extra paths the collector claims beyond what it collected —
 		 *  destinations reachable only through the More page (settings). */
 		moreOwns?: string[];
+		/** A live count on the collector slot — at bar widths the rail's bell
+		 *  is gone, so this is how an unread count stays in view. The app
+		 *  supplies the source (`() => notifications.unread || null`); the
+		 *  shell has no data opinion of its own. */
+		moreBadge?: () => number | null | undefined;
 		/** Replaces the built-in `⋯` — pass the app's icon set for consistency. */
 		moreIcon?: NavIcon;
 		class?: string;
@@ -65,7 +71,8 @@
 					label: kit.labels.more(),
 					path: moreHref,
 					icon: moreIcon ?? MoreIcon,
-					owns: moreOwns
+					owns: moreOwns,
+					badge: moreBadge
 				}
 			}).bar
 	);

@@ -17,9 +17,18 @@
 <div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card {klass}">
 	{#each items as item (item.path)}
 		{@const Icon = item.icon as IconOf | undefined}
+		{@const count = item.badge?.()}
 		<a href={item.path} class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent">
 			{#if Icon}<Icon size={20} class="shrink-0 text-muted-foreground" />{/if}
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{item.label}</span>
+			{#if count}
+				<span
+					class="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-destructive
+					       px-1 text-[10px] font-semibold text-destructive-foreground"
+				>
+					{count > 99 ? '99+' : count}
+				</span>
+			{/if}
 			<svg
 				viewBox="0 0 16 16"
 				class="size-4 shrink-0 text-muted-foreground"

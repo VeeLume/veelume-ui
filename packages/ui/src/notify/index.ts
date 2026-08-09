@@ -18,8 +18,12 @@
 import Bell from './Bell.svelte';
 import Toasts from './Toasts.svelte';
 import Center from './Center.svelte';
+import List from './List.svelte';
 
-export const Notify = { Bell, Toasts, Center };
+// List is the embeddable half of Center (the Picker/PickerDialog split): a
+// page-sized host — the More-page route at bar widths — renders the same
+// rows the anchored panel does.
+export const Notify = { Bell, Toasts, Center, List };
 
 export {
 	notifications,
