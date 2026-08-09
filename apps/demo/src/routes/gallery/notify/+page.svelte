@@ -86,11 +86,15 @@
 
 	<Case
 		title="Bell + Center, composed locally"
-		note="The same parts the rail uses, in a page context: a relative wrapper, the bell toggling, the panel in its default below-the-trigger position. Opening marks everything read — the badge is the unread signal, and a badge that survives looking at the list lies."
+		note="The same parts the rail uses, in a page context: a relative wrapper, the bell toggling. The default position (below, right-aligned) suits a screen-right trigger; this bell sits at the LEFT of a scroll container — where leftward overflow is clipped, not scrollable — so the case passes `top-full left-0 mt-2` and the panel grows rightward. Opening marks everything read — a badge that survives looking at the list lies."
 	>
 		<div class="relative inline-flex">
 			<Notify.Bell onclick={() => (centerOpen = !centerOpen)} />
-			<Notify.Center open={centerOpen} onclose={() => (centerOpen = false)} />
+			<Notify.Center
+				open={centerOpen}
+				onclose={() => (centerOpen = false)}
+				class="top-full left-0 mt-2"
+			/>
 		</div>
 		<p class="mt-2 text-xs text-muted-foreground">
 			{notifications.items.length} in the log · {notifications.unread} unread
