@@ -18,7 +18,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
@@ -202,6 +202,37 @@ expire, concurrent writers are normal, and **events are lossy**.
 - **Deletion has three tiers**, in order of what is known: we did it (`discard`) · the event
   carries keys (`ChangeInfo.kind: 'delete'`) · neither, in which case the fill must reconcile
   the key interval it covered. Absence is only meaningful inside a range the server enumerated.
+
+### The workbench — a working set over a Split
+
+Selection grows a CURATED SET: list + tab strip + pane(s). Settled in the demo catalog's
+prototype before any of it froze here.
+
+- **Two authorities, never merged.** ACTIVE is the consumer's, in the URL (a `one` browse
+  field — push history, back means "the item I was on"). The TAB SET is a `createWorkset`
+  instance at the app's module scope — workspace state like expansion: survives navigation,
+  never history. `TabStrip` reads active from the surface context and never stores it.
+- **Preview-vs-pinned is what stops tab garbage.** Click previews — ONE slot, replaced by
+  the next click; double-click pins. Closing returns the neighbour; the CONSUMER applies it
+  to the URL (`onactivate`). A closed item can come back via `history.back()` — the strip's
+  URL sync re-materialises it as a preview, deliberately.
+- **The strip owns the URL→workset sync**, untracked with a plain-variable guard. ⚑ This is
+  load-bearing, not style: `select()` reads workset state, so an unguarded sync effect
+  tracks the workset itself and re-runs BEFORE a pending `goto` lands — resurrecting
+  just-closed tabs from the stale URL. The trap is invisible at the effect's call site;
+  owning the sync in the strip means consumers cannot re-hit it.
+- **Gestures are the kit's, wiring is the app's** — each callback writes app browse state,
+  and omission removes the control: no `onbelow`, no split button; no `onback`, no back
+  button. An empty workset renders no strip at all.
+- **The second pane is a PROJECTION by key** (`byKey` reads ALL rows, pre-filter), stacked
+  BELOW the first — stacking costs height, not width, so no breakpoint gates it. It is
+  independent of the tab set and lives in its own URL param: a compare is a shareable
+  state, back closes the split before the selection, and the pane survives both a search
+  that empties the list and its own tab closing. It acts as a persistent comparison anchor
+  across selection changes.
+- **Windowed limitation:** scroll-to-selection rides attachments reading `isSelected`,
+  which only works below the windowing threshold — `win.scrollTo(index)` is the
+  prerequisite before a workbench list meets a windowed set.
 
 ### L1 — browse state
 

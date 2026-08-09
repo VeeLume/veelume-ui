@@ -42,6 +42,7 @@
 		{ path: '/gallery/list-header', label: 'Surface.ListHeader' },
 		{ path: '/gallery/toolbar', label: 'Surface.Toolbar' },
 		{ path: '/gallery/split', label: 'Surface.Split' },
+		{ path: '/gallery/tabstrip', label: 'Surface.TabStrip' },
 		{ path: '/gallery/form', label: 'RecordForm' },
 		{ path: '/gallery/number', label: 'NumberInput' },
 		{ path: '/gallery/shell-footer', label: 'Shell footers' },

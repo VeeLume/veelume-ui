@@ -23,7 +23,6 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Surface, Segmented } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
@@ -60,10 +59,17 @@
 	// renarrows every header for free.
 	const byAuthor: GroupDef<WorkRow>[] = [{ key: (r) => r.author }];
 
+	// ONE derivation, shared by the pipeline and the panes: the page derives
+	// works and the descriptor takes them as its source with an identity
+	// `derive`. (The prototype ran deriveWorks twice — once in the descriptor,
+	// once for the pane lookup; the tab strip's labels now come from the
+	// pipeline's own `byKey`, and the panes read this.)
+	const works = $derived(deriveWorks({ editions: editions.all, shelf: shelf.all }));
+	const workByKey = $derived(new Map(works.map((r) => [r.key, r])));
+
 	const base = {
-		// TWO sources. This is the structural difference.
-		sources: () => ({ editions: editions.all, shelf: shelf.all }),
-		derive: deriveWorks,
+		sources: () => works,
+		derive: (rs: WorkRow[]) => rs,
 		searchIn: (r: WorkRow) => [r.title, r.author],
 		facets: [
 			{
@@ -114,34 +120,7 @@
 	const status = $derived(editions.status);
 
 	const active = $derived(browse.values.work || null);
-
-	// A deep link or back/forward must land as a visible tab: the URL is the
-	// authority on ACTIVE, the workset follows.
-	//
-	// ⚑ `untrack` + a PLAIN-variable guard, the rulebook's exact pattern — and
-	// the bug that forced it was subtle: `select()` reads `pinned`, so a naked
-	// call here made the workset's own state a tracked dependency of this
-	// effect. Closing a tab then re-ran the effect BEFORE `goto` updated the
-	// URL — which still held the closing key — and select() resurrected the
-	// just-closed tab as a preview. Untracked and guarded, the effect fires
-	// only when the URL genuinely changes.
-	let lastSynced: string | null = null; // deliberately not $state — see rulebook
-	$effect(() => {
-		const k = browse.values.work;
-		if (k === lastSynced) return;
-		lastSynced = k;
-		if (k) untrack(() => catalogWorkset.select(k));
-	});
-
-	// Row lookup for tab labels and the detail pane. A second run of the same
-	// derivation the pipeline does — honest prototype cost; if the workbench
-	// is promoted, the surface context is the natural place to expose rows
-	// by key instead.
-	const workByKey = $derived(
-		new Map(deriveWorks({ editions: editions.all, shelf: shelf.all }).map((r) => [r.key, r]))
-	);
 	const activeWork = $derived(active ? workByKey.get(active) : undefined);
-	const titleOf = (key: string) => workByKey.get(key)?.title ?? key;
 
 	// The second pane is a PROJECTION by key, deliberately independent of the
 	// tab set: closing B's tab does not tear down a compare you set up, and a
@@ -153,11 +132,6 @@
 	function openWork(key: string) {
 		catalogWorkset.select(key);
 		browse.set('work', key);
-	}
-
-	function closeTab(key: string) {
-		const next = catalogWorkset.close(key);
-		if ((browse.values.work || '') === key) browse.set('work', next ?? '');
 	}
 
 	const symbol = { owned: '●', want: '♡', none: '○' } as const;
@@ -258,71 +232,16 @@
 
 			{#snippet detail()}
 				<div class="flex h-full min-h-0 flex-col">
-					{#if catalogWorkset.tabs.length > 0}
-						<!-- The working set. Preview tab renders italic and there is at
-						     most one; pinned tabs accumulate in pin order. -->
-						<div class="-mb-px flex items-end gap-1 overflow-x-auto" role="tablist">
-							<button
-								type="button"
-								class="mr-1 mb-1 grid size-9 shrink-0 place-items-center rounded-md border
-								       border-input md:hidden"
-								aria-label="Back to list"
-								onclick={() => browse.set('work', '')}
-							>
-								←
-							</button>
-							{#each catalogWorkset.tabs as t (t.key)}
-								{@const isActive = t.key === active}
-								<!-- Same attachment move as the list rows, horizontal axis:
-								     when the strip overflows, activating a tab (click, close-
-								     promotes-neighbour, back/forward) brings it into view. -->
-								<div
-									role="tab"
-									aria-selected={isActive}
-									class="flex shrink-0 items-center rounded-t-md border
-									       {isActive
-										? 'border-border border-b-card bg-card'
-										: 'border-transparent text-muted-foreground hover:text-foreground'}"
-									{@attach (node) => {
-										if (isActive) node.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-									}}
-								>
-									<button
-										type="button"
-										class="h-9 max-w-48 truncate pl-3 pr-1 text-sm {t.pinned ? '' : 'italic'}"
-										title={t.pinned
-											? titleOf(t.key)
-											: `${titleOf(t.key)} — preview · double-click to pin`}
-										onclick={() => openWork(t.key)}
-										ondblclick={() => catalogWorkset.pin(t.key)}
-									>
-										{titleOf(t.key)}
-									</button>
-									<!-- Open THIS tab's work in the second pane without
-									     activating it — with A active, ⊟ on B is "B below A". -->
-									<button
-										type="button"
-										class="grid size-5 place-items-center rounded-sm text-xs
-										       text-muted-foreground hover:bg-muted hover:text-foreground"
-										aria-label="Open below"
-										title="Open below"
-										onclick={() => browse.set('below', t.key)}
-									>
-										⊟
-									</button>
-									<button
-										type="button"
-										class="mr-1 grid size-5 place-items-center rounded-sm text-xs
-										       text-muted-foreground hover:bg-muted hover:text-foreground"
-										aria-label="Close tab"
-										onclick={() => closeTab(t.key)}
-									>
-										✕
-									</button>
-								</div>
-							{/each}
-						</div>
-					{/if}
+					<!-- The kit's strip: gestures are its contract (click activates,
+					     double-click pins, ✕ closes-and-promotes-the-neighbour), the
+					     wiring is the app's — each callback writes app browse state,
+					     and OMITTING onbelow/onback would remove those controls. -->
+					<Surface.TabStrip
+						workset={catalogWorkset}
+						onactivate={(k) => browse.set('work', k ?? '')}
+						onback={() => browse.set('work', '')}
+						onbelow={(k) => browse.set('below', k)}
+					/>
 
 					{#snippet workPane(w: WorkRow, closable: boolean)}
 						<div class="min-h-0 flex-1 overflow-auto p-4">

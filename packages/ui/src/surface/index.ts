@@ -25,10 +25,13 @@ import ListHeader from './ListHeader.svelte';
 import FilterButton from './FilterButton.svelte';
 import List from './List.svelte';
 import Split from './Split.svelte';
+import TabStrip from './TabStrip.svelte';
 
-export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split };
+export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split, TabStrip };
 
 export { createSurface } from './pipeline.svelte.js';
+export { createWorkset } from './workset.svelte.js';
+export type { Workset, WorksetTab } from './workset.svelte.js';
 export type { Surface as SurfaceState } from './pipeline.svelte.js';
 export { isGroupHeader } from './types.js';
 export type {

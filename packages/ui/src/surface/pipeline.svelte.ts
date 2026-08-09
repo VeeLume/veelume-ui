@@ -98,6 +98,14 @@ export function createSurface<Src, R extends Row>(
 	/** Step 1 — records to rows. 1:1 for a CRUD surface, N:1 for a catalog. */
 	const rows = $derived(descriptor.derive(descriptor.sources()));
 
+	/**
+	 * Rows by key, over ALL rows — deliberately pre-filter. The workbench's
+	 * panes are projections by key that must survive a search emptying the
+	 * list, and a tab's label must resolve while its row is filtered out.
+	 * (The prototype re-derived rows for this; one derivation is the point.)
+	 */
+	const byKeyMap = $derived(new Map(rows.map((r) => [r.key, r])));
+
 	const query = $derived(
 		String(browse.values.q ?? '')
 			.trim()
@@ -232,6 +240,10 @@ export function createSurface<Src, R extends Row>(
 		},
 		get selected() {
 			return selected;
+		},
+		/** A row by its key, from ALL rows (pre-filter) — see `byKeyMap`. */
+		byKey(key: string): R | undefined {
+			return byKeyMap.get(key);
 		},
 		get total() {
 			return rows.length;

@@ -76,6 +76,14 @@ export type LabelBag = {
 	expandRow: () => string;
 	collapseRow: () => string;
 
+	// ── workbench tabs ───────────────────────────────────────────────────────
+	/** Accessible name for a tab's close button. */
+	tabClose: () => string;
+	/** Accessible name for a tab's open-in-second-pane button. */
+	tabOpenBelow: () => string;
+	/** Title-suffix on a preview tab, naming the pin gesture. */
+	tabPreviewHint: () => string;
+
 	// ── shell ────────────────────────────────────────────────────────────────
 	/** The settings entry in the rail footer, and the settings pane title. */
 	settings: () => string;
@@ -131,6 +139,9 @@ export const defaultLabels: LabelBag = {
 
 	expandRow: () => 'Expand',
 	collapseRow: () => 'Collapse',
+	tabClose: () => 'Close tab',
+	tabOpenBelow: () => 'Open below',
+	tabPreviewHint: () => 'preview · double-click to pin',
 
 	settings: () => 'Settings',
 	selectCategory: () => 'Select a category',
