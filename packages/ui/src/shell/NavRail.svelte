@@ -13,7 +13,13 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { activeNavPath, railRowClass, type NavGroup, type NavItem, type IconOf } from './types.js';
+	import {
+		activeNavPath,
+		railRowClass,
+		type NavGroup,
+		type NavItem,
+		type IconOf
+	} from './types.js';
 
 	let {
 		groups,

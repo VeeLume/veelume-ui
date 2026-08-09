@@ -120,8 +120,7 @@ export function sseInvalidation<K, S>(
 	onChange: (info?: ChangeInfo<K, S>) => void
 ): () => void {
 	const parse =
-		options.parse ??
-		((data: unknown) => (data ?? undefined) as ChangeInfo<K, S> | undefined);
+		options.parse ?? ((data: unknown) => (data ?? undefined) as ChangeInfo<K, S> | undefined);
 
 	const source = new EventSource(options.url);
 	let everOpened = false;
@@ -205,8 +204,6 @@ export function createHttpIO<
 						: undefined
 				}
 			: undefined,
-		subscribe: options.events
-			? (onChange) => sseInvalidation(options.events!, onChange)
-			: undefined
+		subscribe: options.events ? (onChange) => sseInvalidation(options.events!, onChange) : undefined
 	};
 }

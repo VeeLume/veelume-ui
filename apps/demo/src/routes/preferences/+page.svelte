@@ -89,8 +89,10 @@
 		</span>
 	</header>
 
-	<div class="mx-auto w-full max-w-2xl flex-1 overflow-auto rounded-lg border border-border
-	            bg-card p-5">
+	<div
+		class="mx-auto w-full max-w-2xl flex-1 overflow-auto rounded-lg border border-border
+	            bg-card p-5"
+	>
 		{#if !form.record}
 			<p class="text-sm text-muted-foreground">{kit.labels.loading()}</p>
 		{:else}

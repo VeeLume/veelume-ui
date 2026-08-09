@@ -77,7 +77,7 @@ function readField(params: URLSearchParams, key: string, field: BrowseField): st
 		// equal to a generated one.
 		return all.length ? [...all].sort() : ((field.default ?? []) as string[]);
 	}
-	return params.get(key) ?? (field.default ?? '');
+	return params.get(key) ?? field.default ?? '';
 }
 
 export function createBrowseState<Spec extends BrowseSpec>(spec: Spec) {

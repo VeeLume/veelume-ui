@@ -7,8 +7,8 @@
 <div class="grid max-w-4xl gap-6">
 	<h1 class="text-lg font-semibold">Surface.Split</h1>
 	<p class="-mt-4 text-sm text-muted-foreground">
-		The one place the layout opinion lives. Narrow the window to see the responsive half: on a
-		phone the list IS the page, and picking a record makes it step aside.
+		The one place the layout opinion lives. Narrow the window to see the responsive half: on a phone
+		the list IS the page, and picking a record makes it step aside.
 	</p>
 
 	<Case title="list + detail — nothing selected" frame={false}>

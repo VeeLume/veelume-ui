@@ -7,7 +7,7 @@
 	 * and that is a content judgement about what a phone user reaches for — not
 	 * something a component can infer from a nav tree.
 	 */
-	import { type NavItem , type IconOf } from './types.js';
+	import { type NavItem, type IconOf } from './types.js';
 	import { page } from '$app/state';
 
 	let {

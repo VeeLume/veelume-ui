@@ -31,7 +31,8 @@
 				{#snippet leading()}
 					<div class="flex shrink-0 rounded-md border border-input p-0.5 text-xs">
 						{#each ['2024', '2025', '2026'] as y (y)}
-							<span class="rounded px-2 py-1 {y === '2026' ? 'bg-accent text-accent-foreground' : ''}"
+							<span
+								class="rounded px-2 py-1 {y === '2026' ? 'bg-accent text-accent-foreground' : ''}"
 								>{y}</span
 							>
 						{/each}

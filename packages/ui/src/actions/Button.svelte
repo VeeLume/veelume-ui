@@ -49,9 +49,7 @@
 		'transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none ' +
 		'disabled:pointer-events-none disabled:opacity-40';
 
-	const sizing = $derived(
-		size === 'icon' ? 'size-9' : size === 'field' ? 'px-3' : 'h-9 px-3'
-	);
+	const sizing = $derived(size === 'icon' ? 'size-9' : size === 'field' ? 'px-3' : 'h-9 px-3');
 	const cls = $derived(`${base} ${VARIANTS[variant]} ${sizing} ${klass}`);
 	// `field` is the only size that follows density; the others are chrome.
 	const style = $derived(size === 'field' ? 'height: var(--density-target)' : undefined);

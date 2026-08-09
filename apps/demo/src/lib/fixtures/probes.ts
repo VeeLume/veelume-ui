@@ -108,8 +108,7 @@ export const probeFixtures: FixtureModule = {
 			.trim()
 			.toLowerCase();
 		const hits = paged.filter(
-			(p) =>
-				!needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)
+			(p) => !needle || p.name.toLowerCase().includes(needle) || p.id.toLowerCase().includes(needle)
 		);
 
 		const cursor = payload.cursor == null ? null : String(payload.cursor);

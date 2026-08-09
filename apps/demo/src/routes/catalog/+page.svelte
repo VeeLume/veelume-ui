@@ -19,13 +19,7 @@
 	import { Surface } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
-	import {
-		editions,
-		shelf,
-		deriveWorks,
-		toggleShelf,
-		type WorkRow
-	} from '$lib/library.svelte';
+	import { editions, shelf, deriveWorks, toggleShelf, type WorkRow } from '$lib/library.svelte';
 
 	const kit = getKitContext();
 

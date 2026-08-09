@@ -22,9 +22,9 @@
 		<h2 class="text-lg font-semibold">StatusBadge</h2>
 		<p class="text-sm text-muted-foreground">
 			Four stibu components were one pill with different maps, so the kit ships the pill and four
-			tones; the domain ships a status→(label, tone) map. Labels are functions, so an app wires
-			its i18n directly — stibu hardcoded German in the component, which is the coupling this
-			kit forbids.
+			tones; the domain ships a status→(label, tone) map. Labels are functions, so an app wires its
+			i18n directly — stibu hardcoded German in the component, which is the coupling this kit
+			forbids.
 		</p>
 	</div>
 

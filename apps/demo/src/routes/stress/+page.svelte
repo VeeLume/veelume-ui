@@ -135,8 +135,7 @@
 		warmMs = Math.round(performance.now() - t0);
 	}
 
-	const money = (c: number) =>
-		kit.format.number(c / 100, { style: 'currency', currency: 'EUR' });
+	const money = (c: number) => kit.format.number(c / 100, { style: 'currency', currency: 'EUR' });
 </script>
 
 <div class="flex h-full min-h-0 flex-col gap-3 p-4">
@@ -163,7 +162,10 @@
 			<option value="">any kind</option>
 			{#each KINDS as k (k)}<option value={k}>{k}</option>{/each}
 		</select>
-		<select class="h-9 rounded-md border border-input bg-background px-2 text-sm" bind:value={order}>
+		<select
+			class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+			bind:value={order}
+		>
 			{#each ORDERS as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
 		</select>
 		<label class="flex items-center gap-1 text-sm">
@@ -189,36 +191,59 @@
 		class="grid grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-border bg-card p-3
 		       text-sm sm:grid-cols-4"
 	>
-		<div><dt class="text-xs text-muted-foreground">total (server)</dt>
-			<dd class="tabular-nums">{kit.format.number(view.total ?? 0)}</dd></div>
-		<div><dt class="text-xs text-muted-foreground">fetched</dt>
-			<dd class="tabular-nums">{kit.format.number(view.fetchedCount)}</dd></div>
+		<div>
+			<dt class="text-xs text-muted-foreground">total (server)</dt>
+			<dd class="tabular-nums">{kit.format.number(view.total ?? 0)}</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">fetched</dt>
+			<dd class="tabular-nums">{kit.format.number(view.fetchedCount)}</dd>
+		</div>
 		<!-- DOM rows, not derived rows. With the window this stays ~a viewport
 		     however many rows the set holds — which is the whole point. -->
-		<div><dt class="text-xs text-muted-foreground">rendered</dt>
+		<div>
+			<dt class="text-xs text-muted-foreground">rendered</dt>
 			<dd class="tabular-nums">
 				{kit.format.number(shown.length)}<span class="text-xs text-muted-foreground">
-					of {kit.format.number(rows.length)}</span>
-			</dd></div>
-		<div><dt class="text-xs text-muted-foreground">complete</dt>
-			<dd class={view.complete ? '' : 'text-destructive'}>{view.complete}</dd></div>
-		<div><dt class="text-xs text-muted-foreground">status</dt><dd>{view.status}</dd></div>
-		<div><dt class="text-xs text-muted-foreground">query</dt>
+					of {kit.format.number(rows.length)}</span
+				>
+			</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">complete</dt>
+			<dd class={view.complete ? '' : 'text-destructive'}>{view.complete}</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">status</dt>
+			<dd>{view.status}</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">query</dt>
 			<dd class="tabular-nums">
-				{queryMs ?? '…'} ms{#if cached}<span class="text-xs text-muted-foreground"> · cached</span
+				{queryMs ?? '…'} ms{#if cached}<span class="text-xs text-muted-foreground">
+						· cached</span
 					>{/if}
-			</dd></div>
-		<div><dt class="text-xs text-muted-foreground">to paint</dt>
-			<dd class="tabular-nums">{paintMs ?? '…'} ms</dd></div>
-		<div><dt class="text-xs text-muted-foreground">window</dt>
-			<dd class="tabular-nums">{win.start}–{win.end}</dd></div>
-		<div><dt class="text-xs text-muted-foreground">cached records</dt>
-			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd></div>
+			</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">to paint</dt>
+			<dd class="tabular-nums">{paintMs ?? '…'} ms</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">window</dt>
+			<dd class="tabular-nums">{win.start}–{win.end}</dd>
+		</div>
+		<div>
+			<dt class="text-xs text-muted-foreground">cached records</dt>
+			<dd class="tabular-nums">{kit.format.number(entries.debug.cached)}</dd>
+		</div>
 		<!-- Sets being MAINTAINED right now. Should hover at 1–2: this page reads
 		     one set at a time, and every set beyond that is paying maintenance
 		     for nobody. Climbing with search history means the lifecycle broke. -->
-		<div><dt class="text-xs text-muted-foreground">live sets</dt>
-			<dd class="tabular-nums">{entries.debug.liveSets.length}</dd></div>
+		<div>
+			<dt class="text-xs text-muted-foreground">live sets</dt>
+			<dd class="tabular-nums">{entries.debug.liveSets.length}</dd>
+		</div>
 	</dl>
 
 	{#if view.fetching && !view.complete}

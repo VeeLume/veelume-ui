@@ -152,7 +152,8 @@
 	{/if}
 	{#if r.badge}
 		<!-- One class source with StatusBadge — a string is just the neutral tone. -->
-		{@const b = typeof r.badge === 'string' ? { label: r.badge, tone: 'neutral' as const } : r.badge}
+		{@const b =
+			typeof r.badge === 'string' ? { label: r.badge, tone: 'neutral' as const } : r.badge}
 		<span class="{statusBadgeClass} {statusToneClass[b.tone]}">{b.label}</span>
 	{/if}
 {/snippet}
@@ -177,7 +178,9 @@
 			class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1
 			       text-xs text-muted-foreground"
 		>
-			<span class="tabular-nums">{kit.labels.narrowedCount({ shown: s.shown, total: s.total })}</span>
+			<span class="tabular-nums"
+				>{kit.labels.narrowedCount({ shown: s.shown, total: s.total })}</span
+			>
 			{#if hasMore && onloadmore}
 				<button
 					type="button"

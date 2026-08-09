@@ -62,8 +62,16 @@
 			}
 		],
 		sorts: [
-			{ value: 'name', label: 'Name', compare: (a: ProbeRow, b: ProbeRow) => a.title.localeCompare(b.title) },
-			{ value: 'name-desc', label: 'Name ↓', compare: (a: ProbeRow, b: ProbeRow) => b.title.localeCompare(a.title) }
+			{
+				value: 'name',
+				label: 'Name',
+				compare: (a: ProbeRow, b: ProbeRow) => a.title.localeCompare(b.title)
+			},
+			{
+				value: 'name-desc',
+				label: 'Name ↓',
+				compare: (a: ProbeRow, b: ProbeRow) => b.title.localeCompare(a.title)
+			}
 		]
 	};
 
@@ -223,20 +231,32 @@
 			>
 		</div>
 		<dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-sm sm:grid-cols-6">
-			<div><dt class="text-xs text-muted-foreground">rows</dt>
-				<dd class="tabular-nums">{rig.all.length}</dd></div>
-			<div><dt class="text-xs text-muted-foreground">total</dt>
-				<dd class="tabular-nums">{rig.total ?? '—'}</dd></div>
-			<div><dt class="text-xs text-muted-foreground">stopped</dt>
-				<dd>{rig.stopped ?? '—'}</dd></div>
-			<div><dt class="text-xs text-muted-foreground">status</dt>
-				<dd>{rig.status}</dd></div>
+			<div>
+				<dt class="text-xs text-muted-foreground">rows</dt>
+				<dd class="tabular-nums">{rig.all.length}</dd>
+			</div>
+			<div>
+				<dt class="text-xs text-muted-foreground">total</dt>
+				<dd class="tabular-nums">{rig.total ?? '—'}</dd>
+			</div>
+			<div>
+				<dt class="text-xs text-muted-foreground">stopped</dt>
+				<dd>{rig.stopped ?? '—'}</dd>
+			</div>
+			<div>
+				<dt class="text-xs text-muted-foreground">status</dt>
+				<dd>{rig.status}</dd>
+			</div>
 			<!-- The metric that IS the demonstration: pushed-down search mints a
 			     set per term; locally-served search mints none. -->
-			<div><dt class="text-xs text-muted-foreground">sets</dt>
-				<dd class="tabular-nums">{paged.debug.sets.length}</dd></div>
-			<div><dt class="text-xs text-muted-foreground">live</dt>
-				<dd class="tabular-nums">{paged.debug.liveSets.length}</dd></div>
+			<div>
+				<dt class="text-xs text-muted-foreground">sets</dt>
+				<dd class="tabular-nums">{paged.debug.sets.length}</dd>
+			</div>
+			<div>
+				<dt class="text-xs text-muted-foreground">live</dt>
+				<dd class="tabular-nums">{paged.debug.liveSets.length}</dd>
+			</div>
 		</dl>
 		<p class="mt-1 text-xs text-muted-foreground">
 			At cap 20 the base stays capped and every term is a pushed-down set — “sets” climbs per

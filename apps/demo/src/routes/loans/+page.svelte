@@ -105,9 +105,21 @@
 			}
 		],
 		sorts: [
-			{ value: 'due', label: 'Due date', compare: (a: LoanRow, b: LoanRow) => a.loan.due_on.localeCompare(b.loan.due_on) },
-			{ value: 'borrower', label: 'Borrower', compare: (a: LoanRow, b: LoanRow) => a.loan.borrower.localeCompare(b.loan.borrower) },
-			{ value: 'fine', label: 'Fine', compare: (a: LoanRow, b: LoanRow) => b.loan.fine_cents - a.loan.fine_cents }
+			{
+				value: 'due',
+				label: 'Due date',
+				compare: (a: LoanRow, b: LoanRow) => a.loan.due_on.localeCompare(b.loan.due_on)
+			},
+			{
+				value: 'borrower',
+				label: 'Borrower',
+				compare: (a: LoanRow, b: LoanRow) => a.loan.borrower.localeCompare(b.loan.borrower)
+			},
+			{
+				value: 'fine',
+				label: 'Fine',
+				compare: (a: LoanRow, b: LoanRow) => b.loan.fine_cents - a.loan.fine_cents
+			}
 		]
 	};
 
@@ -225,7 +237,9 @@
 			{/snippet}
 
 			{#snippet detail()}
-				<div class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+				<div
+					class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+				>
 					{#if selected}
 						<!-- Same 56px bar and 36px controls as the toolbar above the list,
 						     so nothing shifts when you move between them. -->

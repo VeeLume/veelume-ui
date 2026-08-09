@@ -2,7 +2,13 @@
 // `$lib/paraglide/messages` directly, so the locale-switch behaviour below is
 // the only path that exists.
 import * as m from '$lib/paraglide/messages';
-import { getLocale, setLocale, locales, localStorageKey, type Locale } from '$lib/paraglide/runtime';
+import {
+	getLocale,
+	setLocale,
+	locales,
+	localStorageKey,
+	type Locale
+} from '$lib/paraglide/runtime';
 
 export { m, getLocale, setLocale, locales };
 export type { Locale };

@@ -61,7 +61,12 @@
 	}
 	body {
 		margin: 0;
-		font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			'Segoe UI',
+			Roboto,
+			sans-serif;
 		font-size: var(--density-unit);
 		line-height: 1.5;
 		background-color: var(--background);

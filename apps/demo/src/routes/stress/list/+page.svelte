@@ -52,7 +52,11 @@
 			}
 		],
 		sorts: [
-			{ value: 'date', label: 'Date', compare: (a: EntryRow, b: EntryRow) => a.entry.id - b.entry.id },
+			{
+				value: 'date',
+				label: 'Date',
+				compare: (a: EntryRow, b: EntryRow) => a.entry.id - b.entry.id
+			},
 			{
 				value: 'amount',
 				label: 'Amount',

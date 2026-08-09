@@ -45,8 +45,6 @@
 >
 	<span
 		class="pointer-events-none absolute top-0.5 left-0.5 size-[0.875rem] rounded-full shadow-sm
-		       transition-transform {checked
-			? 'translate-x-4 bg-primary-foreground'
-			: 'bg-foreground/60'}"
+		       transition-transform {checked ? 'translate-x-4 bg-primary-foreground' : 'bg-foreground/60'}"
 	></span>
 </button>

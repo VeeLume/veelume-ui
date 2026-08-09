@@ -74,7 +74,8 @@
 				<select
 					class="h-8 rounded-md border border-input bg-background px-2"
 					value={appearance.theme}
-					onchange={(e) => appearance.setTheme(e.currentTarget.value as 'light' | 'dark' | 'system')}
+					onchange={(e) =>
+						appearance.setTheme(e.currentTarget.value as 'light' | 'dark' | 'system')}
 				>
 					<option value="system">system</option>
 					<option value="light">light</option>

@@ -26,16 +26,57 @@ export const STRESS_COUNT = 1_500_000;
 export const KINDS = ['invoice', 'receipt', 'refund', 'credit', 'transfer', 'adjustment'];
 
 const SURNAMES = [
-	'Grunwald', 'Petersen', 'Kowalski', 'Ferreira', 'Nakamura', 'Oyelaran', 'Bergström',
-	'Dvorak', 'Halvorsen', 'Ivanova', 'Jankowski', 'Kaufmann', 'Lindqvist', 'Moreau',
-	'Nielsen', 'Okonkwo', 'Pavlenko', 'Quintero', 'Rasmussen', 'Sørensen', 'Takahashi',
-	'Ueberroth', 'Vasquez', 'Weisskopf', 'Xiong', 'Yamamoto', 'Zieliński', 'Abadi',
-	'Broekhuis', 'Castellano', 'Duarte', 'Eriksdottir'
+	'Grunwald',
+	'Petersen',
+	'Kowalski',
+	'Ferreira',
+	'Nakamura',
+	'Oyelaran',
+	'Bergström',
+	'Dvorak',
+	'Halvorsen',
+	'Ivanova',
+	'Jankowski',
+	'Kaufmann',
+	'Lindqvist',
+	'Moreau',
+	'Nielsen',
+	'Okonkwo',
+	'Pavlenko',
+	'Quintero',
+	'Rasmussen',
+	'Sørensen',
+	'Takahashi',
+	'Ueberroth',
+	'Vasquez',
+	'Weisskopf',
+	'Xiong',
+	'Yamamoto',
+	'Zieliński',
+	'Abadi',
+	'Broekhuis',
+	'Castellano',
+	'Duarte',
+	'Eriksdottir'
 ];
 
 const GIVEN = [
-	'Anja', 'Boris', 'Clara', 'Dmitri', 'Elif', 'Farid', 'Greta', 'Hugo', 'Ines', 'Jonas',
-	'Kira', 'Lucas', 'Mira', 'Nils', 'Olga', 'Piotr'
+	'Anja',
+	'Boris',
+	'Clara',
+	'Dmitri',
+	'Elif',
+	'Farid',
+	'Greta',
+	'Hugo',
+	'Ines',
+	'Jonas',
+	'Kira',
+	'Lucas',
+	'Mira',
+	'Nils',
+	'Olga',
+	'Piotr'
 ];
 
 /**
@@ -136,7 +177,8 @@ function matching(search: string, kind: string, order: string, desc: boolean): n
 	}
 
 	if (order === 'amount') hits.sort((a, b) => all[a].cents - all[b].cents);
-	else if (order === 'party') hits.sort((a, b) => (partyLc[a] < partyLc[b] ? -1 : partyLc[a] > partyLc[b] ? 1 : 0));
+	else if (order === 'party')
+		hits.sort((a, b) => (partyLc[a] < partyLc[b] ? -1 : partyLc[a] > partyLc[b] ? 1 : 0));
 	// Default: ids are already in date order by construction, as an indexed
 	// column would be — no sort needed.
 

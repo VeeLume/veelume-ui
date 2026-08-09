@@ -52,8 +52,16 @@
 			       transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/40
 			       focus-visible:outline-none"
 		>
-			<svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.6"
-				stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg
+				viewBox="0 0 16 16"
+				class="size-4"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.6"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
 				<path d="M10 3 5 8l5 5" />
 			</svg>
 		</button>

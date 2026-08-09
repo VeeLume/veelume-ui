@@ -56,11 +56,7 @@ export {
 	createRecordForm,
 	sectionsOf
 } from './form/index.js';
-export {
-	formatLocaleNumber,
-	localeSeparators,
-	parseLocaleNumber
-} from './form/index.js';
+export { formatLocaleNumber, localeSeparators, parseLocaleNumber } from './form/index.js';
 export type {
 	FieldKind,
 	FieldSpec,
@@ -113,12 +109,7 @@ export { createCollection } from './collection/index.svelte.js';
 // discipline and status→KitError mapping; the app owns URL building, because
 // that is what differs between Axum, Litestar and TrailBase.
 export { createHttpIO, sseInvalidation, classifyHttpError } from './collection/http.js';
-export type {
-	HttpCall,
-	HttpIOOptions,
-	HttpRoutes,
-	SseOptions
-} from './collection/http.js';
+export type { HttpCall, HttpIOOptions, HttpRoutes, SseOptions } from './collection/http.js';
 export type {
 	Collection,
 	CollectionIO,

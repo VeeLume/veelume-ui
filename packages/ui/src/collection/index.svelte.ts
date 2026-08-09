@@ -219,7 +219,6 @@ export function createCollection<
 		sets = { ...sets, [k]: { ...(sets[k] ?? EMPTY_SET), ...patch } };
 	}
 
-
 	/**
 	 * ⚑ A LIVE SET: rows derived once, then maintained by BATCH.
 	 *
@@ -1011,8 +1010,7 @@ export function createCollection<
 	// ── writes ─────────────────────────────────────────────────────────────────
 
 	function divergence(requested: B, returned: T): string[] {
-		const isDiverged =
-			io.write?.isDiverged ?? ((_f: string, a: unknown, b: unknown) => a !== b);
+		const isDiverged = io.write?.isDiverged ?? ((_f: string, a: unknown, b: unknown) => a !== b);
 		const rec = returned as unknown as Record<string, unknown>;
 		return Object.keys(requested).filter((f) => isDiverged(f, requested[f], rec[f]));
 	}

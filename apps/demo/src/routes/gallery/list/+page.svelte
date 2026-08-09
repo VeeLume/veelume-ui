@@ -12,8 +12,7 @@
 
 	<p class="-mt-4 text-sm text-muted-foreground">
 		The list owns its own header — search and filters act on the list, so they ride inside it. See
-		<a class="underline" href="/gallery/list-header">Surface.ListHeader</a> for that band's own
-		states.
+		<a class="underline" href="/gallery/list-header">Surface.ListHeader</a> for that band's own states.
 	</p>
 
 	<Case
@@ -26,7 +25,11 @@
 		</Surface.Root>
 	</Case>
 
-	<Case title="selected" note="Selection is passed in, not owned — it comes from the URL." frame={false}>
+	<Case
+		title="selected"
+		note="Selection is passed in, not owned — it comes from the URL."
+		frame={false}
+	>
 		<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
 			<Surface.List status="ready" />
 		</Surface.Root>
@@ -125,7 +128,9 @@
 				     falls back to the base `Row`. A wart of the context approach, not
 				     of this page. -->
 				{#snippet row(r: DemoRow)}
-					<div class="flex items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0">
+					<div
+						class="flex items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0"
+					>
 						<span class="font-mono text-xs text-muted-foreground">{r.key}</span>
 						<span class="flex-1 truncate">{r.title}</span>
 						<span class="text-xs text-muted-foreground">{r.note}</span>

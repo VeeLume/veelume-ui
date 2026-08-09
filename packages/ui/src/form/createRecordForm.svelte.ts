@@ -98,6 +98,4 @@ export function createRecordForm<T extends Record<string, unknown>>(io: RecordFo
 	};
 }
 
-export type RecordForm<T extends Record<string, unknown>> = ReturnType<
-	typeof createRecordForm<T>
->;
+export type RecordForm<T extends Record<string, unknown>> = ReturnType<typeof createRecordForm<T>>;

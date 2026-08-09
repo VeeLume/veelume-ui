@@ -14,15 +14,10 @@
 	let { items, class: klass = '' }: { items: NavItem[]; class?: string } = $props();
 </script>
 
-<div
-	class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card {klass}"
->
+<div class="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card {klass}">
 	{#each items as item (item.path)}
 		{@const Icon = item.icon as IconOf | undefined}
-		<a
-			href={item.path}
-			class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent"
-		>
+		<a href={item.path} class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent">
 			{#if Icon}<Icon size={20} class="shrink-0 text-muted-foreground" />{/if}
 			<span class="min-w-0 flex-1 truncate text-sm font-medium">{item.label}</span>
 			<svg

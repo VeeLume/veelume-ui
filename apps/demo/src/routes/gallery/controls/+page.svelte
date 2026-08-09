@@ -24,7 +24,10 @@
 		</p>
 	</div>
 
-	<Case title="Switch states" note="Off, on, disabled-off, disabled-on. Stateless — these two are live.">
+	<Case
+		title="Switch states"
+		note="Off, on, disabled-off, disabled-on. Stateless — these two are live."
+	>
 		<div class="flex items-center gap-4">
 			<Switch checked={a} label="live a" onchange={(v) => (a = v)} />
 			<Switch checked={b} label="live b" onchange={(v) => (b = v)} />
@@ -72,7 +75,10 @@
 		note="The row idiom — text from one left edge, controls hanging from one right edge. Compare with a bare control dropped under a heading."
 	>
 		<div class="w-full max-w-xl">
-			<Settings.Section title="Notifications" description="How the demo would nag you, if it nagged.">
+			<Settings.Section
+				title="Notifications"
+				description="How the demo would nag you, if it nagged."
+			>
 				<Settings.Row label="Overdue reminders" hint="Remind me when a loan falls overdue.">
 					<Switch checked={a} label="Overdue reminders" onchange={(v) => (a = v)} />
 				</Settings.Row>
@@ -98,7 +104,10 @@
 		note="A Segmented with long labels would collide with a Row's label on a phone — stibu's Darstellung answer is heading above, control below, left-hugging (the Section's justify-items-start is what stops it stretching)."
 	>
 		<div class="w-full max-w-xl">
-			<Settings.Section title="Density" description="'Comfortable' is larger; 'Compact' shows more at once.">
+			<Settings.Section
+				title="Density"
+				description="'Comfortable' is larger; 'Compact' shows more at once."
+			>
 				<Segmented
 					options={[
 						{ value: 'comfortable', label: 'Comfortable' },

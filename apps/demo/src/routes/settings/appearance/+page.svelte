@@ -16,7 +16,11 @@
 
 <Settings.Page title="Appearance">
 	<Settings.Section title="Theme" description="'System' follows the device's setting.">
-		<Segmented options={themes} value={appearance.theme} onchange={(v) => appearance.setTheme(v as Theme)} />
+		<Segmented
+			options={themes}
+			value={appearance.theme}
+			onchange={(v) => appearance.setTheme(v as Theme)}
+		/>
 	</Settings.Section>
 
 	<Settings.Section

@@ -43,7 +43,11 @@ export function createSurface<Src, R extends Row>(
 	/** Step 1 — records to rows. 1:1 for a CRUD surface, N:1 for a catalog. */
 	const rows = $derived(descriptor.derive(descriptor.sources()));
 
-	const query = $derived(String(browse.values.q ?? '').trim().toLowerCase());
+	const query = $derived(
+		String(browse.values.q ?? '')
+			.trim()
+			.toLowerCase()
+	);
 
 	/** Step 2 — free-text search, kept separate from filters because the
 	 *  contextual counts below must be computed against a searched population.

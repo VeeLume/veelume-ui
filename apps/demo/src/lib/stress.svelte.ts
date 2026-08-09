@@ -64,7 +64,8 @@ export const entries = createCollection<Entry, number, void>(
 		compare: (order) => {
 			const dir = order?.dir === 'desc' ? -1 : 1;
 			if (order?.by === 'amount') return (a: Entry, b: Entry) => (a.cents - b.cents) * dir;
-			if (order?.by === 'party') return (a: Entry, b: Entry) => a.party.localeCompare(b.party) * dir;
+			if (order?.by === 'party')
+				return (a: Entry, b: Entry) => a.party.localeCompare(b.party) * dir;
 			return (a: Entry, b: Entry) => (a.id - b.id) * dir;
 		}
 	}

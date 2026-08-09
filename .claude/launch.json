@@ -4,15 +4,7 @@
 		{
 			"name": "demo-browser",
 			"runtimeExecutable": "pnpm",
-			"runtimeArgs": [
-				"--filter",
-				"veelume-ui-demo",
-				"exec",
-				"vite",
-				"dev",
-				"--port",
-				"1430"
-			],
+			"runtimeArgs": ["--filter", "veelume-ui-demo", "exec", "vite", "dev", "--port", "1430"],
 			"port": 1430
 		}
 	]

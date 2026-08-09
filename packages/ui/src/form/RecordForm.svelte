@@ -30,9 +30,7 @@
 	const kit = getKitContext();
 	const sections = $derived(sectionsOf(fields));
 
-	const divergedFields = $derived(
-		form.error?.kind === 'write-diverged' ? form.error.diverged : []
-	);
+	const divergedFields = $derived(form.error?.kind === 'write-diverged' ? form.error.diverged : []);
 </script>
 
 <div class="grid gap-5 {klass}">
@@ -64,7 +62,9 @@
 						<label class="text-xs text-muted-foreground" for={f.name}>{f.label}</label>
 
 						{#if f.kind === 'display'}
-							<p class="text-sm">{f.render ? f.render(form.value as T) : String(form.value[f.name] ?? '—')}</p>
+							<p class="text-sm">
+								{f.render ? f.render(form.value as T) : String(form.value[f.name] ?? '—')}
+							</p>
 						{:else if f.kind === 'number'}
 							<NumberInput
 								id={f.name}
