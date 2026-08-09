@@ -12,29 +12,40 @@
 	 *   - focus returns to the trigger when closing dropped it on <body> —
 	 *     and only then, so a close that moved focus deliberately keeps it
 	 *
-	 * The panel is position: absolute inside the consumer's `relative`
-	 * wrapper. `position` REPLACES the default anchor classes rather than
-	 * merging — two `top-*` utilities on one element resolve by stylesheet
-	 * order, not author intent. Collision-aware placement (flip/shift via
-	 * floating-ui, portalling out of overflow clips) is the planned upgrade
-	 * INSIDE this component; it changes no consumer's API, which is the
-	 * point of the extraction.
+	 * Placement is INTENT, not classes: `side`/`align` name the preference
+	 * and floating-ui measures at open time — flip renders on the opposite
+	 * side when the preferred one would overflow, shift slides the panel
+	 * along its axis to stay inside the clipping ancestors. The class-string
+	 * era's failure mode (a right-aligned panel authored for a screen-right
+	 * trigger, clipped when the trigger sat elsewhere) is gone structurally.
+	 *
+	 * The panel stays inside the consumer's `relative` wrapper (the anchor
+	 * is the panel's offsetParent — no anchor prop needed). Portalling to
+	 * <body>, which would also escape overflow clipping entirely, is the
+	 * remaining upgrade; it adds z-stacking and teleport concerns flip/shift
+	 * do not, so it waits for a consumer that needs it.
 	 */
 	import type { Snippet } from 'svelte';
+	import { autoUpdate, computePosition, flip, offset as offsetBy, shift } from '@floating-ui/dom';
 
 	let {
 		open = false,
 		onclose,
-		position = undefined,
+		side = 'bottom',
+		align = 'start',
+		offset = 8,
 		label = undefined,
 		class: klass = '',
 		children
 	}: {
 		open?: boolean;
 		onclose: () => void;
-		/** Anchor classes, replacing the default `top-full left-0 mt-2`
-		 *  (below the trigger, left-aligned). */
-		position?: string;
+		/** Preferred side of the trigger. Flips when it would not fit. */
+		side?: 'top' | 'bottom' | 'left' | 'right';
+		/** Alignment along that side. Shifts when it would poke out. */
+		align?: 'start' | 'center' | 'end';
+		/** Gap to the trigger, px. */
+		offset?: number;
 		/** Accessible name for the panel. */
 		label?: string;
 		/** Sizing and padding — width is the consumer's call. */
@@ -42,7 +53,37 @@
 		children: Snippet;
 	} = $props();
 
-	const anchor = $derived(position || 'top-full left-0 mt-2');
+	let panel = $state<HTMLElement | null>(null);
+	// Hidden (but measurable) until the first computed position lands, so the
+	// panel never paints a frame at 0,0 before floating-ui places it.
+	let positioned = $state(false);
+
+	const placement = $derived(align === 'center' ? side : (`${side}-${align}` as const));
+
+	$effect(() => {
+		if (!open || !panel) {
+			positioned = false;
+			return;
+		}
+		const el = panel;
+		// The consumer's `relative` wrapper — the same implicit anchor the
+		// class-string era used, now measured instead of assumed.
+		const anchor = el.offsetParent;
+		if (!(anchor instanceof HTMLElement)) return;
+
+		const cleanup = autoUpdate(anchor, el, () => {
+			computePosition(anchor, el, {
+				placement,
+				strategy: 'absolute',
+				middleware: [offsetBy(offset), flip(), shift({ padding: 8 })]
+			}).then(({ x, y }) => {
+				el.style.left = `${x}px`;
+				el.style.top = `${y}px`;
+				positioned = true;
+			});
+		});
+		return cleanup;
+	});
 
 	let lastFocus: HTMLElement | null = null;
 
@@ -80,10 +121,11 @@
 	></button>
 
 	<div
+		bind:this={panel}
 		role="dialog"
 		aria-label={label}
-		class="absolute z-50 rounded-lg border border-border bg-popover text-popover-foreground
-		       shadow-lg {anchor} {klass}"
+		class="absolute top-0 left-0 z-50 rounded-lg border border-border bg-popover
+		       text-popover-foreground shadow-lg {positioned ? '' : 'invisible'} {klass}"
 	>
 		{@render children()}
 	</div>

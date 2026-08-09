@@ -70,7 +70,8 @@
 					<Notify.Center
 						open={notifOpen}
 						onclose={() => (notifOpen = false)}
-						class="bottom-0 left-full ml-3"
+						side="right"
+						align="end"
 					/>
 				</div>
 				<Shell.SettingsFooter icon={Settings} />

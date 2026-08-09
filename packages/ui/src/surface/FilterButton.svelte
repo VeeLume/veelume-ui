@@ -46,13 +46,15 @@
 		{/if}
 	</button>
 
-	<!-- The dismissal semantics (outside click, Escape, focus return) are the
-	     Popup base's — the upgrade the old inline-panel comment promised, and
-	     it changed nothing about this component's public API. -->
+	<!-- The dismissal semantics (outside click, Escape, focus return) and the
+	     placement (flip/shift against the clipping ancestors) are the Popup
+	     base's — this component states intent, below-start, and nothing else. -->
 	<Popup
 		{open}
 		onclose={() => (open = false)}
-		position="top-full left-0 mt-1"
+		side="bottom"
+		align="start"
+		offset={4}
 		label={kit.labels.filters()}
 		class="w-72 p-3"
 	>

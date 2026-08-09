@@ -21,20 +21,18 @@
 		open = false,
 		onclose,
 		item = undefined,
-		class: klass = ''
+		side = 'bottom',
+		align = 'end'
 	}: {
 		open?: boolean;
 		onclose: () => void;
 		/** Replaces a row's rendering. The list, header and policy stay the kit's. */
 		item?: Snippet<[{ notification: Notification; dismiss: () => void }]>;
-		/**
-		 * Position classes, REPLACING the default `top-full right-0 mt-2`
-		 * (below the trigger, right-aligned) — replaced rather than merged,
-		 * because two `top-*` utilities on one element resolve by stylesheet
-		 * order, not by author intent. A rail-bottom bell passes something
-		 * like `bottom-0 left-full ml-3`.
-		 */
-		class?: string;
+		/** Placement INTENT, passed to Popup — flip/shift handle the rest. A
+		 *  rail-bottom bell passes side="right" align="end"; the default suits
+		 *  a toolbar trigger. */
+		side?: 'top' | 'bottom' | 'left' | 'right';
+		align?: 'start' | 'center' | 'end';
 	} = $props();
 
 	const kit = getKitContext();
@@ -47,7 +45,8 @@
 <Popup
 	{open}
 	{onclose}
-	position={klass || 'top-full right-0 mt-2'}
+	{side}
+	{align}
 	label={kit.labels.notifications()}
 	class="flex max-h-96 w-80 flex-col overflow-hidden"
 >
