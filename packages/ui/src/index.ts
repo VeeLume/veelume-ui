@@ -66,6 +66,23 @@ export type {
 	SelectOption
 } from './form/index.js';
 
+// ── L1+L2: notifications ───────────────────────────────────────────────────
+// One funnel, two surfaces: notify()/ingest() feed a single bounded session
+// log; Toasts (transient, sticky-by-level) and Center (persistent, marks
+// read on open) read it, Bell carries the unread count. Parts compose
+// independently — the store is the contract, not the arrangement.
+export {
+	Notify,
+	notifications,
+	notify,
+	ingest,
+	dismiss,
+	markAllRead,
+	clearAll,
+	isSticky
+} from './notify/index.js';
+export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
+
 // ── L2: status badge ───────────────────────────────────────────────────────
 // One pill + a per-domain status→(label, tone) map — four stibu components
 // were this exact split with the map inlined. `Row.badge` accepts the

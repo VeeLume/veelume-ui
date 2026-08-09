@@ -21,6 +21,7 @@
 		Surface,
 		createBrowseState,
 		getKitContext,
+		notify,
 		resolveStatus,
 		type Action,
 		type Row
@@ -145,6 +146,15 @@
 		} catch (e) {
 			const err = e as { kind?: string; message?: string };
 			message = `${label} failed: ${err.message ?? err.kind ?? 'error'}`;
+			// The funnel answers "where does a failed closer surface": inline
+			// beside the form AND as a sticky toast that outlives navigating
+			// away, with the row preserved in the center.
+			notify({
+				level: 'error',
+				title: `${label} failed`,
+				body: err.message ?? err.kind ?? 'error',
+				source: 'loans'
+			});
 		}
 	}
 

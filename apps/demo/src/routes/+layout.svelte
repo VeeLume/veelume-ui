@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { Shell, setKitContext } from '@veelume/ui';
+	import { Notify, Shell, setKitContext } from '@veelume/ui';
 	import { Settings } from 'lucide-svelte';
 	import { m, getLocale } from '$lib/i18n';
 	import { nav } from '$lib/nav.svelte';
@@ -11,6 +11,8 @@
 	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
 
 	let { children } = $props();
+
+	let notifOpen = $state(false);
 
 	/**
 	 * The kit's only channel into app state. Two locales on purpose:
@@ -60,7 +62,19 @@
 			<!-- The demo has no accounts, so the no-account default footer. The
 			     icon prop keeps the demo's lucide set; omit it for the built-in
 			     gear. AccountFooter is exercised in /gallery/shell-footer. -->
-			{#snippet footer()}
+			{#snippet footer({ showLabels })}
+				<!-- Bell + Center, the donors' sidebar arrangement: the panel opens
+				     beside the rail, bottom-anchored, so it never leaves the screen.
+				     At bar widths the rail (and bell) is gone — the toast stack and
+				     a /more entry would be the phone answer; not built until needed. -->
+				<div class="relative flex" class:w-full={showLabels} class:justify-center={!showLabels}>
+					<Notify.Bell onclick={() => (notifOpen = !notifOpen)} />
+					<Notify.Center
+						open={notifOpen}
+						onclose={() => (notifOpen = false)}
+						class="bottom-0 left-full ml-3"
+					/>
+				</div>
 				<Shell.SettingsFooter icon={Settings} />
 			{/snippet}
 		</Shell.Rail>
@@ -79,4 +93,7 @@
 			{@render children()}
 		</Shell.Content>
 	</Shell.Root>
+
+	<!-- Once, at the root: the transient surface of the notification funnel. -->
+	<Notify.Toasts />
 {/if}

@@ -46,7 +46,8 @@
 		{ path: '/gallery/number', label: 'NumberInput' },
 		{ path: '/gallery/shell-footer', label: 'Shell footers' },
 		{ path: '/gallery/badge', label: 'StatusBadge' },
-		{ path: '/gallery/controls', label: 'Switch & Segmented' }
+		{ path: '/gallery/controls', label: 'Switch & Segmented' },
+		{ path: '/gallery/notify', label: 'Notify' }
 	];
 
 	const LOCALES = ['de-DE', 'en-US', 'en-GB', 'fr-FR', 'ja-JP'];

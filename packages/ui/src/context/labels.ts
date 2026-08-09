@@ -80,6 +80,16 @@ export type LabelBag = {
 	selectCategory: () => string;
 	/** The bottom bar's overflow collector slot. */
 	more: () => string;
+
+	// ── notifications ────────────────────────────────────────────────────────
+	/** The bell's accessible name and the center's heading. */
+	notifications: () => string;
+	/** Empties the notification center. */
+	clearAll: () => string;
+	/** Accessible name for a toast's / a center row's close button. */
+	dismiss: () => string;
+	/** The center with no notifications this session. */
+	nothingYet: () => string;
 };
 
 /**
@@ -120,5 +130,10 @@ export const defaultLabels: LabelBag = {
 
 	settings: () => 'Settings',
 	selectCategory: () => 'Select a category',
-	more: () => 'More'
+	more: () => 'More',
+
+	notifications: () => 'Notifications',
+	clearAll: () => 'Clear all',
+	dismiss: () => 'Dismiss',
+	nothingYet: () => 'Nothing yet'
 };
