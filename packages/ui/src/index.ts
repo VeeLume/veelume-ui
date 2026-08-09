@@ -51,6 +51,8 @@ export type { SettingsCategory, SettingsContext } from './settings/index.js';
 export {
 	RecordForm,
 	NumberInput,
+	DateInput,
+	TimeInput,
 	Switch,
 	Segmented,
 	createRecordForm,

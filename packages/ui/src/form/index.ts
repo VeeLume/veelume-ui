@@ -1,5 +1,7 @@
 export { default as RecordForm } from './RecordForm.svelte';
 export { default as NumberInput } from './NumberInput.svelte';
+export { default as DateInput } from './DateInput.svelte';
+export { default as TimeInput } from './TimeInput.svelte';
 export { default as Switch } from './Switch.svelte';
 export { default as Segmented } from './Segmented.svelte';
 export { createRecordForm } from './createRecordForm.svelte.js';

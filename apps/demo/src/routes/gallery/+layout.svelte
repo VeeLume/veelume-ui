@@ -49,7 +49,8 @@
 		{ path: '/gallery/controls', label: 'Switch & Segmented' },
 		{ path: '/gallery/notify', label: 'Notify' },
 		{ path: '/gallery/dialog', label: 'Dialog & Confirm' },
-		{ path: '/gallery/picker', label: 'Picker' }
+		{ path: '/gallery/picker', label: 'Picker' },
+		{ path: '/gallery/date', label: 'Date & Time' }
 	];
 
 	const LOCALES = ['de-DE', 'en-US', 'en-GB', 'fr-FR', 'ja-JP'];

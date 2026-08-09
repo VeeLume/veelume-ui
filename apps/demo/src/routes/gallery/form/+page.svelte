@@ -7,6 +7,7 @@
 		amount_cents: number;
 		format: string;
 		insured: boolean;
+		due: string | null;
 		notes: string;
 		created: string;
 	} & Record<string, unknown>;
@@ -16,6 +17,7 @@
 		amount_cents: 123456,
 		format: 'paperback',
 		insured: false,
+		due: '2026-05-01',
 		notes: '',
 		created: '2026-04-05'
 	};
@@ -55,6 +57,13 @@
 			kind: 'boolean',
 			section: 'Money',
 			hint: 'A boolean renders as a row — label beside the switch, never a floating knob.'
+		},
+		{
+			name: 'due',
+			label: 'Due date',
+			kind: 'date',
+			section: 'Money',
+			hint: 'Segments follow the formatting locale — flip the switcher above.'
 		},
 		{ name: 'notes', label: 'Notes', kind: 'textarea', section: 'Notes' },
 		{ name: 'name', label: 'Read-only name', kind: 'text', section: 'Notes', readonly: true }

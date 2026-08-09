@@ -10,6 +10,8 @@
 	import type { Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import NumberInput from './NumberInput.svelte';
+	import DateInput from './DateInput.svelte';
+	import TimeInput from './TimeInput.svelte';
 	import Switch from './Switch.svelte';
 	import { sectionsOf, type FieldSpec } from './types.js';
 	import type { RecordForm } from './createRecordForm.svelte.js';
@@ -73,6 +75,20 @@
 								scale={f.scale ?? 1}
 								disabled={f.readonly}
 								onchange={(n) => form.set(f.name, n as T[typeof f.name])}
+							/>
+						{:else if f.kind === 'date'}
+							<DateInput
+								id={f.name}
+								value={(form.value[f.name] as string | null) ?? null}
+								disabled={f.readonly}
+								onchange={(d) => form.set(f.name, d as T[typeof f.name])}
+							/>
+						{:else if f.kind === 'time'}
+							<TimeInput
+								id={f.name}
+								value={(form.value[f.name] as string | null) ?? null}
+								disabled={f.readonly}
+								onchange={(t) => form.set(f.name, t as T[typeof f.name])}
 							/>
 						{:else if f.kind === 'select'}
 							<select
