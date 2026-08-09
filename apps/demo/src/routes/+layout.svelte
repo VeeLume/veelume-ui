@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { Notify, Shell, setKitContext } from '@veelume/ui';
+	import { Loading, Notify, Shell, setKitContext } from '@veelume/ui';
 	import { Settings } from 'lucide-svelte';
 	import { m, getLocale } from '$lib/i18n';
 	import { nav } from '$lib/nav.svelte';
@@ -49,9 +49,7 @@
 
 {#if settings.loading}
 	<div class="flex h-svh items-center justify-center">
-		<div
-			class="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
-		></div>
+		<Loading />
 	</div>
 {:else}
 	<!-- Composed from parts rather than <AppShell> to exercise the composable

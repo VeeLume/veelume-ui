@@ -96,6 +96,17 @@ export { Dialog, ConfirmDialog } from './dialog/index.js';
 // named axes. Picker is the inline half; PickerDialog wraps it in the modal.
 export { Picker, PickerDialog } from './picker/index.js';
 
+// ── L1: stored value ───────────────────────────────────────────────────────
+// A reactive value backed by localStorage with a validating loader — the
+// per-device preference pattern (Hearth prefs, the demo's appearance store).
+export { storedValue } from './stored/index.svelte.js';
+export type { StoredValue } from './stored/index.svelte.js';
+
+// ── L2: loading ────────────────────────────────────────────────────────────
+// The labelled spinner for boot screens and pane-sized placeholders. A list
+// that is loading uses Surface.List's own states instead.
+export { Loading } from './loading/index.js';
+
 // ── L2: popup ──────────────────────────────────────────────────────────────
 // The anchored-panel base: outside click, Escape, focus return, position
 // classes that REPLACE the default. FilterButton and Notify.Center ride it;
