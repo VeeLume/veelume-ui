@@ -100,23 +100,34 @@
 	</Case>
 
 	<Case
-		title="Wide control: under the heading, not in a Row"
-		note="A Segmented with long labels would collide with a Row's label on a phone — stibu's Darstellung answer is heading above, control below, left-hugging (the Section's justify-items-start is what stops it stretching)."
+		title="A Row adapts by content, not breakpoint"
+		note="The same Row at two container widths: inline while the control actually fits beside the label, wrapped below it (left-aligned — stibu's Darstellung arrangement) the moment it does not. No prop, no breakpoint — flex-wrap against the label's minimum width, so a narrow Switch stays inline where a wide Segmented drops."
 	>
-		<div class="w-full max-w-xl">
-			<Settings.Section
-				title="Density"
-				description="'Comfortable' is larger; 'Compact' shows more at once."
-			>
-				<Segmented
-					options={[
-						{ value: 'comfortable', label: 'Comfortable' },
-						{ value: 'compact', label: 'Compact' }
-					]}
-					value="comfortable"
-					onchange={() => {}}
-				/>
-			</Settings.Section>
+		<div class="grid w-full gap-4">
+			<div class="w-full max-w-xl rounded-md border border-dashed border-border p-3">
+				<Settings.Row label="Density" hint="Wide container: the control rides inline.">
+					<Segmented
+						options={[
+							{ value: 'comfortable', label: 'Comfortable' },
+							{ value: 'compact', label: 'Compact' }
+						]}
+						value="comfortable"
+						onchange={() => {}}
+					/>
+				</Settings.Row>
+			</div>
+			<div class="w-80 rounded-md border border-dashed border-border p-3">
+				<Settings.Row label="Density" hint="Narrow container: it wrapped on its own.">
+					<Segmented
+						options={[
+							{ value: 'comfortable', label: 'Comfortable' },
+							{ value: 'compact', label: 'Compact' }
+						]}
+						value="comfortable"
+						onchange={() => {}}
+					/>
+				</Settings.Row>
+			</div>
 		</div>
 	</Case>
 </div>

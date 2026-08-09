@@ -7,15 +7,19 @@
 	 * The description is not decoration — stibu's settings pages explain what
 	 * a choice MEANS ("'System' follows your device") rather than restating
 	 * the heading, and that is the register this slot is for.
+	 *
+	 * Both are optional: a group of `Settings.Row`s that carry their own
+	 * labels and hints needs the rule and the rhythm, not a second heading
+	 * restating the page title.
 	 */
 	import type { Snippet } from 'svelte';
 
 	let {
-		title,
+		title = undefined,
 		description = undefined,
 		children
 	}: {
-		title: string;
+		title?: string;
 		description?: string;
 		children: Snippet;
 	} = $props();
@@ -27,11 +31,13 @@
 <section
 	class="grid justify-items-start gap-3 border-t border-border pt-6 pb-6 first:border-t-0 first:pt-0 last:pb-0"
 >
-	<div>
-		<h2 class="text-sm font-semibold">{title}</h2>
-		{#if description}
-			<p class="text-xs text-muted-foreground">{description}</p>
-		{/if}
-	</div>
+	{#if title || description}
+		<div>
+			{#if title}<h2 class="text-sm font-semibold">{title}</h2>{/if}
+			{#if description}
+				<p class="text-xs text-muted-foreground">{description}</p>
+			{/if}
+		</div>
+	{/if}
 	{@render children()}
 </section>
