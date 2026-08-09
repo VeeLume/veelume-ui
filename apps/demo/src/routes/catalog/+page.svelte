@@ -23,8 +23,7 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { SvelteSet } from 'svelte/reactivity';
-	import { Surface, Segmented } from '@veelume/ui';
+	import { Surface, Segmented, Expand, createExpansion } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
 	import type { GroupDef } from '@veelume/ui';
@@ -52,7 +51,9 @@
 		below: { kind: 'one', default: '', narrows: false }
 	});
 
-	const expanded = new SvelteSet<string>();
+	// `many`: peeking at one work's editions has no business closing another's.
+	// A deep-read accordion (Starlume's missions) is where `one` belongs.
+	const expanded = createExpansion('many');
 
 	// One level. The label default is the key itself (the author); the count the
 	// default header renders is the group's VISIBLE rows, so narrowing the list
@@ -166,65 +167,44 @@
 						     without watching layout. `nearest` keeps it minimal: no jump
 						     when the row is already visible. -->
 						<div
-							class="border-b border-border last:border-b-0"
 							{@attach (node) => {
 								if (isSelected) node.scrollIntoView({ block: 'nearest' });
 							}}
 						>
-							<div class="flex items-stretch">
-								<!-- The caret is its OWN control now: expansion peeks at the
-								     variants in place, selection opens the workbench — the
-								     two gestures the archetype revision separates. -->
-								<button
-									type="button"
-									class="grid w-8 shrink-0 place-items-center text-xs text-muted-foreground
-									       hover:bg-muted hover:text-foreground"
-									aria-expanded={expanded.has(r.key)}
-									aria-label="Toggle editions"
-									onclick={() =>
-										expanded.has(r.key) ? expanded.delete(r.key) : expanded.add(r.key)}
-								>
-									{expanded.has(r.key) ? '▾' : '▸'}
-								</button>
-								<button
-									type="button"
-									class="flex min-w-0 flex-1 items-center gap-3 py-2 pr-3 text-left text-sm
-									       {isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}"
-									onclick={() => openWork(r.key)}
-									ondblclick={() => catalogWorkset.pin(r.key)}
-								>
-									<span class="min-w-0 flex-1">
-										<span class="block truncate font-medium">{r.title}</span>
-										<span class="block truncate text-xs text-muted-foreground">
-											{r.author} · {kit.format.number(r.total)} editions · from {r.firstYear}
-										</span>
-									</span>
-									{#if r.badge}<span class="shrink-0 text-xs">{r.badge}</span>{/if}
-									<span class="shrink-0 text-xs tabular-nums text-muted-foreground"
-										>{r.trailing}</span
-									>
-								</button>
-							</div>
-
-							{#if expanded.has(r.key)}
-								<ul class="bg-muted/30 px-3 pb-2">
-									{#each r.members as m (m.edition.id)}
-										<li class="flex items-center gap-3 border-t border-border/50 py-1.5 text-xs">
+							<!-- Both gestures, which is why the kit splits them: the caret
+							     peeks at the editions in place, the body opens the workbench.
+							     Supplying `onselect` is what separates them. -->
+							<Expand.Row
+								title={r.title}
+								subtitle="{r.author} · {kit.format.number(r.total)} editions · from {r.firstYear}"
+								open={expanded.has(r.key)}
+								ontoggle={() => expanded.toggle(r.key)}
+								selected={isSelected}
+								onselect={() => openWork(r.key)}
+							>
+								{#snippet right()}
+									{#if r.badge}<span class="mr-2">{r.badge}</span>{/if}{r.trailing}
+								{/snippet}
+								<!-- The expansion is NESTED ROWS, not a bespoke list: leaves are
+								     the same component one level in, so a variant can grow its
+								     own facts later without new markup. -->
+								{#each r.members as m (m.edition.id)}
+									<Expand.Row title={m.edition.format} indent={1}>
+										{#snippet gutter()}
 											<button
 												type="button"
-												class="grid size-6 shrink-0 place-items-center rounded border border-input
-												       bg-background hover:bg-muted"
+												class="grid size-6 place-items-center rounded border border-input
+												       bg-background text-xs hover:bg-muted"
 												title={nextLabel[m.state]}
 												onclick={() => toggleShelf(m.edition.id)}
 											>
 												{symbol[m.state]}
 											</button>
-											<span class="flex-1">{m.edition.format}</span>
-											<span class="tabular-nums text-muted-foreground">{m.edition.year}</span>
-										</li>
-									{/each}
-								</ul>
-							{/if}
+										{/snippet}
+										{#snippet right()}{m.edition.year}{/snippet}
+									</Expand.Row>
+								{/each}
+							</Expand.Row>
 						</div>
 					{/snippet}
 				</Surface.List>

@@ -85,6 +85,15 @@ export {
 } from './notify/index.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
 
+// ── L2: expand ─────────────────────────────────────────────────────────────
+// The accordion row: one anatomy filled by omission, per-row nesting, and an
+// expansion set that is deliberately NOT browse state — carets are transient
+// exploration, so back must not walk them. Its niche narrowed once the
+// workbench existed: shallow in-place structure (variant leaves, chains,
+// region expanders) and the deep-read case, not "working with several".
+export { Expand, createExpansion } from './expand/index.js';
+export type { Expansion, ExpansionMode, Fact } from './expand/index.js';
+
 // ── L2: wizard ─────────────────────────────────────────────────────────────
 // The step frame, not an overlay — the Picker/PickerDialog split again, so a
 // full-screen host and a dialog host cannot drift. Steps are a REACTIVE prop,

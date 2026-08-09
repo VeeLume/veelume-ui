@@ -210,6 +210,36 @@ expire, concurrent writers are normal, and **events are lossy**.
   carries keys (`ChangeInfo.kind: 'delete'`) · neither, in which case the fill must reconcile
   the key interval it covered. Absence is only meaningful inside a range the server enumerated.
 
+### Expand — the accordion row
+
+Shallow in-place structure (variant leaves, chains, region expanders) and the deep-read case.
+Its niche narrowed once the workbench existed: *working with several* is tabs, *a few sub-rows
+of structure* is this.
+
+- **One anatomy, filled by omission** — `gutter · caret · title (+ meta) … right · actions`.
+  Complexity scales by which slots you fill, never by a `variant`. **No `expandable` prop**:
+  supplying `children` IS what makes a row expandable (the donor carried both a boolean and
+  the content, and the two could disagree). A row that is neither selectable nor expandable
+  renders as a plain line, not a dead button.
+- **Two gestures, split by omission**: `onselect` supplied → the body selects and the caret
+  toggles (peeking must not disturb a working set); omitted → the whole row toggles.
+- **`createExpansion(mode)` is page-local, never the URL** — selection is a state you were
+  *in*, expansion is transient exploration; back must not walk your carets. `'many'` is the
+  default (no hidden action, and only it can compare); `'one'` is the deep-read norm.
+- **⚑ The toggled row keeps its viewport position.** Only single-open can move it — closing a
+  row *above* pulls everything up and the row you clicked slides out from under the cursor.
+  That jank is what makes an accordion feel worse than a detail pane, and it is an
+  implementation defect, not a property of the pattern. Corrected twice (after `tick`, then
+  after a frame, because a windowed list re-lays out on rAF). Above the windowing threshold a
+  row may not be in the DOM at all — that is `win.scrollTo(index)`'s job.
+- **Per-row `indent`**, unlike a grouped list's uniform depth: a leaf sits under its parent and
+  its sibling may not, so only the row knows.
+- **`Expand.Cols` uses a CONTAINER query.** The donor keyed a two-column body on a 1100px
+  viewport, which is wrong the moment the list sits in a split — the pane can be narrow on a
+  wide screen. What decides is the box the expansion is in.
+- `Expand.Facts` takes DATA, not snippets, for the same reason `Row.badge` does: an expansion
+  may hold twenty pairs inside a list rendering hundreds of rows.
+
 ### The workbench — a working set over a Split
 
 Selection grows a CURATED SET: list + tab strip + pane(s). Settled in the demo catalog's
