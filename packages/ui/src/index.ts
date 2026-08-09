@@ -83,6 +83,12 @@ export {
 } from './notify/index.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
 
+// ── L2: popup ──────────────────────────────────────────────────────────────
+// The anchored-panel base: outside click, Escape, focus return, position
+// classes that REPLACE the default. FilterButton and Notify.Center ride it;
+// collision-aware placement is the planned upgrade inside it.
+export { Popup } from './popup/index.js';
+
 // ── L2: status badge ───────────────────────────────────────────────────────
 // One pill + a per-domain status→(label, tone) map — four stibu components
 // were this exact split with the map inlined. `Row.badge` accepts the

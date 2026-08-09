@@ -12,6 +12,7 @@
 	 * The badge is the active-filter count, which is also the reason the panel can
 	 * be hidden by default: a narrowed list must never look like an unnarrowed one.
 	 */
+	import Popup from '../popup/Popup.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 
@@ -45,58 +46,59 @@
 		{/if}
 	</button>
 
-	{#if open}
-		<!-- Deliberately a plain panel for now, not a bits-ui Popover: the dismissal
-		     semantics (outside-click, Escape, focus return) are worth doing properly
-		     and are an upgrade that does not change this component's public API. -->
-		<div
-			class="absolute top-10 left-0 z-20 w-72 rounded-md border border-input bg-background
-			       p-3 shadow-lg"
+	<!-- The dismissal semantics (outside click, Escape, focus return) are the
+	     Popup base's — the upgrade the old inline-panel comment promised, and
+	     it changed nothing about this component's public API. -->
+	<Popup
+		{open}
+		onclose={() => (open = false)}
+		position="top-full left-0 mt-1"
+		label={kit.labels.filters()}
+		class="w-72 p-3"
+	>
+		{#if s.sorts.length}
+			<div class="mb-3">
+				<div class="mb-1 text-xs font-medium text-muted-foreground">{kit.labels.sort()}</div>
+				{#each s.sorts as opt (opt.value)}
+					<label class="flex items-center gap-2 py-1 text-sm">
+						<input
+							type="radio"
+							checked={s.activeSort?.value === opt.value}
+							onchange={() => s.browse.set('sort', opt.value as never)}
+						/>
+						{opt.label}
+					</label>
+				{/each}
+			</div>
+		{/if}
+
+		{#each s.facets as f (f.id)}
+			<div class="mb-3">
+				<div class="mb-1 text-xs font-medium text-muted-foreground">{f.label}</div>
+				{#each f.options as opt (opt.value)}
+					{@const picked = s.selectionOf(f).includes(opt.value)}
+					<label class="flex items-center gap-2 py-1 text-sm">
+						<input
+							type={f.mode === 'many' ? 'checkbox' : 'radio'}
+							checked={picked}
+							onchange={() =>
+								f.mode === 'many'
+									? s.browse.toggle(f.id, opt.value)
+									: s.browse.set(f.id, opt.value as never)}
+						/>
+						<span class="flex-1">{opt.label}</span>
+						<span class="tabular-nums text-xs text-muted-foreground"
+							>{s.counts[f.id]?.[opt.value] ?? 0}</span
+						>
+					</label>
+				{/each}
+			</div>
+		{/each}
+
+		<button
+			type="button"
+			class="w-full rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
+			onclick={() => s.browse.reset()}>{kit.labels.resetFilters()}</button
 		>
-			{#if s.sorts.length}
-				<div class="mb-3">
-					<div class="mb-1 text-xs font-medium text-muted-foreground">{kit.labels.sort()}</div>
-					{#each s.sorts as opt (opt.value)}
-						<label class="flex items-center gap-2 py-1 text-sm">
-							<input
-								type="radio"
-								checked={s.activeSort?.value === opt.value}
-								onchange={() => s.browse.set('sort', opt.value as never)}
-							/>
-							{opt.label}
-						</label>
-					{/each}
-				</div>
-			{/if}
-
-			{#each s.facets as f (f.id)}
-				<div class="mb-3">
-					<div class="mb-1 text-xs font-medium text-muted-foreground">{f.label}</div>
-					{#each f.options as opt (opt.value)}
-						{@const picked = s.selectionOf(f).includes(opt.value)}
-						<label class="flex items-center gap-2 py-1 text-sm">
-							<input
-								type={f.mode === 'many' ? 'checkbox' : 'radio'}
-								checked={picked}
-								onchange={() =>
-									f.mode === 'many'
-										? s.browse.toggle(f.id, opt.value)
-										: s.browse.set(f.id, opt.value as never)}
-							/>
-							<span class="flex-1">{opt.label}</span>
-							<span class="tabular-nums text-xs text-muted-foreground"
-								>{s.counts[f.id]?.[opt.value] ?? 0}</span
-							>
-						</label>
-					{/each}
-				</div>
-			{/each}
-
-			<button
-				type="button"
-				class="w-full rounded-md border border-input px-2 py-1 text-sm hover:bg-muted"
-				onclick={() => s.browse.reset()}>{kit.labels.resetFilters()}</button
-			>
-		</div>
-	{/if}
+	</Popup>
 </div>
