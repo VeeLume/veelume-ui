@@ -85,10 +85,10 @@ importers:
   packages/ui:
     dependencies:
       '@floating-ui/dom':
-        specifier: ^1.8.0
+        specifier: 1.8.0
         version: 1.8.0
       '@internationalized/date':
-        specifier: ^3.12.3
+        specifier: 3.12.3
         version: 3.12.3
       bits-ui:
         specifier: 2.18.1

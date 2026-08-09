@@ -458,12 +458,23 @@ Adding any of these is a design decision, not an oversight:
 - Ships **source**, no build step, while workspace-linked. `exports` points at `src/index.ts`.
 - Svelte 5 runes throughout. `.svelte.ts` for rune-bearing modules.
 - Nothing enters `src/index.ts` until it has a consumer in `apps/demo`.
-- **⚑ `bits-ui` is pinned EXACTLY (`2.18.1`), in this package and in every consumer, to the
-  same version.** A caret range on a behaviour-bearing UI dependency is an unversioned
-  contract: 2.18 silently stopped unmounting closed dialog content under a `^2.16` pin, which
-  type-checked clean and left a dismissed modal on screen behind its own inert overlay. Only
-  the gallery caught it. Two rules follow — bump it deliberately and re-walk the gallery's
-  bits-backed specimens (dialog, picker, date, actions' overflow menu); and keep the
-  consumer's pin identical, because two resolved copies would split bits-ui's contexts the
-  way two Svelte runtimes split `getContext`. (The alternative, a peer dependency owned by
-  the consumer, is the reach for if the fleet ever disagrees on a version.)
+- **⚑ The three behaviour-bearing UI dependencies are pinned EXACTLY** — `bits-ui` (2.18.1),
+  `@internationalized/date` (3.12.3), `@floating-ui/dom` (1.8.0) — **and `bits-ui` to the same
+  version in every consumer.** A caret range on these is an unversioned *behaviour* contract,
+  not just an API one: bits-ui 2.18 silently stopped unmounting closed overlay content under a
+  `^2.16` pin, which type-checked clean and left a dismissed modal (and, found by sweeping, a
+  dismissed `⋮` menu) on screen swallowing clicks. Only the gallery would ever notice.
+  - Each carries its own hazard beyond the version: **bits-ui** owns overlay presence, focus
+    and context; **@internationalized/date** hands `CalendarDate` objects across the boundary,
+    so a second copy breaks identity checks, not merely types; **@floating-ui/dom** decides
+    where a panel lands, and a placement regression reads as a CSS bug.
+  - So: bump deliberately, one at a time, and **re-walk the gallery specimens that exercise
+    them** — dialog, picker, wizard's host, actions' overflow menu (bits); date & time (both
+    bits and `@internationalized/date`); list-header's filter panel and Notify.Center
+    (floating-ui, via `Popup`).
+  - Keep a consumer's `bits-ui` pin identical to this one: two resolved copies split its
+    contexts the way two Svelte runtimes split `getContext`. (A peer dependency owned by the
+    consumer is the reach for if the fleet ever disagrees on a version.)
+  - `clsx` / `tailwind-merge` stay on carets deliberately — pure string functions with no
+    lifecycle, no DOM and no cross-boundary objects, so a minor bump cannot regress behaviour
+    invisibly.

@@ -23,8 +23,8 @@
 		"tailwindcss": "^4"
 	},
 	"dependencies": {
-		"@floating-ui/dom": "^1.8.0",
-		"@internationalized/date": "^3.12.3",
+		"@floating-ui/dom": "1.8.0",
+		"@internationalized/date": "3.12.3",
 		"bits-ui": "2.18.1",
 		"clsx": "^2.1.1",
 		"tailwind-merge": "^3.5.0"
