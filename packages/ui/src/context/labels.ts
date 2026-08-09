@@ -64,6 +64,9 @@ export type LabelBag = {
 	create: () => string;
 	save: () => string;
 	cancel: () => string;
+	/** ConfirmDialog's default forward label — per-call overrides ("Delete")
+	 *  are app content and arrive as props. */
+	confirm: () => string;
 
 	/** Accessible name for the `⋮` overflow trigger. */
 	moreActions: () => string;
@@ -121,6 +124,7 @@ export const defaultLabels: LabelBag = {
 	create: () => 'New',
 	save: () => 'Save',
 	cancel: () => 'Cancel',
+	confirm: () => 'Confirm',
 
 	moreActions: () => 'More actions',
 	back: () => 'Back',

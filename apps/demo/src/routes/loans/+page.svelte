@@ -16,6 +16,7 @@
 	import { Plus } from 'lucide-svelte';
 	import {
 		Actions,
+		ConfirmDialog,
 		DetailHeader,
 		StatusBadge,
 		Surface,
@@ -159,6 +160,18 @@
 	}
 
 	/**
+	 * The destructive closers route through the decision gate: the ⋮ entry
+	 * only STAGES the action, ConfirmDialog runs it. The dialog names the
+	 * consequence, never restates the label.
+	 */
+	let confirming = $state<null | {
+		title: string;
+		description: string;
+		confirmLabel: string;
+		run: () => void;
+	}>(null);
+
+	/**
 	 * The four closers are tier ③, not a row of buttons: they are rare, two are
 	 * destructive, and none of them is the forward action. Putting them behind
 	 * the `⋮` is what leaves the top-right slot free for the one thing a user
@@ -173,15 +186,27 @@
 						destructive: true,
 						disabled: selected.status !== 'draft',
 						onclick: () =>
-							act('Cancelled', async () => {
-								await cancelLoan(selected.id);
-								await goto(withParams({ id: null }));
+							(confirming = {
+								title: 'Cancel this draft?',
+								description: `"${selected.title}" is deleted outright — a draft has no history to keep.`,
+								confirmLabel: 'Cancel draft',
+								run: () =>
+									act('Cancelled', async () => {
+										await cancelLoan(selected.id);
+										await goto(withParams({ id: null }));
+									})
 							})
 					},
 					{
 						label: 'Mark lost',
 						destructive: true,
-						onclick: () => act('Marked lost', () => markLost(selected.id))
+						onclick: () =>
+							(confirming = {
+								title: 'Mark as lost?',
+								description: `"${selected.title}" closes with a replacement fine for ${selected.borrower}.`,
+								confirmLabel: 'Mark lost',
+								run: () => act('Marked lost', () => markLost(selected.id))
+							})
 					},
 					{ label: 'Archive', onclick: () => act('Archived', () => archiveLoan(selected.id)) }
 				]
@@ -309,3 +334,16 @@
 		</Surface.Split>
 	</Surface.Root>
 </div>
+
+<ConfirmDialog
+	open={confirming !== null}
+	title={confirming?.title ?? ''}
+	description={confirming?.description}
+	confirmLabel={confirming?.confirmLabel}
+	destructive
+	onclose={() => (confirming = null)}
+	onconfirm={() => {
+		confirming?.run();
+		confirming = null;
+	}}
+/>

@@ -83,6 +83,17 @@ export {
 } from './notify/index.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
 
+// ── L2: dialog ─────────────────────────────────────────────────────────────
+// The modal overlay species (Popup is the anchored one): centred, inert
+// background, focus trapped — bits-ui underneath, stibu's geometry on top.
+// ConfirmDialog is the decision gate for the destructive tier.
+export { Dialog, ConfirmDialog } from './dialog/index.js';
+
+// ── L2: picker ─────────────────────────────────────────────────────────────
+// Pick one/many from a collection — stibu's five derivations, on the four
+// named axes. Picker is the inline half; PickerDialog wraps it in the modal.
+export { Picker, PickerDialog } from './picker/index.js';
+
 // ── L2: popup ──────────────────────────────────────────────────────────────
 // The anchored-panel base: outside click, Escape, focus return, position
 // classes that REPLACE the default. FilterButton and Notify.Center ride it;
