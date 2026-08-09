@@ -14,7 +14,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { createCollection } from '@veelume/ui';
+import { createCollection, wakeInvalidation } from '@veelume/ui';
 import type { Loan } from './fixtures/loans.js';
 
 /** What both backends put on the `loans-changed` event. Mirrors `ChangeInfo`,
@@ -59,11 +59,23 @@ export const loans = createCollection<Loan, string, string>(
 		 * mutation, the fixtures emit through the mocked event bus. A keyed
 		 * `delete` removes locally with no refetch; keyed updates refresh just
 		 * those records; anything less reloads the year's sets.
+		 *
+		 * Composed with `wakeInvalidation`, and the two are different claims: the
+		 * event says WHAT changed, waking says only that we may have missed
+		 * something while the window was hidden — which is why it reloads
+		 * everything. A desktop webview suspended in the tray runs no JS, so
+		 * without this the cache is silently stale on return.
 		 */
-		subscribe: async (onChange) =>
-			listen<LoanChange>('loans-changed', (e) =>
+		subscribe: async (onChange) => {
+			const stopEvents = await listen<LoanChange>('loans-changed', (e) =>
 				onChange({ kind: e.payload.kind, keys: e.payload.keys, scope: e.payload.year })
-			)
+			);
+			const stopWake = wakeInvalidation(() => onChange());
+			return () => {
+				stopEvents();
+				stopWake();
+			};
+		}
 	},
 	{ scope: () => currentYear, cap: capFromUrl || 5, pageSize: 3 }
 );

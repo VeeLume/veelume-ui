@@ -173,6 +173,13 @@ expire, concurrent writers are normal, and **events are lossy**.
   stale with no way to know it is. No new API: every `ChangeInfo` field is optional, so an
   argument-less call already means "something changed, I cannot say what" and reloads every
   declaration.
+- **⚑ Reconnect and WAKE are the same obligation.** A suspended webview (a tray app hidden to
+  the notification area runs no JS) missed events just as surely as a dropped socket did — the
+  channel slept instead of breaking. `wakeInvalidation(onChange, { focus?, every?, debounce? })`
+  is `sseInvalidation`'s sibling for it: visibility + focus, debounced because one alt-tab
+  fires several signals, and its optional poll runs **only while visible** — a hidden poll
+  either cannot run or burns a resident app's idle footprint for nobody. Waking says *that*
+  you missed something, never what, which the argument-less call already expresses.
 - **`pageSize` and `cap` are transport-scaled.** 500/10k were measured over free transport;
   over HTTP start at ~1000 pages and expect the push-down regime to pay off below 10k.
   Re-measure rather than assuming the desktop numbers transfer.

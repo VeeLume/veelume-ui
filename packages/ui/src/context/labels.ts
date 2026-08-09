@@ -76,6 +76,14 @@ export type LabelBag = {
 	expandRow: () => string;
 	collapseRow: () => string;
 
+	// ── wizard ───────────────────────────────────────────────────────────────
+	next: () => string;
+	finish: () => string;
+	skip: () => string;
+	/** Footer progress. Exact counts, because a reactive step list makes a
+	 *  percentage a moving target. */
+	stepCount: (a: { step: number; total: number }) => string;
+
 	// ── workbench tabs ───────────────────────────────────────────────────────
 	/** Accessible name for a tab's close button. */
 	tabClose: () => string;
@@ -139,6 +147,10 @@ export const defaultLabels: LabelBag = {
 
 	expandRow: () => 'Expand',
 	collapseRow: () => 'Collapse',
+	next: () => 'Next',
+	finish: () => 'Finish',
+	skip: () => 'Skip',
+	stepCount: ({ step, total }) => `Step ${step} of ${total}`,
 	tabClose: () => 'Close tab',
 	tabOpenBelow: () => 'Open below',
 	tabPreviewHint: () => 'preview · double-click to pin',

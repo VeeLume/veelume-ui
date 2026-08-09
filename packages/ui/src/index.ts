@@ -85,6 +85,15 @@ export {
 } from './notify/index.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
 
+// ── L2: wizard ─────────────────────────────────────────────────────────────
+// The step frame, not an overlay — the Picker/PickerDialog split again, so a
+// full-screen host and a dialog host cannot drift. Steps are a REACTIVE prop,
+// which is the whole difference between the two donors: Hearth hardcoded its
+// steps, Starlume splices in a module registry's, and a `$derived` array
+// absorbs that with no registry concept in the kit.
+export { Wizard } from './wizard/index.js';
+export type { WizardStep } from './wizard/index.js';
+
 // ── L2: dialog ─────────────────────────────────────────────────────────────
 // The modal overlay species (Popup is the anchored one): centred, inert
 // background, focus trapped — bits-ui underneath, stibu's geometry on top.
@@ -103,9 +112,11 @@ export { storedValue } from './stored/index.svelte.js';
 export type { StoredValue } from './stored/index.svelte.js';
 
 // ── L2: loading ────────────────────────────────────────────────────────────
-// The labelled spinner for boot screens and pane-sized placeholders. A list
-// that is loading uses Surface.List's own states instead.
-export { Loading } from './loading/index.js';
+// The labelled spinner for boot screens and pane-sized placeholders, and the
+// bar for work whose completion is reportable — `value` absent is the
+// indeterminate state, not a mode. A list that is loading uses Surface.List's
+// own states instead.
+export { Loading, Progress } from './loading/index.js';
 
 // ── L2: popup ──────────────────────────────────────────────────────────────
 // The anchored-panel base: outside click, Escape, focus return, position
@@ -161,6 +172,10 @@ export { createCollection } from './collection/index.svelte.js';
 // that is what differs between Axum, Litestar and TrailBase.
 export { createHttpIO, sseInvalidation, classifyHttpError } from './collection/http.js';
 export type { HttpCall, HttpIOOptions, HttpRoutes, SseOptions } from './collection/http.js';
+// Wake catch-up, beside SSE reconnect: a suspended webview is the same lossy
+// channel in time instead of space, so waking carries the same obligation.
+export { wakeInvalidation } from './collection/wake.js';
+export type { WakeOptions } from './collection/wake.js';
 export type {
 	Collection,
 	CollectionIO,

@@ -33,6 +33,19 @@ export type Action = {
 	onclick?: () => void;
 	href?: string;
 	disabled?: boolean;
+	/**
+	 * The action is running: renders disabled with a spinner in the icon slot.
+	 *
+	 * A plain boolean, matching `disabled` on this same type rather than the
+	 * getter `NavItem.badge` uses — consistency within a type beats precedent
+	 * across types, and the failure mode is identical either way (an action
+	 * array built outside a `$derived` never updates either flag).
+	 *
+	 * Every app in the fleet hand-rolls `disabled={busy}` on its async
+	 * buttons; making it a tier property means the position invariant covers
+	 * the pending state too, instead of each screen inventing one.
+	 */
+	busy?: boolean;
 	/** Overflow only: renders in the destructive tone. */
 	destructive?: boolean;
 	/** Falls back to `label`; useful when the label is collapsed on narrow. */

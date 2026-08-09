@@ -12,6 +12,7 @@
 	import type { Snippet } from 'svelte';
 	import Button from './Button.svelte';
 	import ActionMenu from './ActionMenu.svelte';
+	import Spinner from './Spinner.svelte';
 	import type { Action, IconOf } from './types.js';
 
 	let {
@@ -40,10 +41,18 @@
 			variant="primary"
 			href={primary.href}
 			onclick={primary.onclick}
-			disabled={primary.disabled}
+			disabled={primary.disabled || primary.busy}
 			title={primary.title ?? primary.label}
 		>
-			{#if primary.icon}<Icon class="size-4 shrink-0" />{/if}
+			<!-- Busy takes the ICON slot rather than adding a glyph: the button
+			     must not change width when its work starts. An action with no
+			     icon still gets one, which is the honest trade — a moment of
+			     motion beats a dead button with no explanation. -->
+			{#if primary.busy}
+				<Spinner />
+			{:else if primary.icon}
+				<Icon class="size-4 shrink-0" />
+			{/if}
 			<!-- The label collapses on a phone, where the bar has no room for a
 			     sentence; the icon and the position carry it. -->
 			<span class="hidden sm:inline">{primary.label}</span>
@@ -56,10 +65,14 @@
 			variant="outline"
 			href={action.href}
 			onclick={action.onclick}
-			disabled={action.disabled}
+			disabled={action.disabled || action.busy}
 			title={action.title ?? action.label}
 		>
-			{#if action.icon}<Icon class="size-4 shrink-0" />{/if}
+			{#if action.busy}
+				<Spinner />
+			{:else if action.icon}
+				<Icon class="size-4 shrink-0" />
+			{/if}
 			<span class="hidden sm:inline">{action.label}</span>
 		</Button>
 	{/each}

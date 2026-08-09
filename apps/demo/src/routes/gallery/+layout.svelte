@@ -50,6 +50,8 @@
 		{ path: '/gallery/controls', label: 'Switch & Segmented' },
 		{ path: '/gallery/notify', label: 'Notify' },
 		{ path: '/gallery/dialog', label: 'Dialog & Confirm' },
+		{ path: '/gallery/wizard', label: 'Wizard' },
+		{ path: '/gallery/progress', label: 'Progress & busy' },
 		{ path: '/gallery/picker', label: 'Picker' },
 		{ path: '/gallery/date', label: 'Date & Time' }
 	];

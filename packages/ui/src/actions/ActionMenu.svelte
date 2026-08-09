@@ -9,6 +9,7 @@
 	 */
 	import { DropdownMenu } from 'bits-ui';
 	import { getKitContext } from '../context/index.js';
+	import Spinner from './Spinner.svelte';
 	import type { Action, IconOf } from './types.js';
 
 	let {
@@ -51,14 +52,21 @@
 				{@const Icon = action.icon as IconOf}
 				<DropdownMenu.Item
 					onSelect={action.onclick}
-					disabled={action.disabled}
+					disabled={action.disabled || action.busy}
 					class="flex cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2.5 text-sm
 					       outline-none select-none data-disabled:pointer-events-none
 					       data-disabled:opacity-50 {action.destructive
 						? 'text-destructive data-highlighted:bg-destructive/10'
 						: 'data-highlighted:bg-accent data-highlighted:text-accent-foreground'}"
 				>
-					{#if action.icon}<Icon class="size-4 shrink-0" />{/if}
+					<!-- Busy reads the same here as in the cluster: spinner in the
+					     icon slot, item disabled. A menu closes on select, so this
+					     is mostly seen when the menu is reopened during the work. -->
+					{#if action.busy}
+						<Spinner />
+					{:else if action.icon}
+						<Icon class="size-4 shrink-0" />
+					{/if}
 					{action.label}
 				</DropdownMenu.Item>
 			{/each}
