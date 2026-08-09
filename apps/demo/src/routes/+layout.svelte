@@ -57,23 +57,35 @@
 	     omitting the bottom snippet would be rail-only — no strategy flag. -->
 	<Shell.Root groups={nav.groups}>
 		<Shell.Rail>
-			<!-- The demo has no accounts, so the no-account default footer. The
-			     icon prop keeps the demo's lucide set; omit it for the built-in
-			     gear. AccountFooter is exercised in /gallery/shell-footer. -->
-			{#snippet footer({ showLabels })}
-				<!-- Bell + Center, the donors' sidebar arrangement: the panel opens
-				     beside the rail, bottom-anchored, so it never leaves the screen.
-				     At bar widths the rail (and bell) is gone — the toast stack and
-				     a /more entry would be the phone answer; not built until needed. -->
-				<div class="relative flex" class:w-full={showLabels} class:justify-center={!showLabels}>
+			<!-- The brand row: wordmark leading, bell trailing — the donors'
+			     arrangement (Starlume's `.brand`), now a deliberate placement
+			     instead of an afterthought above the footer. The bell is here
+			     because the demo HAS background work to announce (write
+			     failures notify); stibu-shaped apps mount no bell at all —
+			     presence tracks background work, not app size. At bar widths
+			     the rail (and bell) is gone; the More badge carries unread. -->
+			{#snippet header({ showLabels })}
+				<div
+					class="relative flex items-center"
+					class:w-full={showLabels}
+					class:justify-center={!showLabels}
+				>
+					{#if showLabels}
+						<span class="min-w-0 flex-1 truncate px-3 text-sm font-semibold">Veelume UI</span>
+					{/if}
 					<Notify.Bell onclick={() => (notifOpen = !notifOpen)} />
 					<Notify.Center
 						open={notifOpen}
 						onclose={() => (notifOpen = false)}
 						side="right"
-						align="end"
+						align="start"
 					/>
 				</div>
+			{/snippet}
+			<!-- The demo has no accounts, so the no-account default footer. The
+			     icon prop keeps the demo's lucide set; omit it for the built-in
+			     gear. AccountFooter is exercised in /gallery/shell-footer. -->
+			{#snippet footer({ showLabels })}
 				<Shell.SettingsFooter icon={Settings} />
 			{/snippet}
 		</Shell.Rail>

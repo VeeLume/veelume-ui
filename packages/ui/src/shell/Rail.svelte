@@ -13,10 +13,15 @@
 	import { getShellContext } from './context.svelte.js';
 
 	let {
+		header,
 		footer,
 		item,
 		class: klass = ''
 	}: {
+		/** The brand row at the rail's top — see `NavRail`'s prop note. At bar
+		 *  widths the rail (and with it the bell) is gone; the More badge is
+		 *  the narrow-width carrier of an unread count. */
+		header?: Snippet<[{ showLabels: boolean }]>;
 		/** The bottom block — avatar, settings, whatever the app puts there. */
 		footer?: Snippet<[{ showLabels: boolean }]>;
 		/** Replaces a nav row's rendering; the default `<a>` otherwise. */
@@ -32,6 +37,7 @@
 		groups={shell.groups}
 		activePath={shell.activePath}
 		showLabels={shell.showLabels}
+		{header}
 		{footer}
 		{item}
 		class={klass}

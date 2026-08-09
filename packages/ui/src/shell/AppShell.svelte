@@ -11,7 +11,9 @@
 	 *     (stibu is rail+bottom; Hearth and Starlume are rail-only)
 	 *   - `bottomItems`, because choosing what a phone user reaches for is a
 	 *     content judgement
-	 *   - `railFooter`, because the account block's contents are app-specific
+	 *   - `railHeader` / `railFooter`, because a brand row and an account block
+	 *     are app content — a bell belongs in the header exactly when the app
+	 *     has background work to announce
 	 *
 	 * `banner` exists for the things that must sit above the scroll container and
 	 * below the status bar — an update prompt, an offline notice. Putting them in
@@ -29,6 +31,7 @@
 		bottomItems = undefined,
 		strategy = 'bottom',
 		activePath = undefined,
+		railHeader,
 		railFooter,
 		banner,
 		children
@@ -39,6 +42,8 @@
 		bottomItems?: NavItem[];
 		strategy?: NavStrategy;
 		activePath?: string;
+		/** The brand row — app-specific for the same reason as the footer. */
+		railHeader?: Snippet<[{ showLabels: boolean }]>;
 		railFooter?: Snippet<[{ showLabels: boolean }]>;
 		banner?: Snippet;
 		children: Snippet;
@@ -46,7 +51,7 @@
 </script>
 
 <Root {groups} {activePath}>
-	<Rail footer={railFooter} />
+	<Rail header={railHeader} footer={railFooter} />
 	<Content {banner}>
 		{#snippet bottom()}
 			<!-- Mounting BottomBar is what makes the rail yield narrow widths,

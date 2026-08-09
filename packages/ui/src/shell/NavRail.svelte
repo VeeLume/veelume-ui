@@ -25,6 +25,7 @@
 		groups,
 		activePath = undefined,
 		showLabels = false,
+		header,
 		footer,
 		item,
 		class: klass = ''
@@ -33,6 +34,14 @@
 		/** Defaults to the current route; override for tests or nested routers. */
 		activePath?: string;
 		showLabels?: boolean;
+		/**
+		 * The brand row — wordmark leading, and for an app with background work,
+		 * the bell trailing (the presence axis: stibu is user-reactive and mounts
+		 * no bell anywhere; Starlume patches and cooks while hidden, so its bell
+		 * is identity-level chrome at the rail's top). Content is the app's —
+		 * a brand is exactly what a kit must not hardcode.
+		 */
+		header?: Snippet<[{ showLabels: boolean }]>;
 		/** The bottom block — avatar, settings, whatever the app puts there. */
 		footer?: Snippet<[{ showLabels: boolean }]>;
 		/** Replaces a nav row's rendering — a `soon` flag, a badge count. The
@@ -60,6 +69,19 @@
 	class:items-center={!showLabels}
 	class:px-2={!showLabels}
 >
+	{#if header}
+		<!-- No divider, deliberately: the donor's brand row (Starlume) separates
+		     by whitespace. The FOOTER's divider is the settled part — both donors
+		     drew a line above the account block; neither drew one under the brand. -->
+		<div
+			class="mb-2 flex flex-col gap-1"
+			class:w-full={showLabels}
+			class:items-center={!showLabels}
+		>
+			{@render header({ showLabels })}
+		</div>
+	{/if}
+
 	<div class="flex min-h-0 flex-1 flex-col gap-1 overflow-auto" class:w-full={showLabels}>
 		{#each groups as group, i (group.label ?? i)}
 			{#if group.label && showLabels}
