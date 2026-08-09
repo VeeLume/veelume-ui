@@ -458,3 +458,12 @@ Adding any of these is a design decision, not an oversight:
 - Ships **source**, no build step, while workspace-linked. `exports` points at `src/index.ts`.
 - Svelte 5 runes throughout. `.svelte.ts` for rune-bearing modules.
 - Nothing enters `src/index.ts` until it has a consumer in `apps/demo`.
+- **⚑ `bits-ui` is pinned EXACTLY (`2.18.1`), in this package and in every consumer, to the
+  same version.** A caret range on a behaviour-bearing UI dependency is an unversioned
+  contract: 2.18 silently stopped unmounting closed dialog content under a `^2.16` pin, which
+  type-checked clean and left a dismissed modal on screen behind its own inert overlay. Only
+  the gallery caught it. Two rules follow — bump it deliberately and re-walk the gallery's
+  bits-backed specimens (dialog, picker, date, actions' overflow menu); and keep the
+  consumer's pin identical, because two resolved copies would split bits-ui's contexts the
+  way two Svelte runtimes split `getContext`. (The alternative, a peer dependency owned by
+  the consumer, is the reach for if the fleet ever disagrees on a version.)

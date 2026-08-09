@@ -22,9 +22,18 @@
 
 	const kit = getKitContext();
 	const trigger = $derived(label ?? kit.labels.moreActions());
+
+	/**
+	 * ⚑ Controlled only so the Portal can be gated — the same bits-ui 2.18
+	 * presence regression `Dialog` hit: the content stayed MOUNTED and visible
+	 * at `data-state="closed"`, so a dismissed menu hung over the page and
+	 * swallowed clicks. Nothing else reads this; bits still drives every
+	 * open/close decision through the binding.
+	 */
+	let open = $state(false);
 </script>
 
-<DropdownMenu.Root>
+<DropdownMenu.Root bind:open>
 	<DropdownMenu.Trigger
 		class="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground
 		       transition-colors hover:bg-accent hover:text-accent-foreground
@@ -41,35 +50,37 @@
 		</svg>
 	</DropdownMenu.Trigger>
 
-	<DropdownMenu.Portal>
-		<DropdownMenu.Content
-			class="z-50 min-w-52 rounded-md border border-border bg-popover p-1
+	{#if open}
+		<DropdownMenu.Portal>
+			<DropdownMenu.Content
+				class="z-50 min-w-52 rounded-md border border-border bg-popover p-1
 			       text-popover-foreground shadow-md"
-			align="end"
-			sideOffset={6}
-		>
-			{#each actions as action (action.label)}
-				{@const Icon = action.icon as IconOf}
-				<DropdownMenu.Item
-					onSelect={action.onclick}
-					disabled={action.disabled || action.busy}
-					class="flex cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2.5 text-sm
+				align="end"
+				sideOffset={6}
+			>
+				{#each actions as action (action.label)}
+					{@const Icon = action.icon as IconOf}
+					<DropdownMenu.Item
+						onSelect={action.onclick}
+						disabled={action.disabled || action.busy}
+						class="flex cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2.5 text-sm
 					       outline-none select-none data-disabled:pointer-events-none
 					       data-disabled:opacity-50 {action.destructive
-						? 'text-destructive data-highlighted:bg-destructive/10'
-						: 'data-highlighted:bg-accent data-highlighted:text-accent-foreground'}"
-				>
-					<!-- Busy reads the same here as in the cluster: spinner in the
+							? 'text-destructive data-highlighted:bg-destructive/10'
+							: 'data-highlighted:bg-accent data-highlighted:text-accent-foreground'}"
+					>
+						<!-- Busy reads the same here as in the cluster: spinner in the
 					     icon slot, item disabled. A menu closes on select, so this
 					     is mostly seen when the menu is reopened during the work. -->
-					{#if action.busy}
-						<Spinner />
-					{:else if action.icon}
-						<Icon class="size-4 shrink-0" />
-					{/if}
-					{action.label}
-				</DropdownMenu.Item>
-			{/each}
-		</DropdownMenu.Content>
-	</DropdownMenu.Portal>
+						{#if action.busy}
+							<Spinner />
+						{:else if action.icon}
+							<Icon class="size-4 shrink-0" />
+						{/if}
+						{action.label}
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Content>
+		</DropdownMenu.Portal>
+	{/if}
 </DropdownMenu.Root>
