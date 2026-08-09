@@ -44,7 +44,13 @@
 		group: { kind: 'one', default: 'author', narrows: false },
 		// The ACTIVE record — the browse table's selection row: a param, push
 		// history, so back/forward walk the works you were on.
-		work: { kind: 'one', default: '', narrows: false }
+		work: { kind: 'one', default: '', narrows: false },
+		// The SECOND pane — the split, stacked: pane 2 sits BELOW pane 1, the
+		// split line horizontal. A URL param on purpose: a compare is a state
+		// worth sharing (the web tier's build-diff pages are this exact shape),
+		// and back closes the split before it closes the selection, which is
+		// the order you'd want.
+		below: { kind: 'one', default: '', narrows: false }
 	});
 
 	const expanded = new SvelteSet<string>();
@@ -136,6 +142,13 @@
 	);
 	const activeWork = $derived(active ? workByKey.get(active) : undefined);
 	const titleOf = (key: string) => workByKey.get(key)?.title ?? key;
+
+	// The second pane is a PROJECTION by key, deliberately independent of the
+	// tab set: closing B's tab does not tear down a compare you set up, and a
+	// shared ?below= link renders without minting tabs. Whether that
+	// independence survives promotion is a behaviour to judge in use.
+	const below = $derived(browse.values.below || null);
+	const belowWork = $derived(below ? workByKey.get(below) : undefined);
 
 	function openWork(key: string) {
 		catalogWorkset.select(key);
@@ -285,6 +298,18 @@
 									>
 										{titleOf(t.key)}
 									</button>
+									<!-- Open THIS tab's work in the second pane without
+									     activating it — with A active, ⊟ on B is "B below A". -->
+									<button
+										type="button"
+										class="grid size-5 place-items-center rounded-sm text-xs
+										       text-muted-foreground hover:bg-muted hover:text-foreground"
+										aria-label="Open below"
+										title="Open below"
+										onclick={() => browse.set('below', t.key)}
+									>
+										⊟
+									</button>
 									<button
 										type="button"
 										class="mr-1 grid size-5 place-items-center rounded-sm text-xs
@@ -299,53 +324,90 @@
 						</div>
 					{/if}
 
-					<div
-						class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card"
-						class:rounded-tl-none={catalogWorkset.tabs.length > 0}
-					>
-						{#if activeWork}
-							<div class="min-h-0 flex-1 overflow-auto p-4">
-								<h2 class="text-lg font-semibold">{activeWork.title}</h2>
-								<p class="text-sm text-muted-foreground">
-									{activeWork.author} · first published {activeWork.firstYear}
-								</p>
-								{#if !catalogWorkset.isPinned(activeWork.key)}
-									<p class="mt-1 text-xs text-muted-foreground italic">
-										Preview — double-click the row or the tab to pin it
+					{#snippet workPane(w: WorkRow, closable: boolean)}
+						<div class="min-h-0 flex-1 overflow-auto p-4">
+							<div class="flex items-start gap-2">
+								<div class="min-w-0 flex-1">
+									<h2 class="truncate text-lg font-semibold">{w.title}</h2>
+									<p class="text-sm text-muted-foreground">
+										{w.author} · first published {w.firstYear}
 									</p>
+								</div>
+								{#if closable}
+									<button
+										type="button"
+										class="grid size-6 shrink-0 place-items-center rounded text-xs
+										       text-muted-foreground hover:bg-muted hover:text-foreground"
+										aria-label="Close pane"
+										onclick={() => browse.set('below', '')}
+									>
+										✕
+									</button>
 								{/if}
-
-								<h3
-									class="mt-4 mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
-								>
-									Editions {activeWork.ownedCount}/{activeWork.total}
-								</h3>
-								<ul>
-									{#each activeWork.members as m (m.edition.id)}
-										<li class="flex items-center gap-3 border-t border-border/50 py-1.5 text-sm">
-											<button
-												type="button"
-												class="grid size-6 shrink-0 place-items-center rounded border border-input
-												       bg-background hover:bg-muted"
-												title={nextLabel[m.state]}
-												onclick={() => toggleShelf(m.edition.id)}
-											>
-												{symbol[m.state]}
-											</button>
-											<span class="flex-1">{m.edition.format}</span>
-											<span class="tabular-nums text-muted-foreground">{m.edition.year}</span>
-										</li>
-									{/each}
-								</ul>
 							</div>
-						{:else}
-							<div
-								class="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground"
-							>
-								<p>
-									Select a work to preview it here.<br />
-									Click previews · double-click pins · tabs keep your working set.
+							{#if !closable && !catalogWorkset.isPinned(w.key)}
+								<p class="mt-1 text-xs text-muted-foreground italic">
+									Preview — double-click the row or the tab to pin it
 								</p>
+							{/if}
+
+							<h3
+								class="mt-4 mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
+							>
+								Editions {w.ownedCount}/{w.total}
+							</h3>
+							<ul>
+								{#each w.members as m (m.edition.id)}
+									<li class="flex items-center gap-3 border-t border-border/50 py-1.5 text-sm">
+										<button
+											type="button"
+											class="grid size-6 shrink-0 place-items-center rounded border border-input
+											       bg-background hover:bg-muted"
+											title={nextLabel[m.state]}
+											onclick={() => toggleShelf(m.edition.id)}
+										>
+											{symbol[m.state]}
+										</button>
+										<span class="flex-1">{m.edition.format}</span>
+										<span class="tabular-nums text-muted-foreground">{m.edition.year}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/snippet}
+
+					<!-- The split, STACKED: pane 2 below pane 1, the split line
+					     horizontal, one tab strip for both — the working set is the
+					     surface's, not a pane's. Each pane scrolls independently,
+					     which is what makes over-under comparison usable, and
+					     stacking costs height rather than width — so unlike a
+					     side-by-side arrangement it needs no breakpoint gate. -->
+					<div class="flex min-h-0 flex-1 flex-col gap-3">
+						<div
+							class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
+							       border-border bg-card"
+							class:rounded-tl-none={catalogWorkset.tabs.length > 0}
+						>
+							{#if activeWork}
+								{@render workPane(activeWork, false)}
+							{:else}
+								<div
+									class="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground"
+								>
+									<p>
+										Select a work to preview it here.<br />
+										Click previews · double-click pins · ⊟ opens a second pane below.
+									</p>
+								</div>
+							{/if}
+						</div>
+
+						{#if belowWork}
+							<div
+								class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
+								       border-border bg-card"
+							>
+								{@render workPane(belowWork, true)}
 							</div>
 						{/if}
 					</div>
