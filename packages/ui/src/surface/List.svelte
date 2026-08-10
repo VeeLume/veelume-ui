@@ -22,7 +22,7 @@
 	import { isGroupHeader } from './types.js';
 	import type { GroupHeader, ListEntry, Row } from './types.js';
 	import type { Action } from '../actions/types.js';
-	import type { Status } from '../collection/index.svelte.js';
+	import type { Status } from '../collection/types.js';
 
 	let {
 		status = 'ready',

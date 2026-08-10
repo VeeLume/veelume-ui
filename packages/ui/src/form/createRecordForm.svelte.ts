@@ -11,7 +11,7 @@
  * user meant to change.
  */
 
-import type { KitError } from '../collection/index.svelte.js';
+import type { KitError } from '../collection/types.js';
 
 export type RecordFormIO<T> = {
 	/** The record being edited, or undefined while it loads. */

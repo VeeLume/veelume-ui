@@ -27,8 +27,6 @@ import type {
 	WorkingSet
 } from './types.js';
 
-export * from './types.js';
-
 const DEFAULT_KEY = '__single__';
 /**
  * Separator between a set key's scope part and query part. NUL cannot occur in

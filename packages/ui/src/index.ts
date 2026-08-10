@@ -149,7 +149,13 @@ export { StatusBadge, resolveStatus } from './badge/index.js';
 export type { StatusMap, StatusStyle, StatusTone } from './badge/index.js';
 
 // ── L2: surface parts ──────────────────────────────────────────────────────
-export { Surface, createSurface, createWorkset, isGroupHeader } from './surface/index.js';
+export {
+	Surface,
+	createSurface,
+	createWorkset,
+	getSurfaceContext,
+	isGroupHeader
+} from './surface/index.js';
 export type { Workset, WorksetTab } from './surface/index.js';
 export type {
 	FacetDef,
@@ -176,7 +182,7 @@ export { breakpoints } from './theme/breakpoints.svelte.js';
 // paid the update tax on every publish — measured at ~1 ms per rendered row
 // per fill during an order switch. Neutral below its threshold.
 export { createWindow } from './window/index.svelte.js';
-export type { ListWindow, WindowOptions } from './window/index.svelte.js';
+export type { ListWindow, ScrollToOptions, WindowOptions } from './window/index.svelte.js';
 
 // ── L1: browse state ───────────────────────────────────────────────────────
 export { createBrowseState } from './browse/index.js';
@@ -199,19 +205,25 @@ export type { HttpCall, HttpIOOptions, HttpRoutes, SseOptions } from './collecti
 // channel in time instead of space, so waking carries the same obligation.
 export { wakeInvalidation } from './collection/wake.js';
 export type { WakeOptions } from './collection/wake.js';
+export type { Collection } from './collection/index.svelte.js';
+// The type spine, from its real path — `index.svelte.ts` is implementation,
+// not a barrel. `SetQuery`/`FetchRequest`/`FetchPage` are public so an app can
+// tune a query's cap and write a typed custom `CollectionIO`.
 export type {
-	Collection,
 	CollectionIO,
 	CollectionOptions,
 	ChangeInfo,
 	Entry,
+	FetchPage,
+	FetchRequest,
 	KitError,
 	ScopedView,
+	SetQuery,
 	Status,
 	Unsubscribe,
 	WriteIO,
 	WriteSemantics
-} from './collection/index.svelte.js';
+} from './collection/types.js';
 
 // ── L1: context ────────────────────────────────────────────────────────────
 export {

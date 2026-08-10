@@ -46,6 +46,9 @@ export const Surface = {
 };
 
 export { createSurface } from './pipeline.svelte.js';
+// The read half only — Root owns `set`, exactly like the shell/settings twins.
+// This is the seam an app-authored Surface part reads from.
+export { getSurfaceContext } from './context.js';
 export { createWorkset } from './workset.svelte.js';
 export type { Workset, WorksetTab } from './workset.svelte.js';
 export type { Surface as SurfaceState } from './pipeline.svelte.js';
