@@ -79,6 +79,14 @@ pub struct Edition {
     pub author: String,
     pub year: i32,
     pub format: String,
+    /// Comparable attributes. Deliberately a MIX of directions, because that is
+    /// what `Compare`'s `better` has to be exercised against: pages is neutral
+    /// (longer is not worse), price is better lower, rating is better higher.
+    /// Cents rather than a float for the same reason the loans fine is —
+    /// money in the record, euros in the UI, via `NumberInput`'s `scale`.
+    pub pages: i32,
+    pub price_cents: i32,
+    pub rating: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -117,13 +125,21 @@ fn seed_editions() -> Vec<Edition> {
         // 1–3 editions per work, so leaf rows and bundle rows both occur.
         let n = (w % 3) + 1;
         for e in 0..n {
+            // Deterministic, and spread so no two works tie on everything —
+            // a comparison table where every column has the same winner
+            // demonstrates nothing.
+            let wi = w as i32;
+            let ei = e as i32;
             out.push(Edition {
                 id: format!("ed-{w}-{e}"),
                 work_id: format!("work-{w}"),
                 work_title: (*title).into(),
                 author: AUTHORS[w % AUTHORS.len()].into(),
-                year: 1969 + (w as i32) * 3 + e as i32,
+                year: 1969 + wi * 3 + ei,
                 format: FORMATS[e % FORMATS.len()].into(),
+                pages: 180 + (wi * 37) % 320 + ei * 12,
+                price_cents: 799 + (wi * 143) % 1900 + ei * 250,
+                rating: 3.0 + f64::from((wi * 7 + ei * 3) % 21) / 10.0,
             });
         }
     }

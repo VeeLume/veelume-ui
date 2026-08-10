@@ -84,6 +84,12 @@ export type LabelBag = {
 	 *  percentage a moving target. */
 	stepCount: (a: { step: number; total: number }) => string;
 
+	// ── compare ──────────────────────────────────────────────────────────────
+	/** The matrix's corner cell, naming the attribute column. */
+	attribute: () => string;
+	/** Nothing selected to compare yet. */
+	compareEmpty: () => string;
+
 	// ── workbench tabs ───────────────────────────────────────────────────────
 	/** Accessible name for a tab's close button. */
 	tabClose: () => string;
@@ -147,6 +153,8 @@ export const defaultLabels: LabelBag = {
 
 	expandRow: () => 'Expand',
 	collapseRow: () => 'Collapse',
+	attribute: () => 'Attribute',
+	compareEmpty: () => 'Nothing to compare yet',
 	next: () => 'Next',
 	finish: () => 'Finish',
 	skip: () => 'Skip',

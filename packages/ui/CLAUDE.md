@@ -215,6 +215,26 @@ expire, concurrent writers are normal, and **events are lossy**.
   carries keys (`ChangeInfo.kind: 'delete'`) · neither, in which case the fill must reconcile
   the key interval it covered. Absence is only meaningful inside a range the server enumerated.
 
+### Compare — the third view of a working set
+
+A Split shows two entities interactively; `Compare` shows N of them aligned and read-only.
+
+- **Transposed** — attributes down as rows, entities across as columns. The other orientation
+  returns the reader to eye-alignment as soon as there are more than a handful of attributes,
+  which is exactly what two panes already fail at, so it would add nothing.
+- **`better` is opt-in per attribute, and only the winner is marked.** The kit cannot know
+  whether more pages is better; an attribute without a direction is rendered, never judged.
+  Ties for best mark every tied cell; a value that is the SAME across all entities marks
+  nothing, because "identical" is not a win. Strings never compete; `null` renders an em dash,
+  since absent is not zero.
+- **Placement is the app's**, like `Wizard`'s host: a mode over the detail region, a synthetic
+  tab, or a shareable `?compare=a,b,c` route. `entities` is a plain array, so the tab strip is
+  the natural feed but not a wiring — which is what lets one record be compared across two
+  snapshots, where no tabs exist.
+- Values go through the kit's formatter, so `format`/`scale` behave as everywhere else. ⚑ Pass
+  `useGrouping: false` for years — a locale-aware formatter will otherwise render 1984 as
+  `1.984`.
+
 ### Expand — the accordion row
 
 Shallow in-place structure (variant leaves, chains, region expanders) and the deep-read case.

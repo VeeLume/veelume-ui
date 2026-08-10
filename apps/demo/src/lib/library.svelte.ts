@@ -35,6 +35,13 @@ export type WorkRow = Row & {
 	wantCount: number;
 	total: number;
 	firstYear: number;
+	/** Comparable aggregates, invented HERE like `ownedCount` — no edition
+	 *  carries "the cheapest edition of this work". `Compare` therefore reads
+	 *  derived values, which is the case Starlume has too (cooked catalog
+	 *  stats, not raw records). */
+	pages: number;
+	cheapestCents: number;
+	rating: number;
 };
 
 /**
@@ -76,7 +83,10 @@ export function deriveWorks(src: { editions: Edition[]; shelf: ShelfEntry[] }): 
 			ownedCount,
 			wantCount,
 			total: members.length,
-			firstYear: first.year
+			firstYear: first.year,
+			pages: first.pages,
+			cheapestCents: Math.min(...members.map((m) => m.edition.price_cents)),
+			rating: Math.max(...members.map((m) => m.edition.rating))
 		});
 	}
 	return rows;

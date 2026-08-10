@@ -85,6 +85,14 @@ export {
 } from './notify/index.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
 
+// ── L2: compare ────────────────────────────────────────────────────────────
+// The third view of a working set: a Split shows two entities interactively,
+// this shows N aligned and read-only. Transposed (attributes down, entities
+// across) because the other orientation returns to eye-alignment and would add
+// nothing over two panes. Placement is the app's, like Wizard's host.
+export { Compare } from './compare/index.js';
+export type { CompareAttribute } from './compare/index.js';
+
 // ── L2: expand ─────────────────────────────────────────────────────────────
 // The accordion row: one anatomy filled by omission, per-row nesting, and an
 // expansion set that is deliberately NOT browse state — carets are transient

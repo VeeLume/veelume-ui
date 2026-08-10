@@ -51,13 +51,18 @@ function buildEditions(): Edition[] {
 		// 1–3 editions per work, so leaf rows and bundle rows both occur.
 		const n = (w % 3) + 1;
 		for (let e = 0; e < n; e++) {
+			// Same arithmetic as the Rust twin — the two transports must seed
+			// identically or a comparison would differ by backend.
 			out.push({
 				id: `ed-${w}-${e}`,
 				work_id: `work-${w}`,
 				work_title: title,
 				author,
 				year: 1969 + w * 3 + e,
-				format: FORMATS[e % FORMATS.length]
+				format: FORMATS[e % FORMATS.length],
+				pages: 180 + ((w * 37) % 320) + e * 12,
+				price_cents: 799 + ((w * 143) % 1900) + e * 250,
+				rating: 3.0 + ((w * 7 + e * 3) % 21) / 10.0
 			});
 		}
 	});

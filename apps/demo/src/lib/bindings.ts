@@ -212,7 +212,15 @@ export type AppSettings = {
  * Whether first-launch onboarding has been completed or skipped.
  */
 onboarding_completed: boolean }
-export type Edition = { id: string; work_id: string; work_title: string; author: string; year: number; format: string }
+export type Edition = { id: string; work_id: string; work_title: string; author: string; year: number; format: string; 
+/**
+ * Comparable attributes. Deliberately a MIX of directions, because that is
+ * what `Compare`'s `better` has to be exercised against: pages is neutral
+ * (longer is not worse), price is better lower, rating is better higher.
+ * Cents rather than a float for the same reason the loans fine is —
+ * money in the record, euros in the UI, via `NumberInput`'s `scale`.
+ */
+pages: number; price_cents: number; rating: number }
 /**
  * A stored row. Owns its strings — see the module note.
  */

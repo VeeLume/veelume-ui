@@ -44,6 +44,7 @@
 		{ path: '/gallery/split', label: 'Surface.Split' },
 		{ path: '/gallery/tabstrip', label: 'Surface.TabStrip' },
 		{ path: '/gallery/expand', label: 'Expand' },
+		{ path: '/gallery/compare', label: 'Compare' },
 		{ path: '/gallery/form', label: 'RecordForm' },
 		{ path: '/gallery/number', label: 'NumberInput' },
 		{ path: '/gallery/shell-footer', label: 'Shell footers' },

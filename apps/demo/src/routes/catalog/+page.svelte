@@ -23,10 +23,10 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { Surface, Segmented, Expand, createExpansion } from '@veelume/ui';
+	import { Surface, Segmented, Expand, createExpansion, Compare, Button } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
-	import type { GroupDef } from '@veelume/ui';
+	import type { GroupDef, CompareAttribute } from '@veelume/ui';
 	import { editions, shelf, deriveWorks, toggleShelf, type WorkRow } from '$lib/library.svelte';
 	import { catalogWorkset } from '$lib/workset.svelte';
 
@@ -48,7 +48,13 @@
 		// worth sharing (the web tier's build-diff pages are this exact shape),
 		// and back closes the split before it closes the selection, which is
 		// the order you'd want.
-		below: { kind: 'one', default: '', narrows: false }
+		below: { kind: 'one', default: '', narrows: false },
+		// COMPARE — a mode over the detail region rather than a third pane. In
+		// the URL for the same reason as `below`: a comparison is a state worth
+		// sharing, and it is the shape the web tier's public build-diff pages
+		// want. `Compare` itself has no opinion on any of this — placement is
+		// the app's, like the Wizard's host.
+		compare: { kind: 'one', default: '', narrows: false }
 	});
 
 	// `many`: peeking at one work's editions has no business closing another's.
@@ -130,6 +136,49 @@
 	const below = $derived(browse.values.below || null);
 	const belowWork = $derived(below ? workByKey.get(below) : undefined);
 
+	// The working set IS the compare input — that is the whole reason the
+	// workbench was built first. `entities` stays a plain array, so the same
+	// component would serve "one work across two builds" with no tabs at all.
+	const comparing = $derived(browse.values.compare === 'tabs');
+	const compareEntities = $derived(
+		catalogWorkset.tabs.map((t) => workByKey.get(t.key)).filter((w): w is WorkRow => !!w)
+	);
+
+	const compareAttributes: CompareAttribute<WorkRow>[] = [
+		// Neutral: no `better`, because the kit cannot know that a longer book
+		// is a worse one — and a table asserting a winner on taste is lying.
+		// ⚑ `useGrouping: false` — a year is a number the formatter would
+		// happily render as "1.984" under de-DE. Every locale-aware readout has
+		// this trap; `format` is the escape hatch, so the fix is here and not a
+		// special case in the component.
+		{
+			key: 'year',
+			label: 'First published',
+			value: (w) => w.firstYear,
+			format: { useGrouping: false }
+		},
+		{ key: 'pages', label: 'Pages', value: (w) => w.pages },
+		{ key: 'editions', label: 'Editions', value: (w) => w.total },
+		// Declared directions — only these get a marked best value.
+		{
+			key: 'price',
+			label: 'Cheapest',
+			value: (w) => w.cheapestCents,
+			scale: 100,
+			format: { style: 'currency', currency: 'EUR' },
+			better: 'lower'
+		},
+		{
+			key: 'rating',
+			label: 'Rating',
+			value: (w) => w.rating,
+			format: { minimumFractionDigits: 1, maximumFractionDigits: 1 },
+			better: 'higher'
+		},
+		// Comparing an OVERLAY-derived value: owned exists only after the join.
+		{ key: 'owned', label: 'Owned', value: (w) => w.ownedCount, better: 'higher' }
+	];
+
 	function openWork(key: string) {
 		catalogWorkset.select(key);
 		browse.set('work', key);
@@ -167,7 +216,12 @@
 
 						     Both gestures, which is why the kit splits them: the caret
 						     peeks at the editions in place, the body opens the workbench.
-						     Supplying `onselect` is what separates them. -->
+						     Supplying `onselect` is what separates them.
+
+						     Double-click pins. `Expand.Row` names that prop for the
+						     EVENT rather than the meaning, so the row stays ignorant of
+						     the workbench — and the handler sits on the row's own
+						     button, where a dblclick belongs. -->
 						<div>
 							<Expand.Row
 								title={r.title}
@@ -176,6 +230,7 @@
 								ontoggle={() => expanded.toggle(r.key)}
 								selected={isSelected}
 								onselect={() => openWork(r.key)}
+								ondblclick={() => catalogWorkset.pin(r.key)}
 							>
 								{#snippet right()}
 									{#if r.badge}<span class="mr-2">{r.badge}</span>{/if}{r.trailing}
@@ -211,12 +266,28 @@
 					     double-click pins, ✕ closes-and-promotes-the-neighbour), the
 					     wiring is the app's — each callback writes app browse state,
 					     and OMITTING onbelow/onback would remove those controls. -->
-					<Surface.TabStrip
-						workset={catalogWorkset}
-						onactivate={(k) => browse.set('work', k ?? '')}
-						onback={() => browse.set('work', '')}
-						onbelow={(k) => browse.set('below', k)}
-					/>
+					<div class="flex items-end gap-2">
+						<div class="min-w-0 flex-1">
+							<Surface.TabStrip
+								workset={catalogWorkset}
+								onactivate={(k) => browse.set('work', k ?? '')}
+								onback={() => browse.set('work', '')}
+								onbelow={(k) => browse.set('below', k)}
+							/>
+						</div>
+						{#if catalogWorkset.tabs.length > 1}
+							<!-- The action that turns the working set into a comparison.
+							     It only exists with something to compare, which is why it
+							     is not a permanent control. -->
+							<Button
+								variant={comparing ? 'primary' : 'outline'}
+								class="mb-1 shrink-0"
+								onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
+							>
+								Compare {compareEntities.length}
+							</Button>
+						{/if}
+					</div>
 
 					{#snippet workPane(w: WorkRow, closable: boolean)}
 						<div class="min-h-0 flex-1 overflow-auto p-4">
@@ -276,35 +347,54 @@
 					     which is what makes over-under comparison usable, and
 					     stacking costs height rather than width — so unlike a
 					     side-by-side arrangement it needs no breakpoint gate. -->
-					<div class="flex min-h-0 flex-1 flex-col gap-3">
+					{#if comparing}
+						<!-- Compare REPLACES the panes rather than joining them: it is a
+						     different view of the same working set, not a third thing to
+						     read alongside two others. -->
 						<div
 							class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
 							       border-border bg-card"
 							class:rounded-tl-none={catalogWorkset.tabs.length > 0}
 						>
-							{#if activeWork}
-								{@render workPane(activeWork, false)}
-							{:else}
-								<div
-									class="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground"
-								>
-									<p>
-										Select a work to preview it here.<br />
-										Click previews · double-click pins · ⊟ opens a second pane below.
-									</p>
-								</div>
-							{/if}
+							<Compare
+								entities={compareEntities}
+								attributes={compareAttributes}
+								keyOf={(w) => w.key}
+								labelOf={(w) => w.title}
+								class="min-h-0 flex-1"
+							/>
 						</div>
-
-						{#if belowWork}
+					{:else}
+						<div class="flex min-h-0 flex-1 flex-col gap-3">
 							<div
 								class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
 								       border-border bg-card"
+								class:rounded-tl-none={catalogWorkset.tabs.length > 0}
 							>
-								{@render workPane(belowWork, true)}
+								{#if activeWork}
+									{@render workPane(activeWork, false)}
+								{:else}
+									<div
+										class="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground"
+									>
+										<p>
+											Select a work to preview it here.<br />
+											Click previews · double-click pins · ⊟ opens a second pane below.
+										</p>
+									</div>
+								{/if}
 							</div>
-						{/if}
-					</div>
+
+							{#if belowWork}
+								<div
+									class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
+									       border-border bg-card"
+								>
+									{@render workPane(belowWork, true)}
+								</div>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			{/snippet}
 		</Surface.Split>
