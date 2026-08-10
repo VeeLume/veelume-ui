@@ -83,7 +83,10 @@
 			if (va === null) return 1;
 			if (vb === null) return -1;
 			if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
-			return String(va).localeCompare(String(vb)) * dir;
+			// The FORMATTING locale, not the host's — ä/ö/ü collate differently
+			// under de vs en, and the host browser's locale is the one thing the
+			// kit promises never to consult.
+			return String(va).localeCompare(String(vb), kit.formattingLocale) * dir;
 		});
 	});
 

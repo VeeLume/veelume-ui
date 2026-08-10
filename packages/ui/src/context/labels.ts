@@ -161,7 +161,10 @@ export const defaultLabels: LabelBag = {
 	stepCount: ({ step, total }) => `Step ${step} of ${total}`,
 	tabClose: () => 'Close tab',
 	tabOpenBelow: () => 'Open below',
-	tabPreviewHint: () => 'preview · double-click to pin',
+	// "activate again", not "double-click": pinning is a rapid SECOND
+	// activation (click-click or Enter-twice), never a dblclick — the
+	// re-render recreates the element the browser counts clicks on.
+	tabPreviewHint: () => 'preview · activate again to pin',
 
 	settings: () => 'Settings',
 	selectCategory: () => 'Select a category',

@@ -208,7 +208,7 @@
 		<div class="flex items-baseline gap-2 px-3 pt-4 pb-1 text-sm font-semibold text-primary">
 			<span class="truncate">{h.label}</span>
 			<span class="shrink-0 text-xs font-normal tabular-nums text-muted-foreground"
-				>{h.rows.length}</span
+				>{kit.format.number(h.rows.length)}</span
 			>
 		</div>
 	{:else}
@@ -217,7 +217,7 @@
 			       tracking-wider text-muted-foreground uppercase"
 		>
 			<span class="truncate">{h.label}</span>
-			<span class="shrink-0 tabular-nums opacity-70">{h.rows.length}</span>
+			<span class="shrink-0 tabular-nums opacity-70">{kit.format.number(h.rows.length)}</span>
 		</div>
 	{/if}
 {/snippet}
