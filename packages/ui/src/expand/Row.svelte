@@ -30,7 +30,6 @@
 		ontoggle = undefined,
 		selected = false,
 		onselect = undefined,
-		ondblclick = undefined,
 		indent = 0,
 		gutter,
 		meta,
@@ -49,18 +48,15 @@
 		selected?: boolean;
 		/** Present = the body is a selection target and the caret is separate. */
 		onselect?: () => void;
-		/**
-		 * A second activation gesture on the body. Named for the EVENT, not for
-		 * a meaning: the workbench reads it as "pin", another surface might read
-		 * it as "open in place", and the row has no business knowing which.
-		 *
-		 * ⚑ It lives here rather than on a wrapper the consumer supplies
-		 * because the handler belongs on the interactive element — a `dblclick`
-		 * on a static `<div>` is an a11y defect the compiler correctly flags.
-		 * Known gap, shared with `Surface.TabStrip`: there is no keyboard
-		 * equivalent for this gesture anywhere yet.
+		/*
+		 * ⚑ There is deliberately NO `ondblclick`. It was added and removed
+		 * within a day: double-click cannot carry a gesture on a row whose
+		 * first click navigates, because the re-render recreates the element
+		 * the browser is counting clicks on and the pair never completes. The
+		 * workbench's promote-on-second-activation (`createWorkset.activate`)
+		 * rides `onselect` instead, which also gives keyboard users the gesture
+		 * for free.
 		 */
-		ondblclick?: () => void;
 		/**
 		 * Nesting depth. ⚑ Per-ROW indent, unlike a grouped list's, where depth
 		 * is uniform and lives on the surface — here a variant leaf sits under
@@ -177,7 +173,6 @@
 				class="flex min-w-0 flex-1 items-center gap-3 py-2 pr-2 text-left text-sm
 				       {selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}"
 				onclick={onselect}
-				{ondblclick}
 			>
 				{@render body()}
 			</button>
@@ -188,7 +183,6 @@
 				       {selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}"
 				aria-expanded={open}
 				onclick={anchoredToggle}
-				{ondblclick}
 			>
 				<span class="w-4 shrink-0 text-xs text-muted-foreground">{open ? '▾' : '▸'}</span>
 				{@render body()}

@@ -27,6 +27,10 @@ export function createWorkset() {
 	let pinned = $state<string[]>([]);
 	let preview = $state<string | null>(null);
 
+	/** For `activate`'s rapid-second-activation test. */
+	let lastKey: string | null = null;
+	let lastAt = 0;
+
 	const tabsOf = (): WorksetTab[] => [
 		...pinned.map((key) => ({ key, pinned: true })),
 		...(preview !== null && !pinned.includes(preview) ? [{ key: preview, pinned: false }] : [])
@@ -42,6 +46,30 @@ export function createWorkset() {
 		 *  anything else takes the single preview slot. Idempotent. */
 		select(key: string): void {
 			if (!pinned.includes(key)) preview = key;
+		},
+
+		/**
+		 * The row/tab gesture: preview on first activation, PIN on a rapid
+		 * second activation of the same key.
+		 *
+		 * ⚑ This replaces a `dblclick` handler, which cannot be relied on here.
+		 * The first click navigates (selection lives in the URL), the re-render
+		 * recreates the element the browser is counting clicks on, and the pair
+		 * never completes — so double-click-to-pin worked when scripted and
+		 * failed under a real double-click, which is exactly the shape of bug
+		 * synthetic events hide. Timing state survives the re-render because it
+		 * is state, not DOM.
+		 *
+		 * It also closes the a11y gap dblclick had: Enter twice on a focused
+		 * row now pins, because a keyboard activation is a click.
+		 */
+		activate(key: string, options: { doubleMs?: number } = {}): void {
+			const now = Date.now();
+			const rapid = lastKey === key && now - lastAt < (options.doubleMs ?? 400);
+			lastKey = key;
+			lastAt = now;
+			if (rapid) this.pin(key);
+			else this.select(key);
 		},
 
 		/** Promote the preview (or any key) to a pinned tab. Idempotent. */

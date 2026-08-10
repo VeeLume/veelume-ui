@@ -23,7 +23,7 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { Surface, Segmented, Expand, createExpansion, Compare, Button } from '@veelume/ui';
+	import { Surface, Segmented, Expand, createExpansion, Compare } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
 	import type { GroupDef, CompareAttribute } from '@veelume/ui';
@@ -54,7 +54,11 @@
 		// sharing, and it is the shape the web tier's public build-diff pages
 		// want. `Compare` itself has no opinion on any of this — placement is
 		// the app's, like the Wizard's host.
-		compare: { kind: 'one', default: '', narrows: false }
+		compare: { kind: 'one', default: '', narrows: false },
+		// List collapse — view state, so the URL, so a link can carry "give me
+		// the wide read". `replace` history: hiding the list is not a place you
+		// want the back button to walk through.
+		list: { kind: 'one', default: 'open', narrows: false, history: 'replace' }
 	});
 
 	// `many`: peeking at one work's editions has no business closing another's.
@@ -180,7 +184,10 @@
 	];
 
 	function openWork(key: string) {
-		catalogWorkset.select(key);
+		// `activate`, not `select`: a rapid second activation of the same row
+		// pins it. Replaces the dblclick that could not survive the navigation
+		// this very call triggers — and it works from the keyboard too.
+		catalogWorkset.activate(key);
 		browse.set('work', key);
 	}
 
@@ -195,7 +202,11 @@
 -->
 <div class="flex h-full min-h-0 flex-col">
 	<Surface.Root {descriptor} {browse} selected={active} class="min-h-0 flex-1 gap-0">
-		<Surface.Split class="p-3">
+		<Surface.Split
+			class="p-3"
+			collapsed={browse.values.list === 'closed'}
+			oncollapse={(next) => browse.set('list', next ? 'closed' : 'open')}
+		>
 			{#snippet list()}
 				<Surface.List {status}>
 					{#snippet headerLeading()}
@@ -218,10 +229,9 @@
 						     peeks at the editions in place, the body opens the workbench.
 						     Supplying `onselect` is what separates them.
 
-						     Double-click pins. `Expand.Row` names that prop for the
-						     EVENT rather than the meaning, so the row stays ignorant of
-						     the workbench — and the handler sits on the row's own
-						     button, where a dblclick belongs. -->
+						     Pinning rides `onselect` via `workset.activate`: a second
+						     activation of the same row promotes it. No dblclick, which
+						     could not survive the navigation the first click causes. -->
 						<div>
 							<Expand.Row
 								title={r.title}
@@ -230,7 +240,6 @@
 								ontoggle={() => expanded.toggle(r.key)}
 								selected={isSelected}
 								onselect={() => openWork(r.key)}
-								ondblclick={() => catalogWorkset.pin(r.key)}
 							>
 								{#snippet right()}
 									{#if r.badge}<span class="mr-2">{r.badge}</span>{/if}{r.trailing}
@@ -266,28 +275,38 @@
 					     double-click pins, ✕ closes-and-promotes-the-neighbour), the
 					     wiring is the app's — each callback writes app browse state,
 					     and OMITTING onbelow/onback would remove those controls. -->
-					<div class="flex items-end gap-2">
-						<div class="min-w-0 flex-1">
-							<Surface.TabStrip
-								workset={catalogWorkset}
-								onactivate={(k) => browse.set('work', k ?? '')}
-								onback={() => browse.set('work', '')}
-								onbelow={(k) => browse.set('below', k)}
-							/>
-						</div>
-						{#if catalogWorkset.tabs.length > 1}
-							<!-- The action that turns the working set into a comparison.
-							     It only exists with something to compare, which is why it
-							     is not a permanent control. -->
-							<Button
-								variant={comparing ? 'primary' : 'outline'}
-								class="mb-1 shrink-0"
-								onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
-							>
-								Compare {compareEntities.length}
-							</Button>
-						{/if}
-					</div>
+					<Surface.TabStrip
+						workset={catalogWorkset}
+						onactivate={(k) => browse.set('work', k ?? '')}
+						onback={() => browse.set('work', '')}
+						onbelow={(k) => browse.set('below', k)}
+					>
+						{#snippet trailing()}
+							{#if catalogWorkset.tabs.length > 1}
+								<!-- A VIRTUAL TAB, not a button: comparing is another way of
+								     looking at the working set, so it belongs in the same
+								     row as the tabs and reads as one of them — active state
+								     included. It carries no key, which is why the kit models
+								     it as a trailing slot rather than a workset entry. -->
+								<div
+									role="tab"
+									aria-selected={comparing}
+									class="flex shrink-0 items-center rounded-t-md border
+									       {comparing
+										? 'border-border border-b-card bg-card'
+										: 'border-transparent text-muted-foreground hover:text-foreground'}"
+								>
+									<button
+										type="button"
+										class="h-9 px-3 text-sm"
+										onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
+									>
+										⊞ Compare {compareEntities.length}
+									</button>
+								</div>
+							{/if}
+						{/snippet}
+					</Surface.TabStrip>
 
 					{#snippet workPane(w: WorkRow, closable: boolean)}
 						<div class="min-h-0 flex-1 overflow-auto p-4">

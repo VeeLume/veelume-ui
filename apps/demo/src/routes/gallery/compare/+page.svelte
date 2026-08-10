@@ -96,7 +96,7 @@
 
 	<Case
 		title="declared directions win, taste does not"
-		note="Only attributes with `better` get a marked best value: fire rate and damage highest, recoil and price lowest. Crew differs too but is NEUTRAL — the kit cannot know that more crew is better, and a table asserting a winner on taste would be lying. Only the winner is marked, never a ranking: the two ships tied at 7.250 € are simply not it. And when EVERY entity holds the same value, nothing is marked at all, because 'the same' is not a win."
+		note="Click an attribute label to SORT the columns by it — best-first, then reversed, then back to the given order, because a sort you cannot undo would destroy the app's ordering for the session. Only attributes with `better` get a marked best value: fire rate and damage highest, recoil and price lowest. Crew differs too but is NEUTRAL — the kit cannot know that more crew is better, and a table asserting a winner on taste would be lying. Only the winner is marked, never a ranking: the two ships tied at 7.250 € are simply not it. And when EVERY entity holds the same value, nothing is marked at all, because 'the same' is not a win."
 		frame={false}
 	>
 		<div class="rounded-lg border border-border bg-card">

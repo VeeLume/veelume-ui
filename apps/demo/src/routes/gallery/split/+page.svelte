@@ -2,6 +2,8 @@
 	import { Surface } from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
 	import { descriptor, staticBrowse } from '$lib/gallery/fixtures.svelte';
+
+	let collapsed = $state(false);
 </script>
 
 <div class="grid max-w-4xl gap-6">
@@ -10,6 +12,27 @@
 		The one place the layout opinion lives. Narrow the window to see the responsive half: on a phone
 		the list IS the page, and picking a record makes it step aside.
 	</p>
+
+	<Case
+		title="collapsible list"
+		note="The divider IS the control — a button in either pane would belong to that pane and compete with its contents, while the seam between them belongs to neither. Controlled like Switch, so whether the state is a URL param, a preference or page-local is the app's call; omit `oncollapse` and no divider renders at all. Scoped to `md:` and up, because below that the list and the record already take turns being the whole page."
+		frame={false}
+	>
+		<div class="h-56">
+			<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
+				<Surface.Split {collapsed} oncollapse={(next) => (collapsed = next)}>
+					{#snippet list()}<Surface.List status="ready" />{/snippet}
+					{#snippet detail()}
+						<div class="grid h-full place-items-center rounded-lg border border-border bg-card">
+							<p class="text-sm text-muted-foreground">
+								{collapsed ? 'Full width — the list is collapsed.' : 'Click the divider ‹'}
+							</p>
+						</div>
+					{/snippet}
+				</Surface.Split>
+			</Surface.Root>
+		</div>
+	</Case>
 
 	<Case title="list + detail — nothing selected" frame={false}>
 		<div class="h-56">

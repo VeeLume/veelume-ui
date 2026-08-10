@@ -42,19 +42,65 @@
 	type Cell = { text: string; best: boolean };
 
 	/**
+	 * Sorting the ENTITIES by one attribute — i.e. reordering columns from a
+	 * row. Internal state rather than a prop: the given order is the app's
+	 * (usually the tab order), and this is a transient way of looking at it,
+	 * the same argument that keeps expansion out of the URL.
+	 *
+	 * Three states, and the third is the point: a sort you cannot undo would
+	 * destroy the app's ordering for the rest of the session.
+	 */
+	let sortKey = $state<string | null>(null);
+	let reversed = $state(false);
+
+	function cycleSort(key: string) {
+		if (sortKey !== key) {
+			sortKey = key;
+			reversed = false;
+		} else if (!reversed) {
+			reversed = true;
+		} else {
+			sortKey = null;
+			reversed = false;
+		}
+	}
+
+	const ordered = $derived.by(() => {
+		const attr = attributes.find((a) => a.key === sortKey);
+		if (!attr) return entities;
+
+		// `better` decides which end leads: best-first is the useful default
+		// when a direction exists, ascending when it does not.
+		const descending = attr.better === 'higher';
+		const dir = (reversed ? -1 : 1) * (descending ? -1 : 1);
+
+		return [...entities].sort((a, b) => {
+			const va = attr.value(a);
+			const vb = attr.value(b);
+			// Missing values sink, in BOTH directions — a blank is not a winner
+			// and reversing should not promote it to one.
+			if (va === null && vb === null) return 0;
+			if (va === null) return 1;
+			if (vb === null) return -1;
+			if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+			return String(va).localeCompare(String(vb)) * dir;
+		});
+	});
+
+	/**
 	 * Rows are computed once per render rather than per cell, because finding
 	 * the best value needs the whole row anyway — and doing it in the template
 	 * would mean re-scanning every entity for every cell.
 	 */
 	const rows = $derived(
 		attributes.map((attr) => {
-			const raw = entities.map((e) => attr.value(e));
+			const raw = ordered.map((e) => attr.value(e));
 			const numeric = raw.map((v) => (typeof v === 'number' ? v : null));
 
 			// A winner needs a declared direction, at least two entities, and
 			// genuine disagreement. Otherwise nothing is marked.
 			let bestValue: number | null = null;
-			if (attr.better && entities.length > 1) {
+			if (attr.better && ordered.length > 1) {
 				const present = numeric.filter((v): v is number => v !== null);
 				if (present.length > 1) {
 					const min = Math.min(...present);
@@ -73,9 +119,11 @@
 				};
 			});
 
-			return { key: attr.key, label: attr.label, cells };
+			return { key: attr.key, label: attr.label, cells, sortable: true };
 		})
 	);
+
+	const marker = (key: string) => (sortKey !== key ? '' : reversed ? ' ↑' : ' ↓');
 </script>
 
 {#if entities.length === 0}
@@ -100,7 +148,7 @@
 					>
 						{kit.labels.attribute()}
 					</th>
-					{#each entities as entity (keyOf(entity))}
+					{#each ordered as entity (keyOf(entity))}
 						<th
 							class="sticky top-0 z-10 min-w-32 border-b border-l border-border bg-card px-3 py-2
 							       text-left font-medium"
@@ -113,13 +161,24 @@
 			<tbody>
 				{#each rows as row (row.key)}
 					<tr class="hover:bg-muted/40">
+						<!-- The attribute label IS the sort control: clicking a row
+						     reorders the COLUMNS by it. Cycles best-first → reversed →
+						     back to the app's order, because a sort you cannot undo
+						     would destroy the given ordering for the session. -->
 						<th
-							class="sticky left-0 z-10 border-b border-border bg-card px-3 py-2 text-left
-							       text-xs font-medium tracking-wider text-muted-foreground uppercase"
+							class="sticky left-0 z-10 border-b border-border bg-card p-0 text-left"
+							aria-sort={sortKey !== row.key ? 'none' : reversed ? 'ascending' : 'descending'}
 						>
-							{row.label}
+							<button
+								type="button"
+								class="w-full px-3 py-2 text-left text-xs font-medium tracking-wider uppercase
+								       hover:text-foreground {sortKey === row.key ? 'text-foreground' : 'text-muted-foreground'}"
+								onclick={() => cycleSort(row.key)}
+							>
+								{row.label}{marker(row.key)}
+							</button>
 						</th>
-						{#each row.cells as cell, i (keyOf(entities[i]))}
+						{#each row.cells as cell, i (keyOf(ordered[i]))}
 							<td
 								class="border-b border-l border-border px-3 py-2 tabular-nums
 								       {cell.best ? 'font-semibold text-primary' : ''}"

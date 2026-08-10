@@ -23,7 +23,7 @@
 	 * card's top edge. Pair with `rounded-tl-none` on the card while tabs
 	 * exist (see apps/demo's catalog).
 	 */
-	import { untrack } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 	import type { Workset } from './workset.svelte.js';
@@ -34,6 +34,7 @@
 		onactivate,
 		onback = undefined,
 		onbelow = undefined,
+		trailing,
 		class: klass = ''
 	}: {
 		workset: Workset;
@@ -49,6 +50,14 @@
 		onback?: () => void;
 		/** Open a key in the second pane. Omit and no split button renders. */
 		onbelow?: (key: string) => void;
+		/**
+		 * Pinned to the RIGHT of the strip, after a flexible gap — for things
+		 * that are part of the working set's chrome rather than of the set: a
+		 * compare tab, a layout toggle. Rendering them as a trailing tab rather
+		 * than a button elsewhere keeps every way of looking at the set in one
+		 * row, which is the whole point of a strip.
+		 */
+		trailing?: Snippet;
 		class?: string;
 	} = $props();
 
@@ -102,12 +111,17 @@
 					if (isActive) node.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 				}}
 			>
+				<!-- `activate`, not a dblclick: activating the previewed tab again
+				     pins it, and that gesture survives the re-render the first
+				     activation causes. See `createWorkset.activate`. -->
 				<button
 					type="button"
 					class="h-9 max-w-48 truncate pl-3 pr-1 text-sm {t.pinned ? '' : 'italic'}"
 					title={t.pinned ? label(t.key) : `${label(t.key)} — ${kit.labels.tabPreviewHint()}`}
-					onclick={() => onactivate(t.key)}
-					ondblclick={() => workset.pin(t.key)}
+					onclick={() => {
+						workset.activate(t.key);
+						onactivate(t.key);
+					}}
 				>
 					{label(t.key)}
 				</button>
@@ -134,5 +148,13 @@
 				</button>
 			</div>
 		{/each}
+		{#if trailing}
+			<!-- `ml-auto` rather than a spacer element: the trailing group sits
+			     right when there is room and simply follows the tabs when the
+			     strip is already overflowing, instead of being pushed off. -->
+			<div class="ml-auto flex shrink-0 items-end pl-2">
+				{@render trailing()}
+			</div>
+		{/if}
 	</div>
 {/if}

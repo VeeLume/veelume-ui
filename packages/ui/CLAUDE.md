@@ -231,6 +231,10 @@ A Split shows two entities interactively; `Compare` shows N of them aligned and 
   tab, or a shareable `?compare=a,b,c` route. `entities` is a plain array, so the tab strip is
   the natural feed but not a wiring — which is what lets one record be compared across two
   snapshots, where no tabs exist.
+- **Clicking an attribute sorts the COLUMNS by it** — best-first, then reversed, then back to
+  the given order. The third state is the point: the entity order is the app's (usually tab
+  order), so a sort you cannot undo would destroy it for the session. Missing values sink in
+  both directions, because reversing must not promote a blank to a winner.
 - Values go through the kit's formatter, so `format`/`scale` behave as everywhere else. ⚑ Pass
   `useGrouping: false` for years — a locale-aware formatter will otherwise render 1984 as
   `1.984`.
@@ -275,7 +279,11 @@ prototype before any of it froze here.
   instance at the app's module scope — workspace state like expansion: survives navigation,
   never history. `TabStrip` reads active from the surface context and never stores it.
 - **Preview-vs-pinned is what stops tab garbage.** Click previews — ONE slot, replaced by
-  the next click; double-click pins. Closing returns the neighbour; the CONSUMER applies it
+  the next click; a rapid SECOND activation of the same key pins (`workset.activate`).
+  ⚑ **Not a `dblclick`**: the first click navigates, the re-render recreates the element the
+  browser counts clicks on, and the pair never completes — it worked when scripted and failed
+  under a real double-click, the exact shape of bug synthetic events hide. Timing state
+  survives because it is state, not DOM, and Enter-twice now pins for keyboard users too. Closing returns the neighbour; the CONSUMER applies it
   to the URL (`onactivate`). A closed item can come back via `history.back()` — the strip's
   URL sync re-materialises it as a preview, deliberately.
 - **The strip owns the URL→workset sync**, untracked with a plain-variable guard. ⚑ This is
@@ -286,6 +294,14 @@ prototype before any of it froze here.
 - **Gestures are the kit's, wiring is the app's** — each callback writes app browse state,
   and omission removes the control: no `onbelow`, no split button; no `onback`, no back
   button. An empty workset renders no strip at all.
+- **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
+  being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
+  entry precisely because it carries no key.
+- **`Split` collapses the list from the DIVIDER**, not from either pane: a control inside a
+  pane belongs to that pane and competes with its contents, while the seam belongs to neither
+  — the same containment argument that put search inside the list. Controlled, so the state's
+  home is the app's call; omit `oncollapse` and no divider renders. `md:`-scoped, because
+  below that the panes already take turns being the whole page.
 - **The second pane is a PROJECTION by key** (`byKey` reads ALL rows, pre-filter), stacked
   BELOW the first — stacking costs height, not width, so no breakpoint gates it. It is
   independent of the tab set and lives in its own URL param: a compare is a shareable
