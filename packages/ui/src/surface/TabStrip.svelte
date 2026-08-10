@@ -23,7 +23,7 @@
 	 * card's top edge. Pair with `rounded-tl-none` on the card while tabs
 	 * exist (see apps/demo's catalog).
 	 */
-	import { untrack, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 	import type { Workset } from './workset.svelte.js';
@@ -66,9 +66,60 @@
 
 	const label = (key: string) => (titleOf ? titleOf(key) : (s.byKey(key)?.title ?? key));
 
-	function close(key: string) {
+	// `$state` because the keydown handler reads it — a plain `let` assigned by
+	// `bind:this` never notifies, which svelte-check flags precisely because
+	// the read would silently see `undefined`.
+	let strip = $state<HTMLElement | undefined>(undefined);
+
+	/** The tabs' own focusable elements, in visual order. Queried rather than
+	 *  tracked in an array because the trailing slot's content is the app's and
+	 *  may legitimately be a tab too (the demo's Compare). */
+	const tabButtons = () => (strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : []);
+
+	function close(key: string, refocus = false) {
 		const next = workset.close(key);
 		if (s.selected === key) onactivate(next);
+		// Keyboard closes must land focus somewhere deliberate; a mouse close
+		// leaves focus where the pointer put it, which is already correct.
+		if (refocus) void tick().then(() => tabButtons()[0]?.focus());
+	}
+
+	/**
+	 * ⚑ Browser-tab keyboard semantics, and they are not decoration: this strip
+	 * already declares `role="tablist"`/`role="tab"`, which PROMISES arrow-key
+	 * navigation and a roving tabindex. Declaring the roles without the
+	 * interaction is worse than not declaring them — a screen reader announces
+	 * a tab list the keyboard then refuses to drive.
+	 *
+	 * Activation is MANUAL (arrows move focus, Enter/Space activate) rather
+	 * than automatic-on-focus. Automatic is the commoner tab pattern, but here
+	 * activation navigates and writes history, so arrowing across five tabs
+	 * would push five entries the back button then has to walk.
+	 */
+	function onkeydown(event: KeyboardEvent) {
+		const buttons = tabButtons();
+		const from = buttons.indexOf(document.activeElement as HTMLElement);
+		if (from < 0) return;
+
+		let to = -1;
+		if (event.key === 'ArrowRight') to = (from + 1) % buttons.length;
+		else if (event.key === 'ArrowLeft') to = (from - 1 + buttons.length) % buttons.length;
+		else if (event.key === 'Home') to = 0;
+		else if (event.key === 'End') to = buttons.length - 1;
+		else if (event.key === 'Delete') {
+			// The APG's gesture for a deletable tab. Ctrl+W is the browser's own
+			// and cannot be intercepted on the web at all — a desktop shell can
+			// bind it, which makes it the app's business rather than the kit's.
+			const key = buttons[from].dataset.tabKey;
+			if (key) {
+				event.preventDefault();
+				close(key, true);
+			}
+			return;
+		} else return;
+
+		event.preventDefault();
+		buttons[to]?.focus();
 	}
 
 	// The URL is the authority on ACTIVE; the workset follows. Guarded and
@@ -83,7 +134,16 @@
 </script>
 
 {#if workset.tabs.length > 0}
-	<div class="-mb-px flex items-end gap-1 overflow-x-auto {klass}" role="tablist">
+	<!-- `tabindex={-1}` on the list itself: the ROVING tabindex lives on the
+	     tabs, so the container must be focusable-by-script yet skipped by Tab —
+	     which is also what satisfies `tablist`'s focus contract. -->
+	<div
+		bind:this={strip}
+		class="-mb-px flex items-end gap-1 overflow-x-auto {klass}"
+		role="tablist"
+		tabindex={-1}
+		{onkeydown}
+	>
 		{#if onback}
 			<button
 				type="button"
@@ -101,8 +161,6 @@
 			     click, close-promotes-neighbour, back/forward — scrolls it into
 			     view when the strip overflows. -->
 			<div
-				role="tab"
-				aria-selected={isActive}
 				class="flex shrink-0 items-center rounded-t-md border
 				       {isActive
 					? 'border-border border-b-card bg-card'
@@ -111,23 +169,49 @@
 					if (isActive) node.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 				}}
 			>
-				<!-- `activate`, not a dblclick: activating the previewed tab again
+				<!-- `role="tab"` sits on the FOCUSABLE element, not the wrapper: a
+				     roving tabindex has to live where focus actually lands, and a
+				     role on a div that cannot take focus is the promise this strip
+				     was already breaking.
+
+				     `activate`, not a dblclick: activating the previewed tab again
 				     pins it, and that gesture survives the re-render the first
 				     activation causes. See `createWorkset.activate`. -->
 				<button
 					type="button"
+					role="tab"
+					aria-selected={isActive}
+					tabindex={isActive ? 0 : -1}
+					data-tab-key={t.key}
 					class="h-9 max-w-48 truncate pl-3 pr-1 text-sm {t.pinned ? '' : 'italic'}"
 					title={t.pinned ? label(t.key) : `${label(t.key)} — ${kit.labels.tabPreviewHint()}`}
 					onclick={() => {
 						workset.activate(t.key);
 						onactivate(t.key);
 					}}
+					onauxclick={(e) => {
+						// Middle click closes, as in every browser since tabs existed.
+						if (e.button === 1) {
+							e.preventDefault();
+							close(t.key);
+						}
+					}}
+					onmousedown={(e) => {
+						// Without this the middle button starts autoscroll, which
+						// leaves the page in scroll mode after the tab is gone.
+						if (e.button === 1) e.preventDefault();
+					}}
 				>
 					{label(t.key)}
 				</button>
+				<!-- The controls inside a tab are OUT of the tab order (`-1`):
+				     browser tabs behave the same way, and Delete on the focused tab
+				     is the keyboard path to closing. Otherwise every tab would cost
+				     three Tab presses to walk past. -->
 				{#if onbelow}
 					<button
 						type="button"
+						tabindex="-1"
 						class="grid size-5 place-items-center rounded-sm text-xs
 						       text-muted-foreground hover:bg-muted hover:text-foreground"
 						aria-label={kit.labels.tabOpenBelow()}
@@ -139,6 +223,7 @@
 				{/if}
 				<button
 					type="button"
+					tabindex="-1"
 					class="mr-1 grid size-5 place-items-center rounded-sm text-xs
 					       text-muted-foreground hover:bg-muted hover:text-foreground"
 					aria-label={kit.labels.tabClose()}

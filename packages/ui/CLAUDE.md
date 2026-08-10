@@ -294,6 +294,17 @@ prototype before any of it froze here.
 - **Gestures are the kit's, wiring is the app's** — each callback writes app browse state,
   and omission removes the control: no `onbelow`, no split button; no `onback`, no back
   button. An empty workset renders no strip at all.
+- **⚑ Tabs follow BROWSER-TAB convention, and the roles oblige it.** The strip declares
+  `role="tablist"`/`role="tab"`, which promises arrow-key navigation and a roving tabindex —
+  declaring the roles without the interaction is worse than not declaring them, because a
+  screen reader then announces a tab list the keyboard refuses to drive. So: arrows move
+  focus, Home/End jump, **Delete closes** (the APG gesture; Ctrl+W belongs to the browser and
+  a desktop shell can bind it, which makes it the app's), **middle-click closes** as it has
+  in every browser since tabs existed, and activation is **manual** (Enter/Space) rather than
+  automatic-on-focus, because activation navigates and arrowing across five tabs would push
+  five history entries. `role="tab"` sits on the FOCUSABLE button, never a wrapper — a role
+  on a non-focusable div silently drops out of the keyboard order. Controls INSIDE a tab are
+  `tabindex="-1"`, like a browser's close button, or every tab would cost three Tab presses.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.

@@ -289,15 +289,22 @@
 								     included. It carries no key, which is why the kit models
 								     it as a trailing slot rather than a workset entry. -->
 								<div
-									role="tab"
-									aria-selected={comparing}
 									class="flex shrink-0 items-center rounded-t-md border
 									       {comparing
 										? 'border-border border-b-card bg-card'
 										: 'border-transparent text-muted-foreground hover:text-foreground'}"
 								>
+									<!-- `role="tab"` on the BUTTON, matching the kit's own tabs:
+									     the strip's arrow-key navigation focuses whatever carries
+									     the role, so a role on a non-focusable div silently drops
+									     out of the keyboard order. `tabindex="-1"` because the
+									     roving 0 belongs to the selected record tab — arrow keys
+									     focus explicitly and ignore it. -->
 									<button
 										type="button"
+										role="tab"
+										aria-selected={comparing}
+										tabindex="-1"
 										class="h-9 px-3 text-sm"
 										onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
 									>
