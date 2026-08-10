@@ -75,11 +75,19 @@
 		<!-- The divider IS the control. A button in either pane's chrome would
 		     belong to that pane and compete with its contents; the seam between
 		     them belongs to neither, which is the same containment argument that
-		     put search inside the list. Hidden below `md` with the split. -->
-		<div class="hidden shrink-0 items-center md:flex">
+		     put search inside the list. Hidden below `md` with the split.
+
+		     ⚑ It reads as a real control, not a hairline. The first version was a
+		     12px strip with a bare chevron and Valerie could not find it — "we
+		     still need a collapse button somewhere". A seam is the right PLACE
+		     and was the wrong WEIGHT: it now carries a bordered handle on a
+		     visible rule, which is what a splitter looks like everywhere else. -->
+		<div class="relative hidden w-4 shrink-0 items-center justify-center md:flex">
+			<div class="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-border"></div>
 			<button
 				type="button"
-				class="grid h-16 w-3 place-items-center rounded-full text-xs text-muted-foreground
+				class="relative grid size-6 place-items-center rounded-full border border-border
+				       bg-background text-xs text-muted-foreground shadow-xs transition-colors
 				       hover:bg-muted hover:text-foreground"
 				aria-label={collapsed ? kit.labels.showList() : kit.labels.hideList()}
 				title={collapsed ? kit.labels.showList() : kit.labels.hideList()}

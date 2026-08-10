@@ -38,6 +38,7 @@
 	let {
 		action = undefined,
 		leading,
+		panel,
 		class: klass = ''
 	}: {
 		/**
@@ -48,13 +49,18 @@
 		action?: Action;
 		/** Before the filter button — a segmented control, a scope chip. */
 		leading?: Snippet;
+		/** Extra controls inside the FILTER PANEL — see `FilterButton.panel`.
+		 *  Prefer this over `leading` for view options: the header's width
+		 *  belongs to search, and a control there costs the list every time it
+		 *  renders, whether or not anyone is adjusting the view. */
+		panel?: Snippet;
 		class?: string;
 	} = $props();
 
 	const s = getSurfaceContext();
 	const kit = getKitContext();
 
-	const filterable = $derived(s.facets.length > 0 || s.sorts.length > 0);
+	const filterable = $derived(s.facets.length > 0 || s.sorts.length > 0 || !!panel);
 	const show = $derived(s.searchable || filterable || !!action || !!leading);
 	const Icon = $derived(action?.icon as IconOf | undefined);
 </script>
@@ -63,7 +69,7 @@
 	<Bar class={klass}>
 		{#if leading}{@render leading()}{/if}
 
-		{#if filterable}<FilterButton />{/if}
+		{#if filterable}<FilterButton {panel} />{/if}
 
 		{#if s.searchable}
 			<!-- Pinned to h-9 rather than the density target: at comfortable density a

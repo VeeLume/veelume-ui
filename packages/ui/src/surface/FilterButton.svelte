@@ -12,11 +12,27 @@
 	 * The badge is the active-filter count, which is also the reason the panel can
 	 * be hidden by default: a narrowed list must never look like an unnarrowed one.
 	 */
+	import type { Snippet } from 'svelte';
 	import Popup from '../popup/Popup.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 
-	let { class: klass = '' }: { class?: string } = $props();
+	let {
+		panel,
+		class: klass = ''
+	}: {
+		/**
+		 * App-supplied controls for the panel — VIEW options the descriptor
+		 * cannot model, like a grouping toggle.
+		 *
+		 * Rendered with sort and before the facets, because the panel reads in
+		 * two halves: how the list is ARRANGED (sort, grouping), then what it is
+		 * NARROWED to (facets). A view control in the header would compete with
+		 * search for the width the list actually needs.
+		 */
+		panel?: Snippet;
+		class?: string;
+	} = $props();
 
 	const s = getSurfaceContext();
 	const kit = getKitContext();
@@ -72,6 +88,10 @@
 					</label>
 				{/each}
 			</div>
+		{/if}
+
+		{#if panel}
+			<div class="mb-3">{@render panel()}</div>
 		{/if}
 
 		{#each s.facets as f (f.id)}

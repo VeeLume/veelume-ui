@@ -227,6 +227,9 @@ A Split shows two entities interactively; `Compare` shows N of them aligned and 
   Ties for best mark every tied cell; a value that is the SAME across all entities marks
   nothing, because "identical" is not a win. Strings never compete; `null` renders an em dash,
   since absent is not zero.
+- **A compare view is a TAB, not a toggle** — activating any record must leave it, and in ONE
+  navigation (`browse.setMany`). Two `set` calls make "record selected, compare still open" a
+  real state the back button can land on.
 - **Placement is the app's**, like `Wizard`'s host: a mode over the detail region, a synthetic
   tab, or a shareable `?compare=a,b,c` route. `entities` is a plain array, so the tab strip is
   the natural feed but not a wiring — which is what lets one record be compared across two
@@ -305,6 +308,11 @@ prototype before any of it froze here.
   five history entries. `role="tab"` sits on the FOCUSABLE button, never a wrapper — a role
   on a non-focusable div silently drops out of the keyboard order. Controls INSIDE a tab are
   `tabindex="-1"`, like a browser's close button, or every tab would cost three Tab presses.
+- **The split control is revealed on hover, or kept on the ACTIVE tab** — a control repeated
+  on every tab reads as noise past three of them, and splitting is a deliberate act rather
+  than a per-tab affordance (browser tabs treat their close button the same way). Toggled by
+  OPACITY at a fixed size, never by width: an animated width reflows the strip under the
+  pointer you are aiming with.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.

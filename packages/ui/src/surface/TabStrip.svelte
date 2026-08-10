@@ -161,7 +161,7 @@
 			     click, close-promotes-neighbour, back/forward — scrolls it into
 			     view when the strip overflows. -->
 			<div
-				class="flex shrink-0 items-center rounded-t-md border
+				class="group flex shrink-0 items-center rounded-t-md border
 				       {isActive
 					? 'border-border border-b-card bg-card'
 					: 'border-transparent text-muted-foreground hover:text-foreground'}"
@@ -209,11 +209,19 @@
 				     is the keyboard path to closing. Otherwise every tab would cost
 				     three Tab presses to walk past. -->
 				{#if onbelow}
+					<!-- ⚑ Revealed on hover, or kept on the ACTIVE tab. A control
+					     repeated on every tab reads as noise the moment there are
+					     more than three, and splitting is a deliberate act rather
+					     than a per-tab affordance. Browser tabs treat their close
+					     button the same way. `w-0`, not `hidden`, so revealing it
+					     does not reflow the strip under the pointer. -->
 					<button
 						type="button"
 						tabindex="-1"
-						class="grid size-5 place-items-center rounded-sm text-xs
-						       text-muted-foreground hover:bg-muted hover:text-foreground"
+						class="grid size-5 place-items-center rounded-sm text-xs text-muted-foreground
+						       transition-opacity hover:bg-muted hover:text-foreground
+						       group-hover:pointer-events-auto group-hover:opacity-100
+						       {isActive ? 'opacity-100' : 'pointer-events-none opacity-0'}"
 						aria-label={kit.labels.tabOpenBelow()}
 						title={kit.labels.tabOpenBelow()}
 						onclick={() => onbelow(t.key)}

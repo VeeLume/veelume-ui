@@ -37,6 +37,7 @@
 		onselect,
 		header,
 		headerLeading,
+		headerPanel,
 		row,
 		group,
 		empty,
@@ -83,6 +84,9 @@
 		header?: Snippet;
 		/** Prepend to the default header, keeping search and filters. */
 		headerLeading?: Snippet;
+		/** Extra controls inside the filter panel — view options like a grouping
+		 *  toggle, which would otherwise eat the header width search needs. */
+		headerPanel?: Snippet;
 		/** Replace the default row rendering entirely. */
 		row?: Snippet<[R, boolean]>;
 		/** Replace the default section header — for aggregates the default
@@ -260,7 +264,7 @@
 	{#if header}
 		{@render header()}
 	{:else}
-		<ListHeader {action} leading={headerLeading} />
+		<ListHeader {action} leading={headerLeading} panel={headerPanel} />
 	{/if}
 
 	{#if s.narrowing}

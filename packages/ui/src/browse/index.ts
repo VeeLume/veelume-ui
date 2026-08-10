@@ -159,6 +159,23 @@ export function createBrowseState<Spec extends BrowseSpec>(spec: Spec) {
 			apply({ [key]: value } as never, historyOf(spec[key]));
 		},
 
+		/**
+		 * Several fields in ONE navigation.
+		 *
+		 * ⚑ Not sugar: two `set` calls are two history entries and two renders,
+		 * and the intermediate state is a real state the user can land on with
+		 * the back button — "record selected, compare still open" is exactly the
+		 * incoherence this exists to prevent. Any change that is one gesture
+		 * must be one navigation.
+		 *
+		 * History is `push` when ANY touched field pushes, because the entry is
+		 * worth keeping if any part of it was.
+		 */
+		setMany(values: Partial<{ [K in keyof Spec]: ValueOf<Spec[K]> }>): void {
+			const modes = Object.keys(values).map((k) => historyOf(spec[k]));
+			apply(values as never, modes.includes('push') ? 'push' : 'replace');
+		},
+
 		/** Add/remove one option of a `many` facet. */
 		toggle<K extends keyof Spec & string>(key: K, option: string): void {
 			const field = spec[key];

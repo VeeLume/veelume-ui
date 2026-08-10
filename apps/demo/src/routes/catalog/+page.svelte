@@ -188,7 +188,11 @@
 		// pins it. Replaces the dblclick that could not survive the navigation
 		// this very call triggers — and it works from the keyboard too.
 		catalogWorkset.activate(key);
-		browse.set('work', key);
+		// ⚑ ONE navigation, both fields: compare is a TAB, so activating a record
+		// leaves it — and via `setMany`, because two `set` calls would make
+		// "record selected, compare still open" a real state the back button
+		// could land on.
+		browse.setMany({ work: key, compare: '' });
 	}
 
 	const symbol = { owned: '●', want: '♡', none: '○' } as const;
@@ -209,7 +213,10 @@
 		>
 			{#snippet list()}
 				<Surface.List {status}>
-					{#snippet headerLeading()}
+					{#snippet headerPanel()}
+						<!-- Grouping is a VIEW option, so it rides in the filter panel
+						     beside sort rather than eating header width search needs. -->
+						<div class="mb-1 text-xs font-medium text-muted-foreground">Group</div>
 						<Segmented
 							options={[
 								{ value: 'author', label: 'By author' },
@@ -277,7 +284,7 @@
 					     and OMITTING onbelow/onback would remove those controls. -->
 					<Surface.TabStrip
 						workset={catalogWorkset}
-						onactivate={(k) => browse.set('work', k ?? '')}
+						onactivate={(k) => browse.setMany({ work: k ?? '', compare: '' })}
 						onback={() => browse.set('work', '')}
 						onbelow={(k) => browse.set('below', k)}
 					>
