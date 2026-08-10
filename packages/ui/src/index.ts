@@ -55,6 +55,7 @@ export {
 	TimeInput,
 	Switch,
 	Segmented,
+	RadioGroup,
 	createRecordForm,
 	sectionsOf
 } from './form/index.js';
@@ -133,7 +134,7 @@ export type { StoredValue } from './stored/index.svelte.js';
 // bar for work whose completion is reportable — `value` absent is the
 // indeterminate state, not a mode. A list that is loading uses Surface.List's
 // own states instead.
-export { Loading, Progress } from './loading/index.js';
+export { Loading, Progress, Placeholder } from './loading/index.js';
 
 // ── L2: popup ──────────────────────────────────────────────────────────────
 // The anchored-panel base: outside click, Escape, focus return, position

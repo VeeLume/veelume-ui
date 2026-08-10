@@ -23,11 +23,28 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { Surface, Expand, createExpansion, Compare } from '@veelume/ui';
-	import { createBrowseState } from '@veelume/ui';
-	import { getKitContext } from '@veelume/ui';
+	import {
+		Surface,
+		Expand,
+		createExpansion,
+		Compare,
+		RadioGroup,
+		Placeholder,
+		DetailHeader,
+		Button,
+		createBrowseState,
+		getKitContext
+	} from '@veelume/ui';
 	import type { GroupDef, CompareAttribute } from '@veelume/ui';
-	import { editions, shelf, deriveWorks, toggleShelf, type WorkRow } from '$lib/library.svelte';
+	import {
+		editions,
+		shelf,
+		deriveWorks,
+		toggleShelf,
+		type WorkRow,
+		type ShelfState
+	} from '$lib/library.svelte';
+	import type { Edition } from '$lib/fixtures/library';
 	import { catalogWorkset } from '$lib/workset.svelte';
 
 	const kit = getKitContext();
@@ -195,102 +212,83 @@
 		browse.setMany({ work: key, compare: '' });
 	}
 
-	const symbol = { owned: '●', want: '♡', none: '○' } as const;
-	const nextLabel = { owned: 'Mark as wanted', want: 'Remove from shelf', none: 'Mark as owned' };
+	// Domain data, which is the only thing this page should be defining.
+	const SHELF_SYMBOL = { owned: '●', want: '♡', none: '○' } as const;
+	const NEXT_SHELF_LABEL = {
+		owned: 'Mark as wanted',
+		want: 'Remove from shelf',
+		none: 'Mark as owned'
+	} as const;
+	const GROUPINGS = [
+		{ value: 'author', label: 'By author' },
+		{ value: 'none', label: 'Flat' }
+	];
+
+	/** Tabs sit above the first pane, so it squares its top-left corner. */
+	const tabbed = () => catalogWorkset.tabs.length > 0;
 </script>
 
 <!--
 	Configuration A — no toolbar. The catalog has no chrome that belongs to
 	neither pane, so it has no page bar: search and filters ride in the list's own
 	header, and the 56px a toolbar would have cost goes to rows instead.
+
+	⚑ Everything below is COMPOSITION plus DATA. No element in this file styles
+	anything — the demo exists to exercise the kit, so a class string here would
+	be a bug report about a missing part.
 -->
-<div class="flex h-full min-h-0 flex-col">
-	<Surface.Root
-		{descriptor}
-		{browse}
-		selected={active}
-		collapsed={browse.values.list === 'closed'}
-		oncollapse={(next) => browse.set('list', next ? 'closed' : 'open')}
-		class="min-h-0 flex-1 gap-0"
-	>
-		<Surface.Split class="p-3">
-			{#snippet list()}
-				<Surface.List {status}>
-					{#snippet headerPanel()}
-						<!-- Grouping is a VIEW option, so it rides in the filter panel
-						     beside sort rather than eating header width search needs —
-						     and it renders as RADIOS, because the panel's other
-						     one-of-many choice does. A segmented control beside a radio
-						     list makes two identical decisions look like different
-						     kinds of thing. -->
-						<div class="mb-1 text-xs font-medium text-muted-foreground">Group</div>
-						{#each [{ value: 'author', label: 'By author' }, { value: 'none', label: 'Flat' }] as opt (opt.value)}
-							<label class="flex items-center gap-2 py-1 text-sm">
-								<input
-									type="radio"
-									checked={browse.values.group === opt.value}
-									onchange={() => browse.set('group', opt.value)}
-								/>
-								{opt.label}
-							</label>
+<Surface.Root
+	{descriptor}
+	{browse}
+	selected={active}
+	collapsed={browse.values.list === 'closed'}
+	oncollapse={(next) => browse.set('list', next ? 'closed' : 'open')}
+>
+	<Surface.Split>
+		{#snippet list()}
+			<Surface.List {status}>
+				{#snippet headerPanel()}
+					<!-- A view option, so it rides in the filter panel beside sort
+					     rather than eating the header width search needs — and through
+					     the same RadioGroup the panel renders sort with, so two
+					     identical one-of-many choices cannot start looking different. -->
+					<RadioGroup
+						label="Group"
+						options={GROUPINGS}
+						value={browse.values.group}
+						onchange={(v) => browse.set('group', v)}
+					/>
+				{/snippet}
+				{#snippet row(r: WorkRow, isSelected: boolean)}
+					<!-- Both gestures, which is why the kit splits them: the caret peeks
+					     at the editions in place, the body opens the workbench. Pinning
+					     rides `onselect` via `workset.activate` — a second activation of
+					     the same row promotes it. -->
+					<Expand.Row
+						title={r.title}
+						subtitle="{r.author} · {kit.format.number(r.total)} editions · from {r.firstYear}"
+						open={expanded.has(r.key)}
+						ontoggle={() => expanded.toggle(r.key)}
+						selected={isSelected}
+						onselect={() => openWork(r.key)}
+					>
+						{#snippet right()}{r.badge ?? ''} {r.trailing}{/snippet}
+						<!-- The expansion is NESTED ROWS, not a bespoke list: leaves are
+						     the same component one level in. -->
+						{#each r.members as m (m.edition.id)}
+							{@render editionRow(m, 1)}
 						{/each}
-					{/snippet}
-					{#snippet row(r: WorkRow, isSelected: boolean)}
-						<!-- No scroll-into-view attachment here any more: `Surface.List`
-						     follows selection itself via `win.scrollTo`, which is the only
-						     way it can work above the windowing threshold — where the
-						     target row may not be in the DOM to scroll to at all.
+					</Expand.Row>
+				{/snippet}
+			</Surface.List>
+		{/snippet}
 
-						     Both gestures, which is why the kit splits them: the caret
-						     peeks at the editions in place, the body opens the workbench.
-						     Supplying `onselect` is what separates them.
-
-						     Pinning rides `onselect` via `workset.activate`: a second
-						     activation of the same row promotes it. No dblclick, which
-						     could not survive the navigation the first click causes. -->
-						<div>
-							<Expand.Row
-								title={r.title}
-								subtitle="{r.author} · {kit.format.number(r.total)} editions · from {r.firstYear}"
-								open={expanded.has(r.key)}
-								ontoggle={() => expanded.toggle(r.key)}
-								selected={isSelected}
-								onselect={() => openWork(r.key)}
-							>
-								{#snippet right()}
-									{#if r.badge}<span class="mr-2">{r.badge}</span>{/if}{r.trailing}
-								{/snippet}
-								<!-- The expansion is NESTED ROWS, not a bespoke list: leaves are
-								     the same component one level in, so a variant can grow its
-								     own facts later without new markup. -->
-								{#each r.members as m (m.edition.id)}
-									<Expand.Row title={m.edition.format} indent={1}>
-										{#snippet gutter()}
-											<button
-												type="button"
-												class="grid size-6 place-items-center rounded border border-input
-												       bg-background text-xs hover:bg-muted"
-												title={nextLabel[m.state]}
-												onclick={() => toggleShelf(m.edition.id)}
-											>
-												{symbol[m.state]}
-											</button>
-										{/snippet}
-										{#snippet right()}{m.edition.year}{/snippet}
-									</Expand.Row>
-								{/each}
-							</Expand.Row>
-						</div>
-					{/snippet}
-				</Surface.List>
-			{/snippet}
-
-			{#snippet detail()}
-				<div class="flex h-full min-h-0 flex-col">
-					<!-- The kit's strip: gestures are its contract (click activates,
-					     double-click pins, ✕ closes-and-promotes-the-neighbour), the
-					     wiring is the app's — each callback writes app browse state,
-					     and OMITTING onbelow/onback would remove those controls. -->
+		{#snippet detail()}
+			<Surface.Panes>
+				{#snippet strip()}
+					<!-- Gestures are the kit's contract; the wiring is the app's — each
+					     callback writes app browse state, and omitting `onbelow`/`onback`
+					     would remove those controls. -->
 					<Surface.TabStrip
 						workset={catalogWorkset}
 						selected={comparing ? null : active}
@@ -300,11 +298,10 @@
 					>
 						{#snippet trailing()}
 							{#if catalogWorkset.tabs.length > 1}
-								<!-- A VIRTUAL TAB, not a button: comparing is another way of
-								     looking at the working set, so it belongs in the same
-								     row as the tabs and reads as one of them — active state
-								     included. It carries no key, which is why the kit models
-								     it as a trailing slot rather than a workset entry. -->
+								<!-- A virtual TAB, not a button: comparing is another way of
+								     looking at the working set, so it reads as one of them —
+								     active state included. It carries no key, which is why
+								     the kit models it as a trailing slot. -->
 								<Surface.Tab
 									active={comparing}
 									onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
@@ -314,115 +311,83 @@
 							{/if}
 						{/snippet}
 					</Surface.TabStrip>
+				{/snippet}
 
-					{#snippet workPane(w: WorkRow, closable: boolean)}
-						<div class="min-h-0 flex-1 overflow-auto p-4">
-							<div class="flex items-start gap-2">
-								<div class="min-w-0 flex-1">
-									<h2 class="truncate text-lg font-semibold">{w.title}</h2>
-									<p class="text-sm text-muted-foreground">
-										{w.author} · first published {w.firstYear}
-									</p>
-								</div>
-								{#if closable}
-									<button
-										type="button"
-										class="grid size-6 shrink-0 place-items-center rounded text-xs
-										       text-muted-foreground hover:bg-muted hover:text-foreground"
-										aria-label="Close pane"
-										onclick={() => browse.set('below', '')}
-									>
-										✕
-									</button>
-								{/if}
-							</div>
-							{#if !closable && !catalogWorkset.isPinned(w.key)}
-								<p class="mt-1 text-xs text-muted-foreground italic">
-									Preview — double-click the row or the tab to pin it
-								</p>
-							{/if}
+				{#if comparing}
+					<!-- Compare REPLACES the panes rather than joining them: a different
+					     view of the same working set, not a third thing to read beside
+					     two others. No PaneBody — Compare owns its scroll container,
+					     because its sticky axes depend on it. -->
+					<Surface.Pane tabbed={tabbed()}>
+						<Compare
+							entities={compareEntities}
+							attributes={compareAttributes}
+							keyOf={(w) => w.key}
+							labelOf={(w) => w.title}
+						/>
+					</Surface.Pane>
+				{:else}
+					<Surface.Pane tabbed={tabbed()}>
+						{#if activeWork}
+							{@render workPane(activeWork)}
+						{:else}
+							<Placeholder>
+								Select a work to preview it. Click previews, a second click pins, ⊟ opens a second
+								pane below.
+							</Placeholder>
+						{/if}
+					</Surface.Pane>
 
-							<h3
-								class="mt-4 mb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
-							>
-								Editions {w.ownedCount}/{w.total}
-							</h3>
-							<ul>
-								{#each w.members as m (m.edition.id)}
-									<li class="flex items-center gap-3 border-t border-border/50 py-1.5 text-sm">
-										<button
-											type="button"
-											class="grid size-6 shrink-0 place-items-center rounded border border-input
-											       bg-background hover:bg-muted"
-											title={nextLabel[m.state]}
-											onclick={() => toggleShelf(m.edition.id)}
-										>
-											{symbol[m.state]}
-										</button>
-										<span class="flex-1">{m.edition.format}</span>
-										<span class="tabular-nums text-muted-foreground">{m.edition.year}</span>
-									</li>
-								{/each}
-							</ul>
-						</div>
-					{/snippet}
-
-					<!-- The split, STACKED: pane 2 below pane 1, the split line
-					     horizontal, one tab strip for both — the working set is the
-					     surface's, not a pane's. Each pane scrolls independently,
-					     which is what makes over-under comparison usable, and
-					     stacking costs height rather than width — so unlike a
-					     side-by-side arrangement it needs no breakpoint gate. -->
-					{#if comparing}
-						<!-- Compare REPLACES the panes rather than joining them: it is a
-						     different view of the same working set, not a third thing to
-						     read alongside two others. -->
-						<div
-							class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
-							       border-border bg-card"
-							class:rounded-tl-none={catalogWorkset.tabs.length > 0}
-						>
-							<Compare
-								entities={compareEntities}
-								attributes={compareAttributes}
-								keyOf={(w) => w.key}
-								labelOf={(w) => w.title}
-								class="min-h-0 flex-1"
-							/>
-						</div>
-					{:else}
-						<div class="flex min-h-0 flex-1 flex-col gap-3">
-							<div
-								class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
-								       border-border bg-card"
-								class:rounded-tl-none={catalogWorkset.tabs.length > 0}
-							>
-								{#if activeWork}
-									{@render workPane(activeWork, false)}
-								{:else}
-									<div
-										class="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground"
-									>
-										<p>
-											Select a work to preview it here.<br />
-											Click previews · double-click pins · ⊟ opens a second pane below.
-										</p>
-									</div>
-								{/if}
-							</div>
-
-							{#if belowWork}
-								<div
-									class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border
-									       border-border bg-card"
-								>
-									{@render workPane(belowWork, true)}
-								</div>
-							{/if}
-						</div>
+					{#if belowWork}
+						<Surface.Pane>
+							{@render workPane(belowWork, () => browse.set('below', ''))}
+						</Surface.Pane>
 					{/if}
-				</div>
-			{/snippet}
-		</Surface.Split>
-	</Surface.Root>
-</div>
+				{/if}
+			</Surface.Panes>
+		{/snippet}
+	</Surface.Split>
+</Surface.Root>
+
+<!-- The record view: a header, the facts, and the editions as rows. Every part
+     of it is a kit part; what is app-specific is WHICH facts and which rows. -->
+{#snippet workPane(w: WorkRow, onclose?: () => void)}
+	<DetailHeader title={w.title} onback={onclose} backOnDesktop={!!onclose}>
+		{#snippet actions()}
+			{#if onclose}
+				<Button variant="ghost" size="icon" onclick={onclose} title="Close pane">✕</Button>
+			{/if}
+		{/snippet}
+	</DetailHeader>
+	<Surface.PaneBody>
+		<Expand.Facts
+			facts={[
+				{ label: 'Author', value: w.author },
+				{ label: 'First published', value: String(w.firstYear) },
+				{ label: 'Owned', value: `${w.ownedCount}/${w.total}` },
+				{ label: 'Rating', value: kit.format.number(w.rating, { minimumFractionDigits: 1 }) }
+			]}
+		/>
+		{#each w.members as m (m.edition.id)}
+			{@render editionRow(m)}
+		{/each}
+	</Surface.PaneBody>
+{/snippet}
+
+<!-- One edition, used by BOTH the list's expansion and the record pane — the
+     same component at two indents rather than two lists that drift. -->
+{#snippet editionRow(m: { edition: Edition; state: ShelfState }, indent = 0)}
+	<Expand.Row title={m.edition.format} {indent}>
+		{#snippet gutter()}
+			<Button
+				variant="outline"
+				size="icon"
+				title={NEXT_SHELF_LABEL[m.state]}
+				onclick={() => toggleShelf(m.edition.id)}
+			>
+				{SHELF_SYMBOL[m.state]}
+			</Button>
+		{/snippet}
+		{#snippet right()}{m.edition.year}{/snippet}
+	</Expand.Row>
+{/snippet}

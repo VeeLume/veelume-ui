@@ -255,7 +255,7 @@
 			{/snippet}
 		</Surface.Toolbar>
 
-		<Surface.Split class="p-3">
+		<Surface.Split>
 			{#snippet list()}
 				<!-- Tier ① for the LIST: the one thing you came to the list to start.
 				     It is not a surface action — it creates a row — so it rides here

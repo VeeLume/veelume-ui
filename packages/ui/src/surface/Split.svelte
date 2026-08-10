@@ -50,7 +50,10 @@
 	const listHidden = $derived(collapsed && !!detail);
 </script>
 
-<div class="relative flex min-h-0 flex-1 gap-3 {klass}">
+<!-- `p-3` is the surface gutter, not a caller decision: both demo surfaces
+     asked for exactly it, and the docked collapse handle sits IN it. Override
+     via `class` for a surface that is already inset. -->
+<div class="relative flex min-h-0 flex-1 gap-3 p-3 {klass}">
 	{#if list}
 		<div
 			class="flex min-h-0 w-full flex-col md:w-80 md:shrink-0 lg:w-96 {selected

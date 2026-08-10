@@ -136,7 +136,9 @@
 	<!-- The scroll container is the table's own, so many entities scroll
 	     sideways inside it rather than widening the page — the `min-w-0`
 	     lesson, applied where it belongs. -->
-	<div class="overflow-auto {klass}">
+	<!-- `min-h-0 flex-1` by default: a matrix lives in a pane and should fill it.
+	     Harmless outside a flex column, where both are ignored. -->
+	<div class="min-h-0 flex-1 overflow-auto {klass}">
 		<table class="w-full border-collapse text-sm">
 			<thead>
 				<tr>

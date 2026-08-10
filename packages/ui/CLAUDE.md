@@ -18,7 +18,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, `Surface.Tab`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, plus the workbench chrome `Surface.Tab/.Pane/.PaneBody/.Panes`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
@@ -565,6 +565,21 @@ Adding any of these is a design decision, not an oversight:
 - **In-memory browse state.** See above — it forecloses back/forward.
 - **A hand-rolled date picker.** bits-ui + `@internationalized/date` already handle locale,
   `hourCycle` and granularity.
+
+## The demo's standard
+
+**`apps/demo` may define DATA, never UI.** Descriptors, facets, sorts, groupings, compare
+attributes, domain maps, the derive — those are what exercise the kit. Anything else is a bug
+report about a missing part.
+
+The mechanical test is `class="` in a route file: a class string there means the app is
+styling something the kit should own. `/catalog` is the reference — **zero class attributes
+and zero raw elements**, and getting it there is what produced `Surface.Tab`, `.Pane`,
+`.PaneBody`, `.Panes`, `RadioGroup` and `Placeholder`, plus the surface gutter and the
+matrix's fill becoming defaults instead of things every caller passes.
+
+A layout hint passed to a kit part (`class="p-3"`) is the softer version of the same smell:
+if two surfaces pass the same one, it is a default the kit is refusing to have.
 
 ## Conventions
 

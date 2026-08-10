@@ -1,2 +1,3 @@
 export { default as Loading } from './Loading.svelte';
 export { default as Progress } from './Progress.svelte';
+export { default as Placeholder } from './Placeholder.svelte';

@@ -14,6 +14,7 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import Popup from '../popup/Popup.svelte';
+	import RadioGroup from '../form/RadioGroup.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 
@@ -75,19 +76,13 @@
 		class="w-72 p-3"
 	>
 		{#if s.sorts.length}
-			<div class="mb-3">
-				<div class="mb-1 text-xs font-medium text-muted-foreground">{kit.labels.sort()}</div>
-				{#each s.sorts as opt (opt.value)}
-					<label class="flex items-center gap-2 py-1 text-sm">
-						<input
-							type="radio"
-							checked={s.activeSort?.value === opt.value}
-							onchange={() => s.browse.set('sort', opt.value as never)}
-						/>
-						{opt.label}
-					</label>
-				{/each}
-			</div>
+			<RadioGroup
+				class="mb-3"
+				label={kit.labels.sort()}
+				options={s.sorts}
+				value={s.activeSort?.value ?? ''}
+				onchange={(v) => s.browse.set('sort', v as never)}
+			/>
 		{/if}
 
 		{#if panel}

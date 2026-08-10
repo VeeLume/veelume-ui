@@ -27,8 +27,23 @@ import List from './List.svelte';
 import Split from './Split.svelte';
 import TabStrip from './TabStrip.svelte';
 import Tab from './Tab.svelte';
+import Pane from './Pane.svelte';
+import Panes from './Panes.svelte';
+import PaneBody from './PaneBody.svelte';
 
-export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split, TabStrip, Tab };
+export const Surface = {
+	Root,
+	Toolbar,
+	ListHeader,
+	FilterButton,
+	List,
+	Split,
+	TabStrip,
+	Tab,
+	Pane,
+	Panes,
+	PaneBody
+};
 
 export { createSurface } from './pipeline.svelte.js';
 export { createWorkset } from './workset.svelte.js';
