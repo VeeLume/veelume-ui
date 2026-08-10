@@ -26,8 +26,9 @@
 							{#snippet headerLeading()}
 								<button
 									type="button"
-									class="grid size-9 shrink-0 place-items-center rounded-md border border-input
-									       bg-background text-muted-foreground shadow-xs hover:bg-muted"
+									class="-ml-3 grid h-9 w-4 shrink-0 place-items-center rounded-r-md border
+									       border-l-0 border-input bg-background text-xs text-muted-foreground
+									       shadow-xs hover:w-5 hover:bg-muted"
 									aria-label="Hide list"
 									title="Hide list"
 									onclick={() => (collapsed = true)}
