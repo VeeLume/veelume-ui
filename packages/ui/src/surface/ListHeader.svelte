@@ -33,7 +33,8 @@
 	import FilterButton from './FilterButton.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
-	import type { Action, IconOf } from '../actions/types.js';
+	import type { Action } from '../actions/types.js';
+	import type { IconOf } from '../theme/types.js';
 
 	let {
 		action = undefined,

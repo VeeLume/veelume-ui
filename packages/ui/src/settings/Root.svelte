@@ -16,7 +16,7 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { breakpoints } from '../shell/breakpoints.svelte.js';
+	import { breakpoints } from '../theme/breakpoints.svelte.js';
 	import { setSettingsContext } from './context.js';
 	import type { SettingsCategory } from './types.js';
 	import List from './List.svelte';

@@ -8,13 +8,13 @@
  * array before passing it — no kit API needed.
  */
 
-import type { NavIcon } from '../shell/types.js';
+import type { Icon } from '../theme/types.js';
 
 export type SettingsCategory = {
 	id: string;
 	label: string;
 	/** One line under the label — what lives in this category. */
 	description?: string;
-	icon?: NavIcon;
+	icon?: Icon;
 	path: string;
 };

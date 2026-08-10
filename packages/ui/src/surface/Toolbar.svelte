@@ -25,7 +25,7 @@
 	 */
 	import type { Snippet } from 'svelte';
 	import Bar from '../actions/Bar.svelte';
-	import { breakpoints } from '../shell/breakpoints.svelte.js';
+	import { breakpoints } from '../theme/breakpoints.svelte.js';
 	import { getSurfaceContext } from './context.js';
 
 	let {

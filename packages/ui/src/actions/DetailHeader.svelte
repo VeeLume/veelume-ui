@@ -16,7 +16,7 @@
 	import type { Snippet } from 'svelte';
 	import Bar from './Bar.svelte';
 	import { getKitContext } from '../context/index.js';
-	import { breakpoints } from '../shell/breakpoints.svelte.js';
+	import { breakpoints } from '../theme/breakpoints.svelte.js';
 
 	let {
 		title,

@@ -7,21 +7,12 @@
  * independently.
  */
 
-import type { Component, ComponentType } from 'svelte';
+import type { Icon, IconOf } from '../theme/types.js';
 
-/**
- * Deliberately admits both component eras: lucide-svelte still ships
- * Svelte-4-style class components (`ComponentType`) while other icon sets ship
- * runes-era ones. A kit that accepted only one would be choosing the app's icon
- * library for it.
- *
- * Rendering casts to the runes form — see `IconOf` — because a union is not
- * constructable in a template.
- */
-export type NavIcon = Component<Record<string, unknown>> | ComponentType;
+/** The shared icon union (`theme/types.ts`), under this module's name. */
+export type NavIcon = Icon;
 
-/** The narrowing the templates use. Contained here rather than repeated. */
-export type IconOf = Component<Record<string, unknown>>;
+export type { IconOf };
 
 export type NavItem = {
 	label: string;

@@ -6,7 +6,7 @@
  * one craftable row); a 1:1 CRUD surface writes `rs => rs.map(toRow)`.
  */
 
-import type { StatusTone } from '../badge/types.js';
+import type { StatusTone } from '../theme/types.js';
 
 export type Row = {
 	/** Stable across refetches — expansion state and keyed `{#each}` depend on

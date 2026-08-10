@@ -14,7 +14,7 @@
  */
 
 import { getContext, setContext } from 'svelte';
-import { breakpoints } from './breakpoints.svelte.js';
+import { breakpoints } from '../theme/breakpoints.svelte.js';
 import type { NavGroup } from './types.js';
 
 export type ShellContext = {

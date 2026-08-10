@@ -39,7 +39,6 @@ export const Shell = { Root, Rail, Content, BottomBar, SettingsFooter, AccountFo
 export { default as AppShell } from './AppShell.svelte';
 export { default as NavRail } from './NavRail.svelte';
 export { default as BottomNav } from './BottomNav.svelte';
-export { breakpoints } from './breakpoints.svelte.js';
 export { getShellContext, type ShellContext } from './context.svelte.js';
 export { activeNavPath, splitBottomNav } from './types.js';
 export type { NavGroup, NavIcon, NavItem, NavStrategy } from './types.js';

@@ -5,11 +5,13 @@
  * named variation is the status→(label, tone) map and NOTHING else, so the
  * kit ships the pill and the tone set, and each domain ships a map.
  *
- * Exactly four tones appear across the fleet; a fifth is a design decision,
- * not a prop.
+ * The tone set itself lives in `theme/types.ts` — the L1 surface types carry
+ * a resolved tone, so the vocabulary sits below both modules.
  */
 
-export type StatusTone = 'primary' | 'neutral' | 'warning' | 'destructive';
+import type { StatusTone } from '../theme/types.js';
+
+export type { StatusTone };
 
 /** Labels are functions so an app wires its i18n (`m.loan_out()`) directly
  *  and it resolves at render time — stibu hardcoded German labels in the

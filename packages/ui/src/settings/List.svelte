@@ -11,7 +11,7 @@
 	import { page } from '$app/state';
 	import Bar from '../actions/Bar.svelte';
 	import { getKitContext } from '../context/index.js';
-	import type { IconOf } from '../shell/types.js';
+	import type { IconOf } from '../theme/types.js';
 	import { getSettingsContext } from './context.js';
 
 	const kit = getKitContext();

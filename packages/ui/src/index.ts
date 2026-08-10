@@ -31,7 +31,6 @@ export {
 	AppShell,
 	NavRail,
 	BottomNav,
-	breakpoints,
 	getShellContext,
 	activeNavPath,
 	splitBottomNav
@@ -164,6 +163,12 @@ export type {
 	SurfaceDescriptor,
 	SurfaceState
 } from './surface/index.js';
+
+// ── L1: theme ──────────────────────────────────────────────────────────────
+// The kit's shared vocabulary: window-size classes (Material's set). The icon
+// and tone types live beside it in `theme/types.ts` and reach this API through
+// their owning modules' aliases (`ActionIcon`, `NavIcon`, `StatusTone`).
+export { breakpoints } from './theme/breakpoints.svelte.js';
 
 // ── L1: window ─────────────────────────────────────────────────────────────
 // Render O(viewport), whatever the list holds. Supersedes the reveal: the

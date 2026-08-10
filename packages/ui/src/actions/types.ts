@@ -19,12 +19,12 @@
  * something other than a button passes `leading`.
  */
 
-import type { Component, ComponentType } from 'svelte';
+import type { Icon, IconOf } from '../theme/types.js';
 
-export type ActionIcon = Component<Record<string, unknown>> | ComponentType;
+/** The shared icon union (`theme/types.ts`), under this module's name. */
+export type ActionIcon = Icon;
 
-/** The narrowing templates use — a union is not constructable in markup. */
-export type IconOf = Component<Record<string, unknown>>;
+export type { IconOf };
 
 export type Action = {
 	label: string;
