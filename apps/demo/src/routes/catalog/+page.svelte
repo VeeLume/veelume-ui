@@ -160,20 +160,15 @@
 						/>
 					{/snippet}
 					{#snippet row(r: WorkRow, isSelected: boolean)}
-						<!-- The attachment READS isSelected, so it re-runs when selection
-						     reaches this row — after the DOM update, i.e. after the list
-						     has already narrowed for the detail pane. That ordering is
-						     what makes "scroll to selection when the pane appears" work
-						     without watching layout. `nearest` keeps it minimal: no jump
-						     when the row is already visible. -->
-						<div
-							{@attach (node) => {
-								if (isSelected) node.scrollIntoView({ block: 'nearest' });
-							}}
-						>
-							<!-- Both gestures, which is why the kit splits them: the caret
-							     peeks at the editions in place, the body opens the workbench.
-							     Supplying `onselect` is what separates them. -->
+						<!-- No scroll-into-view attachment here any more: `Surface.List`
+						     follows selection itself via `win.scrollTo`, which is the only
+						     way it can work above the windowing threshold — where the
+						     target row may not be in the DOM to scroll to at all.
+
+						     Both gestures, which is why the kit splits them: the caret
+						     peeks at the editions in place, the body opens the workbench.
+						     Supplying `onselect` is what separates them. -->
+						<div>
 							<Expand.Row
 								title={r.title}
 								subtitle="{r.author} · {kit.format.number(r.total)} editions · from {r.firstYear}"

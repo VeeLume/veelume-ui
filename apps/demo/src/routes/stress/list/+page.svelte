@@ -21,7 +21,12 @@
 	const browse = createBrowseState({
 		q: { kind: 'text' },
 		kind: { kind: 'many' },
-		sort: { kind: 'one', default: 'date', narrows: false }
+		sort: { kind: 'one', default: 'date', narrows: false },
+		// Selection at stress scale, and it is the point rather than decoration:
+		// this is the only surface where the SELECTED ROW MAY NOT BE IN THE DOM,
+		// so it is the only honest test of `win.scrollTo`. A deep link like
+		// `?sel=900000` must land on that row without it ever having rendered.
+		sel: { kind: 'one', default: '', narrows: false }
 	});
 
 	const money = (c: number) => kit.format.number(c / 100, { style: 'currency', currency: 'EUR' });
@@ -81,12 +86,13 @@
 		</span>
 	</header>
 
-	<Surface.Root {descriptor} {browse} class="min-h-0 flex-1">
+	<Surface.Root {descriptor} {browse} selected={browse.values.sel || null} class="min-h-0 flex-1">
 		<Surface.List
 			status={view.status}
 			fetching={view.fetching}
 			hasMore={view.hasMore}
 			onloadmore={() => entries.loadMore({ cap: 10_000 })}
+			onselect={(r) => browse.set('sel', r.key)}
 		/>
 	</Surface.Root>
 </div>

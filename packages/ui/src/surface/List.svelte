@@ -13,7 +13,7 @@
 	 * Note `refreshing` keeps the rows on screen. That is the whole point of the
 	 * status union — a background revalidation must not blank out good data.
 	 */
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import ListHeader from './ListHeader.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
@@ -126,6 +126,50 @@
 	});
 
 	const aged = $derived(updatedAt !== undefined && now - updatedAt >= staleAfter);
+
+	/**
+	 * Selection is followed into view — automatically, and with no prop.
+	 *
+	 * Every donor hand-rolls this, and the consumer cannot do it correctly
+	 * above the windowing threshold anyway (the row may not be in the DOM, so
+	 * `scrollIntoView` has nothing to call). `nearest` means a click on an
+	 * already-visible row scrolls nothing, so the only times it moves are the
+	 * ones that need it: back/forward, a deep link, a tab activated from the
+	 * strip, or a neighbour promoted when a tab closed.
+	 *
+	 * Three things here are load-bearing, and each was a bug first:
+	 *
+	 * ⚑ `lastFollowed` is committed only on SUCCESS. A deep link arrives before
+	 *   the data does, so the first run finds nothing; marking the key followed
+	 *   there means the row never gets scrolled to when the set fills.
+	 *
+	 * ⚑ `status` is the retry trigger, NOT the entry list. Reading `s.entries`
+	 *   tracked would reach the collection's lazy `ensure()`, which writes the
+	 *   set it just read — the documented `effect_update_depth_exceeded` trap.
+	 *   `status` is a plain prop, it already changes exactly when data arrives,
+	 *   and it costs nothing.
+	 *
+	 * ⚑ Guarded on the KEY, not the index: `entries` changes on every filter
+	 *   keystroke, and re-running then would fight a user who scrolled away
+	 *   while typing.
+	 */
+	let lastFollowed: string | null = null; // deliberately not $state
+	$effect(() => {
+		const key = openKey;
+		// Tracked purely as the "data may have arrived" signal.
+		void status;
+		if (!key) {
+			lastFollowed = null;
+			return;
+		}
+		if (key === lastFollowed) return;
+		const index = untrack(() => s.entries.findIndex((e) => !isGroupHeader(e) && e.key === key));
+		// Absent (still loading, or filtered out) — leave the key unfollowed so
+		// the next status change tries again.
+		if (index < 0) return;
+		lastFollowed = key;
+		win.scrollTo(index);
+	});
 
 	/**
 	 * One-directional indentation: a header sits at its level's edge, every row
@@ -294,9 +338,13 @@
 				{/each}
 			</ul>
 		{:else}
+			<!-- Measured here too, though nothing is windowed: `scrollTo` computes
+			     from these heights at EITHER size, so a consumer gets one call
+			     instead of a branch it has to remember. One shared observer over
+			     at most `threshold` rows is not a cost worth a second code path. -->
 			<ul>
-				{#each windowed as e (e.key)}
-					<li style:padding-left="{indentOf(e)}px">
+				{#each windowed as e, i (e.key)}
+					<li data-index={i} {@attach win.item} style:padding-left="{indentOf(e)}px">
 						{#if isGroupHeader(e)}
 							{@render section(e)}
 						{:else}

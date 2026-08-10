@@ -105,7 +105,18 @@
 		};
 		void tick().then(() => {
 			correct();
-			requestAnimationFrame(correct);
+			// rAF AND a timeout, once: a hidden document never runs rAF at all
+			// (the suspended-tray case), so a correction that only used it
+			// would silently not happen off screen. Same pairing the window
+			// module's `schedule()` uses.
+			let done = false;
+			const late = () => {
+				if (done) return;
+				done = true;
+				correct();
+			};
+			requestAnimationFrame(late);
+			setTimeout(late, 40);
 		});
 	}
 

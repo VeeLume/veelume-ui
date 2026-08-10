@@ -109,6 +109,11 @@ bundles; its catalog taxonomy is sections). The rules, each load-bearing:
 - **Headers are not rows**: never selectable or expandable, skipped by `onselect`, not
   counted by the count strip. The default renders label · visible count; the `group` snippet
   on `Surface.List` replaces it (aggregates read the entry's `rows`).
+- **⚑ A hidden document never runs `requestAnimationFrame`.** Anything that has to converge —
+  `win.scrollTo`'s passes, `Expand`'s viewport anchor, the window's own `schedule()` — must
+  pair rAF with a `setTimeout`, guarded to run once. This is not a headless-harness quirk: it
+  is the suspended-tray webview `wakeInvalidation` exists for, so an rAF-only loop silently
+  never converges wherever the app is off screen.
 - **⚑ Hierarchy is typography PLUS one-directional indentation.** Each header sits at its
   level's edge; **every row indents one step past the deepest level**, so content is always
   right of its label and the nesting cannot read backwards. The row inset is a per-surface
@@ -267,9 +272,11 @@ prototype before any of it froze here.
   state, back closes the split before the selection, and the pane survives both a search
   that empties the list and its own tab closing. It acts as a persistent comparison anchor
   across selection changes.
-- **Windowed limitation:** scroll-to-selection rides attachments reading `isSelected`,
-  which only works below the windowing threshold — `win.scrollTo(index)` is the
-  prerequisite before a workbench list meets a windowed set.
+- **Selection is followed into view by `Surface.List` itself**, with no prop: `win.scrollTo`
+  computes the offset from measured heights, so it works above the threshold where the target
+  row is not in the DOM and `scrollIntoView` has nothing to call. `nearest` means an
+  already-visible row never moves; the retry is keyed on `status`, never on the entry list,
+  because reading entries tracked reaches the collection's lazy `ensure()`.
 
 ### L1 — browse state
 

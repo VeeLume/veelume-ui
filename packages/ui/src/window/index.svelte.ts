@@ -90,6 +90,27 @@ export type ListWindow = {
 	container: (node: HTMLElement) => () => void;
 	/** Attach to every rendered row, alongside `data-index`. */
 	item: (node: HTMLElement) => () => void;
+	/**
+	 * Bring a row into view BY INDEX.
+	 *
+	 * ⚑ Why the window has to own this: above the threshold the target row may
+	 * not be in the DOM at all, so `scrollIntoView` has nothing to call and the
+	 * position can only come from the measured heights this module already
+	 * keeps. Below the threshold it is the same arithmetic over the same
+	 * numbers, so consumers get one call that works at either size instead of
+	 * a branch they would have to remember.
+	 */
+	scrollTo: (index: number, options?: ScrollToOptions) => void;
+};
+
+export type ScrollToOptions = {
+	/**
+	 * `nearest` (default) scrolls only if the row is not fully visible, and by
+	 * the smallest amount — the `scrollIntoView({ block: 'nearest' })`
+	 * semantics, which is what keeps a click on a half-visible row from
+	 * yanking the list.
+	 */
+	align?: 'start' | 'center' | 'nearest';
 };
 
 const DEFAULT_ESTIMATE = 44;
@@ -308,6 +329,95 @@ export function createWindow(count: () => number, options: WindowOptions = {}): 
 			return () => {
 				ro.unobserve(node);
 			};
+		},
+		scrollTo(index: number, options: ScrollToOptions = {}) {
+			if (!box || index < 0 || index >= lastCount) return;
+			const align = options.align ?? 'nearest';
+
+			/**
+			 * ⚑ CONVERGES over successive frames rather than jumping once.
+			 *
+			 * Every row between here and the target that has never rendered
+			 * contributes an ESTIMATE, so the first jump lands approximately —
+			 * at 10k rows it was ~500 rows short. The rows it brings into view
+			 * then measure themselves and the next pass aims better.
+			 *
+			 * It must be a frame apart, not a microtask: `ResizeObserver`
+			 * callbacks run after layout, i.e. AFTER the same frame's
+			 * `requestAnimationFrame` callbacks, so a correction scheduled in
+			 * rAF reads exactly the heights the previous pass already had. Two
+			 * passes in one frame is two passes with identical data.
+			 *
+			 * Bounded and self-stopping: it quits as soon as a pass asks for a
+			 * move of less than a pixel, so an accurate jump costs one extra
+			 * frame and a far one costs a handful — imperceptible either way,
+			 * and incapable of fighting the user for longer than that.
+			 */
+			const MAX_PASSES = 8;
+			let passes = 0;
+			let pending = false;
+
+			/**
+			 * ⚑ rAF *and* a timeout, once — the same pairing `schedule()` uses,
+			 * and for a reason that turns out to be load-bearing rather than
+			 * belt-and-braces: **a hidden document never runs
+			 * `requestAnimationFrame` at all.** Verified directly
+			 * (`visibilityState: 'hidden'` → rAF 0 fires, `setTimeout` 1), and
+			 * it is not only a headless-harness quirk — it is precisely the
+			 * suspended-tray webview `wakeInvalidation` exists for. A
+			 * convergence loop that only used rAF would silently never converge
+			 * wherever the app was not on screen.
+			 */
+			const queueNext = () => {
+				if (pending) return;
+				pending = true;
+				const run = () => {
+					if (!pending) return;
+					pending = false;
+					apply();
+				};
+				requestAnimationFrame(run);
+				setTimeout(run, 40);
+			};
+
+			const apply = () => {
+				if (!box) return;
+				ensureCapacity(lastCount);
+				let top = 0;
+				for (let j = 0; j < index; j += 1) top += heightOf(j);
+				const rowHeight = heightOf(index);
+				const view = box.clientHeight;
+				const current = box.scrollTop;
+
+				let next: number;
+				if (align === 'start') next = top;
+				else if (align === 'center') next = top - (view - rowHeight) / 2;
+				else if (top < current) next = top;
+				else if (top + rowHeight > current + view) next = top + rowHeight - view;
+				else return; // `nearest`, already fully visible — settled.
+
+				/**
+				 * ⚑ Settled is judged on the DESIRED position, not the clamped
+				 * one. On the first pass after mount the container's content may
+				 * not be laid out yet, so `scrollHeight` is still the viewport
+				 * height and the clamp pins every target to 0 — which then looks
+				 * identical to "already there" and stopped the passes dead. The
+				 * cold deep link into a short list failed exactly this way while
+				 * the long one worked, because only the short list finished
+				 * mounting inside one frame.
+				 */
+				const clamped = Math.max(0, Math.min(next, box.scrollHeight - view));
+				if (Math.abs(next - current) < 1) return; // genuinely settled.
+
+				if (Math.abs(clamped - current) >= 1) {
+					box.scrollTop = clamped;
+					schedule();
+				}
+				passes += 1;
+				if (passes < MAX_PASSES) queueNext();
+			};
+
+			apply();
 		}
 	};
 }
