@@ -35,6 +35,7 @@
 		onback = undefined,
 		onbelow = undefined,
 		trailing,
+		selected = undefined,
 		class: klass = ''
 	}: {
 		workset: Workset;
@@ -58,11 +59,24 @@
 		 * row, which is the whole point of a strip.
 		 */
 		trailing?: Snippet;
+		/**
+		 * Overrides which tab reads as active. Defaults to `Root.selected`.
+		 *
+		 * ⚑ `null` means NO record tab is active — which is what a surface needs
+		 * when the detail region is showing something that is not a record at
+		 * all. A compare view is a tab too, so leaving the record tab lit while
+		 * comparing shows two active tabs and lies about which one you are in.
+		 * The record's own selection stays in the URL, untouched, so returning
+		 * to it is one click.
+		 */
+		selected?: string | null;
 		class?: string;
 	} = $props();
 
 	const s = getSurfaceContext();
 	const kit = getKitContext();
+
+	const activeKey = $derived(selected !== undefined ? selected : s.selected);
 
 	const label = (key: string) => (titleOf ? titleOf(key) : (s.byKey(key)?.title ?? key));
 
@@ -156,7 +170,7 @@
 			</button>
 		{/if}
 		{#each workset.tabs as t (t.key)}
-			{@const isActive = t.key === s.selected}
+			{@const isActive = t.key === activeKey}
 			<!-- The attachment reads isActive, so activating a tab by ANY route —
 			     click, close-promotes-neighbour, back/forward — scrolls it into
 			     view when the strip overflows. -->

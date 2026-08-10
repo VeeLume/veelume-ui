@@ -229,7 +229,10 @@ A Split shows two entities interactively; `Compare` shows N of them aligned and 
   since absent is not zero.
 - **A compare view is a TAB, not a toggle** — activating any record must leave it, and in ONE
   navigation (`browse.setMany`). Two `set` calls make "record selected, compare still open" a
-  real state the back button can land on.
+  real state the back button can land on. **And exactly one tab may read as active**: pass
+  `TabStrip.selected={null}` while the detail region shows something that is not a record, or
+  the record tab stays lit beside the compare tab and the strip lies about where you are. The
+  record's selection stays in the URL untouched, so returning is one click.
 - **Placement is the app's**, like `Wizard`'s host: a mode over the detail region, a synthetic
   tab, or a shareable `?compare=a,b,c` route. `entities` is a plain array, so the tab strip is
   the natural feed but not a wiring — which is what lets one record be compared across two
@@ -316,6 +319,9 @@ prototype before any of it froze here.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.
+- **The collapse handle aligns to the BAR ROW**, not the middle of the seam: controls live in
+  the band across the top of a surface, and a handle floating at mid-height reads as
+  decoration — it went unfound twice before being moved.
 - **`Split` collapses the list from the DIVIDER**, not from either pane: a control inside a
   pane belongs to that pane and competes with its contents, while the seam belongs to neither
   — the same containment argument that put search inside the list. Controlled, so the state's

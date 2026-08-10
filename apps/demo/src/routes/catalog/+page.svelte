@@ -23,7 +23,7 @@
 	 * selecting anything. Having both on one surface is the point of the
 	 * prototype: feel which one you reach for, and when.
 	 */
-	import { Surface, Segmented, Expand, createExpansion, Compare } from '@veelume/ui';
+	import { Surface, Expand, createExpansion, Compare } from '@veelume/ui';
 	import { createBrowseState } from '@veelume/ui';
 	import { getKitContext } from '@veelume/ui';
 	import type { GroupDef, CompareAttribute } from '@veelume/ui';
@@ -215,16 +215,22 @@
 				<Surface.List {status}>
 					{#snippet headerPanel()}
 						<!-- Grouping is a VIEW option, so it rides in the filter panel
-						     beside sort rather than eating header width search needs. -->
+						     beside sort rather than eating header width search needs —
+						     and it renders as RADIOS, because the panel's other
+						     one-of-many choice does. A segmented control beside a radio
+						     list makes two identical decisions look like different
+						     kinds of thing. -->
 						<div class="mb-1 text-xs font-medium text-muted-foreground">Group</div>
-						<Segmented
-							options={[
-								{ value: 'author', label: 'By author' },
-								{ value: 'none', label: 'Flat' }
-							]}
-							value={browse.values.group}
-							onchange={(v) => browse.set('group', v)}
-						/>
+						{#each [{ value: 'author', label: 'By author' }, { value: 'none', label: 'Flat' }] as opt (opt.value)}
+							<label class="flex items-center gap-2 py-1 text-sm">
+								<input
+									type="radio"
+									checked={browse.values.group === opt.value}
+									onchange={() => browse.set('group', opt.value)}
+								/>
+								{opt.label}
+							</label>
+						{/each}
 					{/snippet}
 					{#snippet row(r: WorkRow, isSelected: boolean)}
 						<!-- No scroll-into-view attachment here any more: `Surface.List`
@@ -284,6 +290,7 @@
 					     and OMITTING onbelow/onback would remove those controls. -->
 					<Surface.TabStrip
 						workset={catalogWorkset}
+						selected={comparing ? null : active}
 						onactivate={(k) => browse.setMany({ work: k ?? '', compare: '' })}
 						onback={() => browse.set('work', '')}
 						onbelow={(k) => browse.set('below', k)}

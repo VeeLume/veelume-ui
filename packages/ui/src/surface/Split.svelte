@@ -82,12 +82,17 @@
 		     still need a collapse button somewhere". A seam is the right PLACE
 		     and was the wrong WEIGHT: it now carries a bordered handle on a
 		     visible rule, which is what a splitter looks like everywhere else. -->
-		<div class="relative hidden w-4 shrink-0 items-center justify-center md:flex">
+		<div class="relative hidden w-5 shrink-0 justify-center pt-4 md:flex">
 			<div class="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-border"></div>
+			<!-- ⚑ Aligned to the BAR row, not centred in the seam. Centred, it
+			     floated at mid-height with nothing around it and read as
+			     decoration — Valerie looked for it twice and did not find it.
+			     Controls live in the band across the top of a surface, so that is
+			     where the eye goes looking for one. -->
 			<button
 				type="button"
-				class="relative grid size-6 place-items-center rounded-full border border-border
-				       bg-background text-xs text-muted-foreground shadow-xs transition-colors
+				class="relative grid size-7 place-items-center rounded-full border border-border
+				       bg-background text-muted-foreground shadow-xs transition-colors
 				       hover:bg-muted hover:text-foreground"
 				aria-label={collapsed ? kit.labels.showList() : kit.labels.hideList()}
 				title={collapsed ? kit.labels.showList() : kit.labels.hideList()}
