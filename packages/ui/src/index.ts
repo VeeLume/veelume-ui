@@ -226,12 +226,5 @@ export type {
 } from './collection/types.js';
 
 // ── L1: context ────────────────────────────────────────────────────────────
-export {
-	createKitContext,
-	setKitContext,
-	getKitContext,
-	defaultLabels,
-	type KitContext,
-	type KitContextInput,
-	type LabelBag
-} from './context/index.js';
+export { createKitContext, setKitContext, getKitContext, defaultLabels } from './context/index.js';
+export type { KitContext, KitContextInput, LabelBag } from './context/index.js';

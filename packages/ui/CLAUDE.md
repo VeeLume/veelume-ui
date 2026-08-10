@@ -14,6 +14,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | Module | Layer | What it is |
 |---|---|---|
 | `context/` | L1 | Label bag + **two locales** (message, formatting) + memoised `Intl` + derived `hourCycle`. No runes — reactivity comes from the app's getters. |
+| `theme/` | L1 | The shared design vocabulary: `breakpoints` (window-size classes) and `types.ts` (`Icon`/`IconOf`, `StatusTone` — aliased publicly as `ActionIcon`/`NavIcon`/`StatusTone` by their owning modules). Admission test: needed by ≥2 modules AND importing from the natural owner would cross layers. No markup, no barrel. |
 | `collection/` | L1 | Scoped cache, keyset accumulation, optional write layer. `.svelte.ts`. |
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
@@ -25,10 +26,13 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `dialog/` | L2 | `Dialog`, the MODAL overlay species (Popup is the anchored, light-dismiss one): centred, inert background, focus trap — bits-ui underneath (the ActionMenu argument; every stibu picker hand-rolled this shell and none got a trap), stibu's panel geometry on top. `ConfirmDialog` rides it: bag-default labels, per-call overrides are app content, Cancel first so the trap's initial stop is the safe choice, and the CALLER closes on confirm — confirming may fail, and a dialog that auto-closed has nowhere to show it. |
 | `picker/` | L2 | stibu's five pickers as one pair against the four named axes: `items` is a reactive prop (store vs list is invisible), `multiple` (onpick always delivers an array — single = one immediately, multi = selection on confirm, surviving searches), `row` snippet, and inline-vs-dialog as a SPLIT — `Picker` is the embeddable search+list, `PickerDialog` only wraps it in the modal, so the modes cannot drift. Dialog close unmounts → reopening starts clean (stibu reset by hand). |
 | `stored/` | L1 | `storedValue(key, initial, validate?)` — a reactive value backed by localStorage with a VALIDATING loader (Hearth's prefs pattern; the demo's appearance store rides it). Rejected reads fall back to `initial` silently; persists as JSON, offers non-JSON reads to the validator raw so donor-era bare strings migrate on first load. |
-| `loading/` | L2 | `Loading`, the labelled spinner for boot screens and pane-sized placeholders (Hearth's, minus its domain). A loading LIST uses `Surface.List`'s own states instead. |
+| `loading/` | L2 | The pane-state trio: `Loading` (labelled spinner for boot screens and pane-sized waits — Hearth's, minus its domain), `Progress` (reportable work; `value` absent IS indeterminate, not a mode), `Placeholder` (nothing-chosen-yet — an invitation, distinct from a list's *found nothing* result). A loading LIST uses `Surface.List`'s own states instead. |
+| `compare/` | L2 | `Compare`, the third view of a working set: N entities aligned and read-only, transposed (attributes down, entities across). `better` opt-in per attribute; column sort cycles best → reversed → given order. |
+| `expand/` | L1+L2 | The accordion row: `Expand.Row/.Facts/.Cols` (one anatomy, filled by omission — `children` IS expandability) and `createExpansion(mode)` (L1, page-local, never the URL). |
+| `wizard/` | L2 | `Wizard`, the step frame — steps are a REACTIVE prop, the host (full-screen or dialog) is the app's, the Picker/PickerDialog split again. |
 | `popup/` | L2 | `Popup`, the anchored-panel base — extracted once FilterButton and Notify.Center disagreed about dismissal. Owns the semantics (outside click via a catcher, Escape, focus return only when close stranded focus on `<body>`) AND the placement: `side`/`align` name the INTENT, floating-ui measures at open — flip when the preferred side would overflow, shift to stay inside the clipping ancestors (the class-string era's clipped-panel bug is structurally gone). Anchor = the consumer's `relative` wrapper (the panel's offsetParent), tracked via `autoUpdate`; the panel is invisible until the first position lands. Portalling to `<body>` is the remaining upgrade — it adds z-stacking/teleport concerns flip/shift do not, and waits for a consumer that needs it. |
 | `notify/` | L1+L2 | The notification funnel (Hearth's design + Starlume's deltas). ONE store: `notify()` for in-app code, `ingest()` for adapters (keyed dedupe; `toast: false` for hydrated backlog — a suspended webview runs no JS, so catch-up entries badge but never toast). Sticky-by-level (info/success fade, warning/error persist), bounded at 100, session-only — durable history and native-toast fallback are backend concerns. Surfaces compose independently: `Notify.Toasts` (once, root layout), `Notify.Bell` (unread count; `onclick` is the whole contract), `Notify.Center` (anchored panel, marks read on open, position classes REPLACE the default — merged `top-*` utilities resolve by stylesheet order), `Notify.List` (the Center's rows, embeddable — the Picker/PickerDialog split; a page host is the bar-width answer, mark-read policy stays the host's). |
-| `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `Shell.SettingsFooter`/`.AccountFooter` (default rail footers, without/with an account concept), `AppShell` (the default arrangement), `NavRail`, `BottomNav`, `breakpoints`. |
+| `shell/` | L3 | `Shell.Root/.Rail/.Content/.BottomBar` (parts on the Surface contract), `Shell.SettingsFooter`/`.AccountFooter` (default rail footers, without/with an account concept), `AppShell` (the default arrangement), `NavRail`, `BottomNav`. (`breakpoints` lives in `theme/` — L1 logic the shell reads but does not own.) |
 | `settings/` | L2+L3 | The stibu-shaped settings scaffold: `Settings.Root` (three-state responsive list-detail), `.List`, `.Page` (`DetailHeader` + content column), `.Section` (title optional — untitled it supplies only the rule and rhythm around Rows), `.Row` (label+hint left, control trailing; adapts by CONTENT via flex-wrap against the label's min width — inline while the control fits, wrapped below it when not, so a Switch stays inline on a phone where a wide Segmented drops. No prop, no breakpoint), `.Placeholder`. Categories are data (`SettingsCategory[]`); adding a setting is one entry plus one small routed page. |
 
 Everything is exercised by a real surface in `apps/demo` — Catalog (derive +
@@ -375,8 +379,9 @@ prototype before any of it froze here.
 ### L2/L3 — components
 
 - **Composable by omission, never rearrangement.** `<Surface.Root>` owns state, parts read it
-  from context. Omitting `<Surface.Toolbar>` is not merely supported, it is the
-  default; moving it below the list is not supported at all.
+  from context (`getSurfaceContext` is public, so an app-authored part reads the
+  same seam the kit's parts do). Omitting `<Surface.Toolbar>` is not merely
+  supported, it is the default; moving it below the list is not supported at all.
 - **The shell follows the same contract.** `Shell.Root` owns the frame decisions (rail vs
   bottom bar, labels, safe-area) in context; parts read them, and an app's custom part reads
   `getShellContext()` and stays in sync with the frame for free. **There is no `strategy`
@@ -510,9 +515,9 @@ Each of these type-checks clean and fails at runtime, or fails silently:
   kit-only classes silently vanish from the stylesheet and layouts break in ways
   that look like bad flex rules. Consumers need
   `@source "…/packages/ui/src"`. The tell: kit components HMR via `/@fs/` paths.
-- **Icon props need the `IconOf` cast in markup.** `NavIcon`/`ActionIcon` are a
-  union so both Svelte component eras work; a union is not constructable in a
-  template. Do not cast to `never`.
+- **Icon props need the `IconOf` cast in markup.** `NavIcon`/`ActionIcon` are
+  aliases of ONE union (`theme/types.ts` `Icon`) so both Svelte component eras
+  work; a union is not constructable in a template. Do not cast to `never`.
 - **Verify against the artefact that fails.** A production build and the dev
   server scan sources differently — checking the wrong one "disproved" a correct
   fix once.
@@ -586,6 +591,43 @@ if two surfaces pass the same one, it is a default the kit is refusing to have.
 - Ships **source**, no build step, while workspace-linked. `exports` points at `src/index.ts`.
 - Svelte 5 runes throughout. `.svelte.ts` for rune-bearing modules.
 - Nothing enters `src/index.ts` until it has a consumer in `apps/demo`.
+
+### File layout (normalized 2026-08; hold the line)
+
+- **Barrels.** A module with components has a barrel-only `index.ts`. A pure-L1
+  module has NO barrel — its index IS the implementation (`context/`,
+  `collection/`, `browse/`, `stored/`, `window/`); satellite files
+  (`context/labels.ts`, `collection/types|http|wake.ts`, `theme/*`) are
+  imported by their real path, by `src/index.ts` included. `collection/http.ts`
+  and `wake.ts` are deliberate deep root exports — funnelling them through a
+  1200-line rune module would recreate the impl-and-barrel hybrid we removed.
+- **Namespace vs flat.** Compound part-sets export one namespace object
+  (`Surface`, `Shell`, `Settings`, `Notify`, `Expand`); standalone components
+  export flat. Shell's mixed shape (namespace + flat `AppShell`/`NavRail`/
+  `BottomNav`) is deliberate — the flat ones are usable outside a shell.
+- **`types.ts` is the module's MODEL**: types plus the pure functions and
+  class-string constants that interpret them (`resolveStatus`, `splitBottomNav`,
+  `isGroupHeader`, `sectionsOf` all qualify). Never runes, never DOM access,
+  never component imports; cross-module imports only from `theme/` or type-only
+  from L1. Pure runtime that is not model interpretation gets its own noun file
+  (`form/number.ts` is the pattern).
+- **L1 helper files are named for the noun they implement** (`expansion`,
+  `workset`, `pipeline`, `recordForm`, `notifications`) — the `create*` verb
+  belongs to the export, not the filename.
+- **Per-module context helpers live in `context.ts`** (`context.svelte.ts` when
+  rune-bearing — shell's derives from `breakpoints`, justified). The top-level
+  `context/` module is *the kit context*; the name collision with the
+  per-module files is known and accepted.
+- **Sibling imports are always deep real paths** (`../actions/Button.svelte`,
+  `../collection/types.js`), never module barrels — barrels exist solely to
+  feed `src/index.ts`, and barrel-mediated sibling imports invite cycles.
+- **Module-private components** (`actions/Spinner`, `shell/GearIcon`,
+  `shell/MoreIcon`) live beside their consumers, unexported from the barrel —
+  that is a home, not the absence of one.
+- **`theme/` admission test**: needed by ≥2 modules AND importing from the
+  natural owner would cross layers. No markup, no barrel. Nothing else enters.
+- **`src/index.ts` style**: value exports and `export type` on separate
+  statements in every block.
 - **⚑ The three behaviour-bearing UI dependencies are pinned EXACTLY** — `bits-ui` (2.18.1),
   `@internationalized/date` (3.12.3), `@floating-ui/dom` (1.8.0) — **and `bits-ui` to the same
   version in every consumer.** A caret range on these is an unversioned *behaviour* contract,
