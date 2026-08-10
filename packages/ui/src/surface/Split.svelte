@@ -69,7 +69,7 @@
 	const listHidden = $derived(collapsed && !!detail);
 </script>
 
-<div class="flex min-h-0 flex-1 gap-3 {klass}">
+<div class="relative flex min-h-0 flex-1 gap-3 {klass}">
 	{#if list}
 		<div
 			class="flex min-h-0 w-full flex-col md:w-80 md:shrink-0 lg:w-96 {selected
@@ -82,40 +82,53 @@
 
 	{#if oncollapse && list && detail && collapsed}
 		<!--
-			⚑ Only the SHOW affordance lives here, and only while collapsed.
-			Three placements were tried before this one:
+			⚑ Only the SHOW affordance lives here, only while collapsed, and
+			DOCKED rather than laid out. Four placements were tried:
 
 			  1. a 12px seam with a bare chevron — unfindable;
-			  2. the same seam, weightier and bar-aligned — findable, but it is a
-			     permanent column reserved for one button ("the divider just eats
-			     space for a single button");
-			  3. this: nothing at all while expanded.
+			  2. the same seam, weightier and bar-aligned — findable, but a
+			     permanent column reserved for one button;
+			  3. a 36px rail while collapsed — no permanent cost, but still a
+			     column, and a square handle spending width it does not need;
+			  4. this: absolutely positioned in the surface's own left gutter, so
+			     the detail pane runs edge to edge and the handle reserves nothing
+			     at all.
 
-			The rule that falls out is the containment rule with its edge case
-			named. HIDE belongs to the list's own header — it acts on the list, so
-			it rides in the list's chrome and costs no layout. SHOW cannot,
-			because the box it would live in is exactly the box that is gone; so
-			the kit supplies it, and only then. A rail that exists only while
-			collapsed spends 36px at the moment the list just gave back 384.
+			The rule underneath is the containment rule with its edge case named.
+			HIDE belongs to the list's own header — it acts on the list, so it
+			rides in the list's chrome and costs no layout. SHOW cannot, because
+			the box it would live in is exactly the box that is gone.
+
+			Shape follows the same logic: a splitter is read ALONG the seam it
+			opens, so height is what makes it a target and width is pure cost —
+			tall and narrow, flat against the left edge, rounded only on the side
+			facing the content it will push.
 		-->
-		<div class="hidden w-9 shrink-0 flex-col items-center pt-4 md:flex">
-			<button
-				type="button"
-				class="grid size-7 place-items-center rounded-md border border-border bg-background
-				       text-muted-foreground shadow-xs transition-colors hover:bg-muted
-				       hover:text-foreground"
-				aria-label={kit.labels.showList()}
-				title={kit.labels.showList()}
-				aria-expanded={false}
-				onclick={() => oncollapse(false)}
-			>
-				›
-			</button>
-		</div>
+		<button
+			type="button"
+			class="absolute top-4 left-0 z-10 hidden h-16 w-3 place-items-center rounded-r-md
+			       border border-l-0 border-border bg-background text-xs text-muted-foreground
+			       shadow-xs transition-colors hover:w-4 hover:bg-muted hover:text-foreground
+			       md:grid"
+			aria-label={kit.labels.showList()}
+			title={kit.labels.showList()}
+			aria-expanded={false}
+			onclick={() => oncollapse(false)}
+		>
+			›
+		</button>
 	{/if}
 
 	{#if detail}
-		<div class="min-h-0 min-w-0 flex-1 {selected || !list ? '' : 'hidden md:block'}">
+		<!-- The collapsed pane keeps a handle-wide gutter of its own. Without it
+		     the docked handle would sit ON the card for any surface that has no
+		     padding of its own — the demo's `p-3` happens to match the handle
+		     exactly, which is luck, not a contract. 12px while collapsed is the
+		     whole cost, against 36 for a rail and 20 for a permanent divider. -->
+		<div
+			class="min-h-0 min-w-0 flex-1 {selected || !list ? '' : 'hidden md:block'}
+			       {oncollapse && list && collapsed ? 'md:pl-3' : ''}"
+		>
 			{@render detail()}
 		</div>
 	{/if}

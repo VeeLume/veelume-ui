@@ -322,11 +322,16 @@ prototype before any of it froze here.
 - **⚑ Collapse is ASYMMETRIC, and the asymmetry is the design.** HIDE belongs to the list's
   own header (`headerLeading`) — it acts on the list, so the containment rule puts it in the
   list's chrome, where it costs no layout at all. SHOW cannot follow that rule, because the
-  box it would live in is exactly the box that disappeared, so the kit renders it — as a
-  narrow rail, and ONLY while collapsed, spending 36px at the moment the list just gave back
-  384. Three placements were tried first: a 12px seam (unfindable), the same seam made
-  weightier and bar-aligned (findable, but a permanent column reserved for one button), and
-  finally nothing at all while expanded. Controlled, so the state's home is the app's call;
+  box it would live in is exactly the box that disappeared, so the kit renders it — **docked**
+  in the surface's left gutter rather than laid out, and ONLY while collapsed. Four placements
+  were tried: a 12px seam (unfindable), the same seam made weightier and bar-aligned
+  (findable, but a permanent column for one button), a 36px rail while collapsed (no
+  permanent cost, but still a column with a square handle), and finally an absolutely
+  positioned handle that reserves nothing. **Shape follows the same logic**: a splitter is
+  read ALONG the seam it opens, so height makes the target and width is pure cost — tall and
+  narrow, flat left edge, rounded only towards the content it will push. The collapsed pane
+  keeps a handle-wide gutter of its own, because a surface with no padding would otherwise
+  have the handle sitting on its card. Controlled, so the state's home is the app's call;
   omit `oncollapse` and neither control exists. `md:`-scoped, because below that the panes
   already take turns being the whole page.
 - **The second pane is a PROJECTION by key** (`byKey` reads ALL rows, pre-filter), stacked
