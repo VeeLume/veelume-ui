@@ -26,8 +26,9 @@ import FilterButton from './FilterButton.svelte';
 import List from './List.svelte';
 import Split from './Split.svelte';
 import TabStrip from './TabStrip.svelte';
+import Tab from './Tab.svelte';
 
-export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split, TabStrip };
+export const Surface = { Root, Toolbar, ListHeader, FilterButton, List, Split, TabStrip, Tab };
 
 export { createSurface } from './pipeline.svelte.js';
 export { createWorkset } from './workset.svelte.js';

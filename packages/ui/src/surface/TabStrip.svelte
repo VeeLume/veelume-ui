@@ -26,6 +26,7 @@
 	import { tick, untrack, type Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
+	import Tab from './Tab.svelte';
 	import type { Workset } from './workset.svelte.js';
 
 	let {
@@ -171,89 +172,71 @@
 		{/if}
 		{#each workset.tabs as t (t.key)}
 			{@const isActive = t.key === activeKey}
-			<!-- The attachment reads isActive, so activating a tab by ANY route —
-			     click, close-promotes-neighbour, back/forward — scrolls it into
-			     view when the strip overflows. -->
-			<div
-				class="group flex shrink-0 items-center rounded-t-md border
-				       {isActive
-					? 'border-border border-b-card bg-card'
-					: 'border-transparent text-muted-foreground hover:text-foreground'}"
-				{@attach (node) => {
-					if (isActive) node.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+			<!-- `activate`, not a dblclick: activating the previewed tab again pins
+			     it, and that gesture survives the re-render the first activation
+			     causes. See `createWorkset.activate`. -->
+			<Tab
+				active={isActive}
+				muted={!t.pinned}
+				tabKey={t.key}
+				focusable={isActive}
+				title={t.pinned ? label(t.key) : `${label(t.key)} — ${kit.labels.tabPreviewHint()}`}
+				onclick={() => {
+					workset.activate(t.key);
+					onactivate(t.key);
+				}}
+				onauxclick={(e) => {
+					// Middle click closes, as in every browser since tabs existed.
+					if (e.button === 1) {
+						e.preventDefault();
+						close(t.key);
+					}
+				}}
+				onmousedown={(e) => {
+					// Without this the middle button starts autoscroll, which leaves
+					// the page in scroll mode after the tab is gone.
+					if (e.button === 1) e.preventDefault();
 				}}
 			>
-				<!-- `role="tab"` sits on the FOCUSABLE element, not the wrapper: a
-				     roving tabindex has to live where focus actually lands, and a
-				     role on a div that cannot take focus is the promise this strip
-				     was already breaking.
-
-				     `activate`, not a dblclick: activating the previewed tab again
-				     pins it, and that gesture survives the re-render the first
-				     activation causes. See `createWorkset.activate`. -->
-				<button
-					type="button"
-					role="tab"
-					aria-selected={isActive}
-					tabindex={isActive ? 0 : -1}
-					data-tab-key={t.key}
-					class="h-9 max-w-48 truncate pl-3 pr-1 text-sm {t.pinned ? '' : 'italic'}"
-					title={t.pinned ? label(t.key) : `${label(t.key)} — ${kit.labels.tabPreviewHint()}`}
-					onclick={() => {
-						workset.activate(t.key);
-						onactivate(t.key);
-					}}
-					onauxclick={(e) => {
-						// Middle click closes, as in every browser since tabs existed.
-						if (e.button === 1) {
-							e.preventDefault();
-							close(t.key);
-						}
-					}}
-					onmousedown={(e) => {
-						// Without this the middle button starts autoscroll, which
-						// leaves the page in scroll mode after the tab is gone.
-						if (e.button === 1) e.preventDefault();
-					}}
-				>
-					{label(t.key)}
-				</button>
-				<!-- The controls inside a tab are OUT of the tab order (`-1`):
-				     browser tabs behave the same way, and Delete on the focused tab
-				     is the keyboard path to closing. Otherwise every tab would cost
-				     three Tab presses to walk past. -->
-				{#if onbelow}
-					<!-- ⚑ Revealed on hover, or kept on the ACTIVE tab. A control
-					     repeated on every tab reads as noise the moment there are
-					     more than three, and splitting is a deliberate act rather
-					     than a per-tab affordance. Browser tabs treat their close
-					     button the same way. `w-0`, not `hidden`, so revealing it
-					     does not reflow the strip under the pointer. -->
+				{label(t.key)}
+				{#snippet actions()}
+					<!-- The controls inside a tab are OUT of the tab order (`-1`):
+					     browser tabs behave the same way, and Delete on the focused
+					     tab is the keyboard path to closing. Otherwise every tab would
+					     cost three Tab presses to walk past. -->
+					{#if onbelow}
+						<!-- ⚑ Revealed on hover, or kept on the ACTIVE tab. A control
+						     repeated on every tab reads as noise the moment there are
+						     more than three, and splitting is a deliberate act rather
+						     than a per-tab affordance. Browser tabs treat their close
+						     button the same way. Opacity at a fixed size, never width,
+						     so revealing it cannot reflow the strip under the pointer. -->
+						<button
+							type="button"
+							tabindex="-1"
+							class="grid size-5 place-items-center rounded-sm text-xs text-muted-foreground
+							       transition-opacity hover:bg-muted hover:text-foreground
+							       group-hover:pointer-events-auto group-hover:opacity-100
+							       {isActive ? 'opacity-100' : 'pointer-events-none opacity-0'}"
+							aria-label={kit.labels.tabOpenBelow()}
+							title={kit.labels.tabOpenBelow()}
+							onclick={() => onbelow(t.key)}
+						>
+							⊟
+						</button>
+					{/if}
 					<button
 						type="button"
 						tabindex="-1"
-						class="grid size-5 place-items-center rounded-sm text-xs text-muted-foreground
-						       transition-opacity hover:bg-muted hover:text-foreground
-						       group-hover:pointer-events-auto group-hover:opacity-100
-						       {isActive ? 'opacity-100' : 'pointer-events-none opacity-0'}"
-						aria-label={kit.labels.tabOpenBelow()}
-						title={kit.labels.tabOpenBelow()}
-						onclick={() => onbelow(t.key)}
+						class="mr-1 grid size-5 place-items-center rounded-sm text-xs
+						       text-muted-foreground hover:bg-muted hover:text-foreground"
+						aria-label={kit.labels.tabClose()}
+						onclick={() => close(t.key)}
 					>
-						⊟
+						✕
 					</button>
-				{/if}
-				<button
-					type="button"
-					tabindex="-1"
-					class="mr-1 grid size-5 place-items-center rounded-sm text-xs
-					       text-muted-foreground hover:bg-muted hover:text-foreground"
-					aria-label={kit.labels.tabClose()}
-					onclick={() => close(t.key)}
-				>
-					✕
-				</button>
-			</div>
+				{/snippet}
+			</Tab>
 		{/each}
 		{#if trailing}
 			<!-- `ml-auto` rather than a spacer element: the trailing group sits

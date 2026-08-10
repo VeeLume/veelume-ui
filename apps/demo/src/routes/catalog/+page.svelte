@@ -205,35 +205,17 @@
 	header, and the 56px a toolbar would have cost goes to rows instead.
 -->
 <div class="flex h-full min-h-0 flex-col">
-	<Surface.Root {descriptor} {browse} selected={active} class="min-h-0 flex-1 gap-0">
-		<Surface.Split
-			class="p-3"
-			collapsed={browse.values.list === 'closed'}
-			oncollapse={(next) => browse.set('list', next ? 'closed' : 'open')}
-		>
+	<Surface.Root
+		{descriptor}
+		{browse}
+		selected={active}
+		collapsed={browse.values.list === 'closed'}
+		oncollapse={(next) => browse.set('list', next ? 'closed' : 'open')}
+		class="min-h-0 flex-1 gap-0"
+	>
+		<Surface.Split class="p-3">
 			{#snippet list()}
 				<Surface.List {status}>
-					{#snippet headerLeading()}
-						<!-- HIDE rides in the list's own header: it acts on the list, so
-						     containment puts it here, and it costs no layout. SHOW is the
-						     kit's, because the box this button lives in is exactly the one
-						     that disappears. Same shape as that handle — half a button,
-						     docked flush to the bar's left edge (`-ml-3` cancels the bar's
-						     inset) — so the two states of one control look like one
-						     control. -->
-						<button
-							type="button"
-							class="-ml-3 grid h-9 w-4 shrink-0 place-items-center rounded-r-md border
-							       border-l-0 border-input bg-background text-xs text-muted-foreground
-							       shadow-xs transition-colors hover:w-5 hover:bg-muted
-							       hover:text-foreground"
-							aria-label="Hide list"
-							title="Hide list"
-							onclick={() => browse.set('list', 'closed')}
-						>
-							‹
-						</button>
-					{/snippet}
 					{#snippet headerPanel()}
 						<!-- Grouping is a VIEW option, so it rides in the filter panel
 						     beside sort rather than eating header width search needs —
@@ -323,29 +305,12 @@
 								     row as the tabs and reads as one of them — active state
 								     included. It carries no key, which is why the kit models
 								     it as a trailing slot rather than a workset entry. -->
-								<div
-									class="flex shrink-0 items-center rounded-t-md border
-									       {comparing
-										? 'border-border border-b-card bg-card'
-										: 'border-transparent text-muted-foreground hover:text-foreground'}"
+								<Surface.Tab
+									active={comparing}
+									onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
 								>
-									<!-- `role="tab"` on the BUTTON, matching the kit's own tabs:
-									     the strip's arrow-key navigation focuses whatever carries
-									     the role, so a role on a non-focusable div silently drops
-									     out of the keyboard order. `tabindex="-1"` because the
-									     roving 0 belongs to the selected record tab — arrow keys
-									     focus explicitly and ignore it. -->
-									<button
-										type="button"
-										role="tab"
-										aria-selected={comparing}
-										tabindex="-1"
-										class="h-9 px-3 text-sm"
-										onclick={() => browse.set('compare', comparing ? '' : 'tabs')}
-									>
-										⊞ Compare {compareEntities.length}
-									</button>
-								</div>
+									⊞ Compare {compareEntities.length}
+								</Surface.Tab>
 							{/if}
 						{/snippet}
 					</Surface.TabStrip>

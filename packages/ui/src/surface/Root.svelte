@@ -16,6 +16,8 @@
 		descriptor,
 		browse,
 		selected = null,
+		collapsed = undefined,
+		oncollapse = undefined,
 		class: klass = '',
 		children
 	}: {
@@ -26,6 +28,16 @@
 		 * for three parts — see the note on `createSurface`'s third argument.
 		 */
 		selected?: string | null;
+		/**
+		 * List collapse. Both halves must be supplied for the controls to exist —
+		 * `Split` renders the docked SHOW handle while collapsed, `Surface.List`
+		 * the HIDE half-button in its own header, and neither draws anything
+		 * without a way to report the change. Controlled like `Switch`, so
+		 * whether the state lives in the URL, a preference or page state is the
+		 * app's call.
+		 */
+		collapsed?: boolean;
+		oncollapse?: (next: boolean) => void;
 		class?: string;
 		children: Snippet;
 	} = $props();
@@ -36,7 +48,8 @@
 		createSurface(
 			() => descriptor,
 			() => browse,
-			() => selected
+			() => selected,
+			() => (oncollapse ? { collapsed: !!collapsed, set: oncollapse } : undefined)
 		)
 	);
 </script>

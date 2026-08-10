@@ -19,24 +19,16 @@
 		frame={false}
 	>
 		<div class="h-56">
-			<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
-				<Surface.Split {collapsed} oncollapse={(next) => (collapsed = next)}>
+			<Surface.Root
+				{descriptor}
+				browse={staticBrowse()}
+				selected="b"
+				{collapsed}
+				oncollapse={(next) => (collapsed = next)}
+			>
+				<Surface.Split>
 					{#snippet list()}
-						<Surface.List status="ready">
-							{#snippet headerLeading()}
-								<button
-									type="button"
-									class="-ml-3 grid h-9 w-4 shrink-0 place-items-center rounded-r-md border
-									       border-l-0 border-input bg-background text-xs text-muted-foreground
-									       shadow-xs hover:w-5 hover:bg-muted"
-									aria-label="Hide list"
-									title="Hide list"
-									onclick={() => (collapsed = true)}
-								>
-									‹
-								</button>
-							{/snippet}
-						</Surface.List>
+						<Surface.List status="ready"></Surface.List>
 					{/snippet}
 					{#snippet detail()}
 						<div class="grid h-full place-items-center rounded-lg border border-border bg-card">

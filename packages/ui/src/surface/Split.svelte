@@ -23,33 +23,10 @@
 	let {
 		list,
 		detail,
-		collapsed = false,
-		oncollapse = undefined,
 		class: klass = ''
 	}: {
 		list?: Snippet;
 		detail?: Snippet;
-		/**
-		 * Give the detail region the full width. Controlled, like `Switch`:
-		 * whether this is a per-session preference, a URL param or a stored
-		 * setting is the app's call, and the split just renders what it is told.
-		 */
-		collapsed?: boolean;
-		/**
-		 * Receives the requested next state.
-		 *
-		 * ⚑ The kit renders only the SHOW affordance, and only while collapsed.
-		 * **The HIDE control is the app's, and belongs in the list's own header**
-		 * (`Surface.List`'s `headerLeading`) — it acts on the list, so by the
-		 * containment rule it rides in the list's chrome, where it costs no
-		 * layout at all. Show cannot follow that rule, because the box it would
-		 * live in is the one that just disappeared; that asymmetry is the whole
-		 * design, not an oversight.
-		 *
-		 * Omit and neither exists — a surface whose list is always visible never
-		 * grows a control it has to explain.
-		 */
-		oncollapse?: (next: boolean) => void;
 		class?: string;
 	} = $props();
 
@@ -59,6 +36,10 @@
 	const s = getSurfaceContext();
 	const kit = getKitContext();
 	const selected = $derived(!!s.selected);
+	// From Root, like `selected`: the HIDE half lives in the list's header and
+	// the SHOW half here, and one fact must drive both.
+	const collapse = $derived(s.collapse);
+	const collapsed = $derived(!!collapse?.collapsed);
 
 	/**
 	 * ⚑ Collapse applies only where the split EXISTS. Below `md` the list and
@@ -80,7 +61,7 @@
 		</div>
 	{/if}
 
-	{#if oncollapse && list && detail && collapsed}
+	{#if collapse && list && detail && collapsed}
 		<!--
 			⚑ Only the SHOW affordance lives here, only while collapsed, and
 			DOCKED rather than laid out. Four placements were tried:
@@ -113,7 +94,7 @@
 			aria-label={kit.labels.showList()}
 			title={kit.labels.showList()}
 			aria-expanded={false}
-			onclick={() => oncollapse(false)}
+			onclick={() => collapse.set(false)}
 		>
 			›
 		</button>
@@ -127,7 +108,7 @@
 		     whole cost, against 36 for a rail and 20 for a permanent divider. -->
 		<div
 			class="min-h-0 min-w-0 flex-1 {selected || !list ? '' : 'hidden md:block'}
-			       {oncollapse && list && collapsed ? 'md:pl-3' : ''}"
+			       {collapse && list && collapsed ? 'md:pl-3' : ''}"
 		>
 			{@render detail()}
 		</div>

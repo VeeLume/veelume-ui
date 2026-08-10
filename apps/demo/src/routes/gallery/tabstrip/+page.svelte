@@ -74,20 +74,13 @@
 
 	<Case
 		title="trailing slot"
-		note="Pinned to the right, after a flexible gap: for chrome that belongs to the working set rather than being a member of it — the demo puts a Compare tab here. It is a trailing slot rather than a workset entry precisely because it carries no key."
+		note="Pinned to the right, after a flexible gap: for chrome that belongs to the working set rather than being a member of it — the demo puts a Compare tab here. It is a trailing slot rather than a workset entry precisely because it carries no key. Built from `Surface.Tab`, the same chrome the strip uses for its own tabs, so an app tab cannot drift from a record tab."
 		frame={false}
 	>
 		<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
 			<Surface.TabStrip workset={mixed} onactivate={noop} onbelow={noop}>
 				{#snippet trailing()}
-					<div
-						role="tab"
-						aria-selected="false"
-						class="flex shrink-0 items-center rounded-t-md border border-transparent
-						       text-muted-foreground hover:text-foreground"
-					>
-						<button type="button" class="h-9 px-3 text-sm">⊞ Compare 3</button>
-					</div>
+					<Surface.Tab active={false} onclick={noop}>⊞ Compare 3</Surface.Tab>
 				{/snippet}
 			</Surface.TabStrip>
 			<div class="h-24 rounded-lg rounded-tl-none border border-border bg-card"></div>

@@ -61,12 +61,35 @@
 	const kit = getKitContext();
 
 	const filterable = $derived(s.facets.length > 0 || s.sorts.length > 0 || !!panel);
-	const show = $derived(s.searchable || filterable || !!action || !!leading);
+	const show = $derived(s.searchable || filterable || !!action || !!leading || !!s.collapse);
 	const Icon = $derived(action?.icon as IconOf | undefined);
 </script>
 
 {#if show}
 	<Bar class={klass}>
+		{#if s.collapse}
+			<!-- The HIDE half of the collapse control, mirroring the docked SHOW
+			     handle `Split` renders: half a button, flat left, rounded only
+			     towards the content, `-ml-3` cancelling the bar's own inset so it
+			     sits flush. The two are one control in two states, so they must
+			     share the code that says what that looks like — the `Bar` lesson,
+			     which this pair had already started to violate as hand-written
+			     copies in two demo pages. -->
+			<button
+				type="button"
+				class="-ml-3 hidden h-9 w-4 shrink-0 place-items-center rounded-r-md border
+				       border-l-0 border-input bg-background text-xs text-muted-foreground
+				       shadow-xs transition-colors hover:w-5 hover:bg-muted hover:text-foreground
+				       md:grid"
+				aria-label={kit.labels.hideList()}
+				title={kit.labels.hideList()}
+				aria-expanded={true}
+				onclick={() => s.collapse?.set(true)}
+			>
+				‹
+			</button>
+		{/if}
+
 		{#if leading}{@render leading()}{/if}
 
 		{#if filterable}<FilterButton {panel} />{/if}

@@ -18,7 +18,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, `Surface.Tab`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
@@ -316,12 +316,20 @@ prototype before any of it froze here.
   than a per-tab affordance (browser tabs treat their close button the same way). Toggled by
   OPACITY at a fixed size, never by width: an animated width reflows the strip under the
   pointer you are aiming with.
+- **`Surface.Tab` is the tab chrome, and both the strip and the app use it.** An app's
+  trailing content has to READ as one of the tabs; hand-copying the border, the
+  `border-b-card` blend and the roles is the `Bar` lesson waiting to happen, and it had
+  already produced a compare tab whose `role` sat on a non-focusable wrapper. One component
+  means an app tab cannot drift from a record tab, and gets scroll-into-view and the
+  focusable contract for free.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.
-- **⚑ Collapse is ASYMMETRIC, and the asymmetry is the design.** HIDE belongs to the list's
-  own header (`headerLeading`) — it acts on the list, so the containment rule puts it in the
-  list's chrome, where it costs no layout at all. SHOW cannot follow that rule, because the
+- **⚑ Collapse is ASYMMETRIC, and the asymmetry is the design.** BOTH halves are the kit's,
+  driven by ONE fact on `Surface.Root` (`collapsed` + `oncollapse`, published through the
+  surface context because `Split` and `List` are siblings the app wires, not a parent and a
+  child a prop could bridge). HIDE renders in the list's own header — it acts on the list, so
+  the containment rule puts it in the list's chrome, where it costs no layout at all. SHOW cannot follow that rule, because the
   box it would live in is exactly the box that disappeared, so the kit renders it — **docked**
   in the surface's left gutter rather than laid out, and ONLY while collapsed. Four placements
   were tried: a 12px seam (unfindable), the same seam made weightier and bar-aligned

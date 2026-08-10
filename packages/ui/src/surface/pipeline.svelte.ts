@@ -86,11 +86,22 @@ export function createSurface<Src, R extends Row>(
 	 * which pane a narrow screen shows, and the toolbar steps aside with the list.
 	 * Three props for one fact is three chances to disagree.
 	 */
-	getSelected: () => string | null = () => null
+	getSelected: () => string | null = () => null,
+	/**
+	 * List collapse, carried for the same reason `selected` is: TWO parts need
+	 * one fact. `Split` decides whether the list pane renders, and `List`
+	 * renders the control that flips it — and they are not in a parent/child
+	 * relationship a prop could bridge, because the list arrives through a
+	 * snippet declared in the APP. `undefined` means the surface has no
+	 * collapse concept at all, and neither part draws anything.
+	 */
+	getCollapse: () => { collapsed: boolean; set: (next: boolean) => void } | undefined = () =>
+		undefined
 ) {
 	const descriptor = $derived(getDescriptor());
 	const browse = $derived(getBrowse());
 	const selected = $derived(getSelected());
+	const collapse = $derived(getCollapse());
 
 	const facets = $derived(descriptor.facets ?? []);
 	const sorts = $derived(descriptor.sorts ?? []);
@@ -240,6 +251,11 @@ export function createSurface<Src, R extends Row>(
 		},
 		get selected() {
 			return selected;
+		},
+		/** `undefined` when the surface does not collapse — the parts test this
+		 *  rather than a flag, so absence stays neutral. */
+		get collapse() {
+			return collapse;
 		},
 		/** A row by its key, from ALL rows (pre-filter) — see `byKeyMap`. */
 		byKey(key: string): R | undefined {
