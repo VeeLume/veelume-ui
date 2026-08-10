@@ -18,7 +18,7 @@
 		notifGlyph,
 		notifLevelClass,
 		type Notification
-	} from './store.svelte.js';
+	} from './notifications.svelte.js';
 
 	let {
 		item = undefined,

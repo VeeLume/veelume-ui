@@ -15,7 +15,12 @@
 	import Popup from '../popup/Popup.svelte';
 	import List from './List.svelte';
 	import { getKitContext } from '../context/index.js';
-	import { notifications, clearAll, markAllRead, type Notification } from './store.svelte.js';
+	import {
+		notifications,
+		clearAll,
+		markAllRead,
+		type Notification
+	} from './notifications.svelte.js';
 
 	let {
 		open = false,

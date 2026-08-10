@@ -35,5 +35,5 @@ export {
 	isSticky,
 	notifGlyph,
 	notifLevelClass
-} from './store.svelte.js';
-export type { NotifAction, NotifInput, NotifLevel, Notification } from './store.svelte.js';
+} from './notifications.svelte.js';
+export type { NotifAction, NotifInput, NotifLevel, Notification } from './notifications.svelte.js';

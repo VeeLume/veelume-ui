@@ -7,7 +7,7 @@
 	 * for the donors' arrangement.
 	 */
 	import { getKitContext } from '../context/index.js';
-	import { notifications } from './store.svelte.js';
+	import { notifications } from './notifications.svelte.js';
 
 	let {
 		onclick,

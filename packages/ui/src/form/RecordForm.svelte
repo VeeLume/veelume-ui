@@ -14,7 +14,7 @@
 	import TimeInput from './TimeInput.svelte';
 	import Switch from './Switch.svelte';
 	import { sectionsOf, type FieldSpec } from './types.js';
-	import type { RecordForm } from './createRecordForm.svelte.js';
+	import type { RecordForm } from './recordForm.svelte.js';
 
 	let {
 		form,
