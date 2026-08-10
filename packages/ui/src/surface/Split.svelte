@@ -36,9 +36,18 @@
 		 */
 		collapsed?: boolean;
 		/**
-		 * Receives the requested next state. **Omit and no control renders** —
-		 * a surface whose list should always be visible never grows a divider
-		 * it has to explain.
+		 * Receives the requested next state.
+		 *
+		 * ⚑ The kit renders only the SHOW affordance, and only while collapsed.
+		 * **The HIDE control is the app's, and belongs in the list's own header**
+		 * (`Surface.List`'s `headerLeading`) — it acts on the list, so by the
+		 * containment rule it rides in the list's chrome, where it costs no
+		 * layout at all. Show cannot follow that rule, because the box it would
+		 * live in is the one that just disappeared; that asymmetry is the whole
+		 * design, not an oversight.
+		 *
+		 * Omit and neither exists — a surface whose list is always visible never
+		 * grows a control it has to explain.
 		 */
 		oncollapse?: (next: boolean) => void;
 		class?: string;
@@ -71,35 +80,36 @@
 		</div>
 	{/if}
 
-	{#if oncollapse && list && detail}
-		<!-- The divider IS the control. A button in either pane's chrome would
-		     belong to that pane and compete with its contents; the seam between
-		     them belongs to neither, which is the same containment argument that
-		     put search inside the list. Hidden below `md` with the split.
+	{#if oncollapse && list && detail && collapsed}
+		<!--
+			⚑ Only the SHOW affordance lives here, and only while collapsed.
+			Three placements were tried before this one:
 
-		     ⚑ It reads as a real control, not a hairline. The first version was a
-		     12px strip with a bare chevron and Valerie could not find it — "we
-		     still need a collapse button somewhere". A seam is the right PLACE
-		     and was the wrong WEIGHT: it now carries a bordered handle on a
-		     visible rule, which is what a splitter looks like everywhere else. -->
-		<div class="relative hidden w-5 shrink-0 justify-center pt-4 md:flex">
-			<div class="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-border"></div>
-			<!-- ⚑ Aligned to the BAR row, not centred in the seam. Centred, it
-			     floated at mid-height with nothing around it and read as
-			     decoration — Valerie looked for it twice and did not find it.
-			     Controls live in the band across the top of a surface, so that is
-			     where the eye goes looking for one. -->
+			  1. a 12px seam with a bare chevron — unfindable;
+			  2. the same seam, weightier and bar-aligned — findable, but it is a
+			     permanent column reserved for one button ("the divider just eats
+			     space for a single button");
+			  3. this: nothing at all while expanded.
+
+			The rule that falls out is the containment rule with its edge case
+			named. HIDE belongs to the list's own header — it acts on the list, so
+			it rides in the list's chrome and costs no layout. SHOW cannot,
+			because the box it would live in is exactly the box that is gone; so
+			the kit supplies it, and only then. A rail that exists only while
+			collapsed spends 36px at the moment the list just gave back 384.
+		-->
+		<div class="hidden w-9 shrink-0 flex-col items-center pt-4 md:flex">
 			<button
 				type="button"
-				class="relative grid size-7 place-items-center rounded-full border border-border
-				       bg-background text-muted-foreground shadow-xs transition-colors
-				       hover:bg-muted hover:text-foreground"
-				aria-label={collapsed ? kit.labels.showList() : kit.labels.hideList()}
-				title={collapsed ? kit.labels.showList() : kit.labels.hideList()}
-				aria-expanded={!collapsed}
-				onclick={() => oncollapse(!collapsed)}
+				class="grid size-7 place-items-center rounded-md border border-border bg-background
+				       text-muted-foreground shadow-xs transition-colors hover:bg-muted
+				       hover:text-foreground"
+				aria-label={kit.labels.showList()}
+				title={kit.labels.showList()}
+				aria-expanded={false}
+				onclick={() => oncollapse(false)}
 			>
-				{collapsed ? '›' : '‹'}
+				›
 			</button>
 		</div>
 	{/if}

@@ -213,6 +213,23 @@
 		>
 			{#snippet list()}
 				<Surface.List {status}>
+					{#snippet headerLeading()}
+						<!-- HIDE rides in the list's own header: it acts on the list, so
+						     containment puts it here, and it costs no layout. SHOW is the
+						     kit's, because the box this button lives in is exactly the
+						     one that disappears. -->
+						<button
+							type="button"
+							class="grid size-9 shrink-0 place-items-center rounded-md border border-input
+							       bg-background text-muted-foreground shadow-xs transition-colors
+							       hover:bg-muted hover:text-foreground"
+							aria-label="Hide list"
+							title="Hide list"
+							onclick={() => browse.set('list', 'closed')}
+						>
+							‹
+						</button>
+					{/snippet}
 					{#snippet headerPanel()}
 						<!-- Grouping is a VIEW option, so it rides in the filter panel
 						     beside sort rather than eating header width search needs —

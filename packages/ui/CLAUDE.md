@@ -319,14 +319,16 @@ prototype before any of it froze here.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.
-- **The collapse handle aligns to the BAR ROW**, not the middle of the seam: controls live in
-  the band across the top of a surface, and a handle floating at mid-height reads as
-  decoration — it went unfound twice before being moved.
-- **`Split` collapses the list from the DIVIDER**, not from either pane: a control inside a
-  pane belongs to that pane and competes with its contents, while the seam belongs to neither
-  — the same containment argument that put search inside the list. Controlled, so the state's
-  home is the app's call; omit `oncollapse` and no divider renders. `md:`-scoped, because
-  below that the panes already take turns being the whole page.
+- **⚑ Collapse is ASYMMETRIC, and the asymmetry is the design.** HIDE belongs to the list's
+  own header (`headerLeading`) — it acts on the list, so the containment rule puts it in the
+  list's chrome, where it costs no layout at all. SHOW cannot follow that rule, because the
+  box it would live in is exactly the box that disappeared, so the kit renders it — as a
+  narrow rail, and ONLY while collapsed, spending 36px at the moment the list just gave back
+  384. Three placements were tried first: a 12px seam (unfindable), the same seam made
+  weightier and bar-aligned (findable, but a permanent column reserved for one button), and
+  finally nothing at all while expanded. Controlled, so the state's home is the app's call;
+  omit `oncollapse` and neither control exists. `md:`-scoped, because below that the panes
+  already take turns being the whole page.
 - **The second pane is a PROJECTION by key** (`byKey` reads ALL rows, pre-filter), stacked
   BELOW the first — stacking costs height, not width, so no breakpoint gates it. It is
   independent of the tab set and lives in its own URL param: a compare is a shareable

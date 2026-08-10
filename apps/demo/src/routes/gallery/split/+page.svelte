@@ -15,17 +15,34 @@
 
 	<Case
 		title="collapsible list"
-		note="The divider IS the control — a button in either pane would belong to that pane and compete with its contents, while the seam between them belongs to neither. Controlled like Switch, so whether the state is a URL param, a preference or page-local is the app's call; omit `oncollapse` and no divider renders at all. Scoped to `md:` and up, because below that the list and the record already take turns being the whole page."
+		note="Asymmetric on purpose. HIDE belongs to the list's own header — it acts on the list, so containment puts it there and it costs no layout. SHOW is the kit's, and exists only while collapsed, because the box it would otherwise live in is exactly the one that disappeared. A permanent divider column reserved for one button was the version before this. Controlled like Switch; omit `oncollapse` and neither control exists. `md:` and up, since below that the panes already take turns being the whole page."
 		frame={false}
 	>
 		<div class="h-56">
 			<Surface.Root {descriptor} browse={staticBrowse()} selected="b">
 				<Surface.Split {collapsed} oncollapse={(next) => (collapsed = next)}>
-					{#snippet list()}<Surface.List status="ready" />{/snippet}
+					{#snippet list()}
+						<Surface.List status="ready">
+							{#snippet headerLeading()}
+								<button
+									type="button"
+									class="grid size-9 shrink-0 place-items-center rounded-md border border-input
+									       bg-background text-muted-foreground shadow-xs hover:bg-muted"
+									aria-label="Hide list"
+									title="Hide list"
+									onclick={() => (collapsed = true)}
+								>
+									‹
+								</button>
+							{/snippet}
+						</Surface.List>
+					{/snippet}
 					{#snippet detail()}
 						<div class="grid h-full place-items-center rounded-lg border border-border bg-card">
 							<p class="text-sm text-muted-foreground">
-								{collapsed ? 'Full width — the list is collapsed.' : 'Click the divider ‹'}
+								{collapsed
+									? 'Full width — click › to bring the list back.'
+									: 'Click ‹ in the list header.'}
 							</p>
 						</div>
 					{/snippet}
