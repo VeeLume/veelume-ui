@@ -1,6 +1,6 @@
 {
 	"name": "@veelume/ui",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"private": true,
 	"type": "module",
 	"description": "Opinionated, uncoupled Svelte UI kit — cache primitives, surfaces, shells",
