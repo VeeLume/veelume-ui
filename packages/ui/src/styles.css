@@ -1,0 +1,45 @@
+/*
+ * The kit's stylesheet. One line for a consumer:
+ *
+ *     @import '@veelume/ui/styles.css';
+ *
+ * ⚑ Why this file exists at all: Tailwind must be told to scan the kit.
+ *
+ * @veelume/ui ships SOURCE, so it reaches an app through node_modules (or a
+ * workspace symlink) — and Tailwind v4's automatic source detection skips
+ * both. Every class used ONLY inside the kit is then missing from the app's
+ * stylesheet: `md:w-72`, `md:flex`, `md:block`, `md:shrink-0`.
+ *
+ * The failure mode is not an error. It looks like a broken flex rule —
+ * opening a record hides the list and nothing brings it back, because
+ * `hidden md:flex` keeps the `hidden` and loses the override.
+ *
+ * `@source` resolves relative to the file that CONTAINS it, so shipping the
+ * directive from here makes it path-independent: no app writes
+ * `../../../packages/ui/src`, no scaffold has to guess where the kit landed,
+ * and `copier update` has nothing to clobber. This is the documented pattern
+ * for component libraries.
+ */
+
+@source ".";
+
+/*
+ * The one tone the shadcn convention has no token for.
+ *
+ * `warning` was the kit's single hardcoded palette (`bg-amber-500/15
+ * text-amber-700 dark:…`), which breaks any app whose brand IS amber: a
+ * warning badge reads as an accent badge, and the semantic distinction
+ * collapses. It was also the only reason a single-theme app needed a `.dark`
+ * class, since nothing else in the kit uses a `dark:` variant.
+ *
+ * Mapped here rather than in the app's `@theme inline` block because that
+ * block lives in template-managed `app.css` — a kit token that required a
+ * scaffold change to adopt would be a tax on every consumer. Apps override
+ * by defining `--warning` / `--warning-foreground` beside their other
+ * tokens; the fallback is the fleet's de facto amber, so an app that never
+ * defines them still renders correctly.
+ */
+@theme inline {
+	--color-warning: var(--warning, oklch(0.75 0.14 70));
+	--color-warning-foreground: var(--warning-foreground, oklch(0.98 0.02 80));
+}

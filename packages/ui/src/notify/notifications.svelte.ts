@@ -145,14 +145,15 @@ export function clearAll() {
 /**
  * Level accents for the two surfaces — one source so a toast and a center
  * row can never disagree about what an error looks like. Same palette logic
- * as StatusBadge: tokens where the convention has them, amber for warning.
+ * as StatusBadge: tokens throughout, `warning` via the pair the kit's own
+ * `styles.css` maps.
  */
 export const notifLevelClass: Record<NotifLevel, { accent: string; glyph: string }> = {
 	info: { accent: 'border-l-border', glyph: 'text-muted-foreground' },
 	success: { accent: 'border-l-primary', glyph: 'text-primary' },
 	warning: {
-		accent: 'border-l-amber-500',
-		glyph: 'text-amber-700 dark:text-amber-400'
+		accent: 'border-l-warning',
+		glyph: 'text-warning'
 	},
 	error: { accent: 'border-l-destructive', glyph: 'text-destructive' }
 };

@@ -510,11 +510,13 @@ Each of these type-checks clean and fails at runtime, or fails silently:
   re-plan — and never make that guard `$state`, or it becomes the same bug.
 - **Runes need `.svelte.ts`.** `$state` in a plain `.ts` passes `svelte-check`
   and throws `rune_outside_svelte` when it runs. No static check catches it.
-- **The consumer must tell Tailwind about this package.** It arrives through a
-  symlink under `node_modules`, which Tailwind v4's auto-detection skips, so
-  kit-only classes silently vanish from the stylesheet and layouts break in ways
-  that look like bad flex rules. Consumers need
-  `@source "…/packages/ui/src"`. The tell: kit components HMR via `/@fs/` paths.
+- **Tailwind must be told to scan this package — the kit ships that itself.**
+  It arrives through `node_modules` (or a workspace symlink), which Tailwind
+  v4's auto-detection skips, so kit-only classes silently vanish and layouts
+  break in ways that look like bad flex rules. `@import '@veelume/ui/styles.css'`
+  is the whole fix: `@source` resolves relative to the file containing it, so
+  the directive ships FROM the kit and no app writes a relative path. The tell
+  that it is missing: kit components HMR via `/@fs/` paths.
 - **Icon props need the `IconOf` cast in markup.** `NavIcon`/`ActionIcon` are
   aliases of ONE union (`theme/types.ts` `Icon`) so both Svelte component eras
   work; a union is not constructable in a template. Do not cast to `never`.

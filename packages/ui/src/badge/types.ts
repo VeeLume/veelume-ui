@@ -22,14 +22,16 @@ export type StatusMap<S extends string = string> = Partial<Record<S, StatusStyle
 
 /**
  * The tone classes, one source so `StatusBadge` and `Surface.List`'s badge
- * slot cannot drift. `warning` is raw amber: the shadcn token convention has
- * no warning token, amber is the fleet's de facto answer (three of four
- * donor maps), and the dark variants are added here — stibu never had them.
+ * slot cannot drift. All four are tokens — `warning` included, via the pair
+ * the kit's own `styles.css` maps (the shadcn convention has none, and the
+ * fleet's amber is the fallback there). It was hardcoded `amber-*` until
+ * Starlume, whose brand IS amber, showed that a warning badge then reads as
+ * an accent badge.
  */
 export const statusToneClass: Record<StatusTone, string> = {
 	primary: 'bg-primary/10 text-primary',
 	neutral: 'bg-muted text-muted-foreground',
-	warning: 'bg-amber-500/15 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400',
+	warning: 'bg-warning/15 text-warning',
 	destructive: 'bg-destructive/10 text-destructive'
 };
 
