@@ -70,22 +70,7 @@
 			     reason: the consumer's Tailwind build cannot be relied on for
 			     custom keyframes (the kit arrives via symlink), while component
 			     CSS compiles wherever the component does. -->
-			<div class="sweep h-full w-1/3 rounded-full bg-primary"></div>
+			<div class="vk-sweep h-full w-1/3 rounded-full bg-primary"></div>
 		{/if}
 	</div>
 </div>
-
-<style>
-	.sweep {
-		animation: sweep 1.2s ease-in-out infinite;
-		position: relative;
-	}
-	@keyframes sweep {
-		from {
-			left: -35%;
-		}
-		to {
-			left: 100%;
-		}
-	}
-</style>

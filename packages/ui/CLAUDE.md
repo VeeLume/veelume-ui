@@ -538,6 +538,19 @@ Each of these type-checks clean and fails at runtime, or fails silently:
   mapping recalibrates against it — the thumb visibly drifts from the mouse. Use
   a spacer whose height changes only with *measurements* plus `translateY` rows,
   and `overflow-anchor: none` on the container.
+- **A git-installed consumer must exclude the kit from Vite's dependency
+  pre-bundler.** The kit ships source, and esbuild cannot parse `.svelte.ts`
+  rune modules: `pnpm tauri dev` fails with `Unexpected token` on every
+  `.svelte.js` re-export in `index.ts`, then `Unexpected end of JSON input`
+  from esbuild. The demo never sees it because a workspace link is not
+  pre-bundled. Consumer-side fix, in `vite.config`:
+  `optimizeDeps: { exclude: ['@veelume/ui'] }` — then purge `.vite` and
+  `.svelte-kit`. Prod builds are unaffected. (Starlume 2026-07, stibu 2026-09.)
+  **Excluding a package also un-bundles its dependencies**: list the kit's own
+  copies explicitly — `include: ['@veelume/ui > bits-ui', '@veelume/ui >
+  @floating-ui/dom', '@veelume/ui > @internationalized/date', '@veelume/ui >
+  clsx', '@veelume/ui > tailwind-merge']` — or bits-ui's styled components hit
+  the virtual-CSS miss described under Conventions.
 - **When a bisect reaches "identical code, different behaviour", stop bisecting
   code.** A partial Vite dependency pre-bundle (from a killed dev server) serves
   two Svelte runtime copies, which breaks every `getContext` lookup and mimics an
@@ -593,6 +606,17 @@ if two surfaces pass the same one, it is a default the kit is refusing to have.
 - Ships **source**, no build step, while workspace-linked. `exports` points at `src/index.ts`.
 - Svelte 5 runes throughout. `.svelte.ts` for rune-bearing modules.
 - Nothing enters `src/index.ts` until it has a consumer in `apps/demo`.
+
+### No `<style>` blocks in kit components (2026-09-06)
+
+Non-utility CSS — keyframes, a colour-mix tint — goes in `styles.css` under a
+`vk-` prefixed global class, never in a component's `<style>`. Reason: a
+git-installed consumer serves the kit from `node_modules`, Vite stamps those
+ids with `?v=<hash>`, and vite-plugin-svelte 6 then cannot serve the virtual
+`?svelte&type=style` module (registered under the stamped id, looked up by bare
+filename). The consumer's dev server dies on the first styled component; the
+workspace-linked demo never sees it. `styles.css` is imported by every consumer,
+so CSS there is exactly as reliable as scoped CSS was meant to be.
 
 ### File layout (normalized 2026-08; hold the line)
 

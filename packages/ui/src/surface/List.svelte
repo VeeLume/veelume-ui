@@ -296,7 +296,7 @@
 		     activity at all, so the bar appearing never shifts the rows below. -->
 		<div class="relative h-0.5 shrink-0 overflow-hidden" aria-hidden="true">
 			{#if fetching}
-				<div class="throb absolute inset-y-0 w-1/3 rounded-full bg-primary"></div>
+				<div class="vk-sweep absolute inset-y-0 w-1/3 rounded-full bg-primary"></div>
 			{/if}
 		</div>
 	{/if}
@@ -380,21 +380,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	/* Indeterminate sweep. A scoped keyframe rather than a Tailwind utility:
-	   the consumer's Tailwind build cannot be relied on for custom keyframes
-	   (the kit arrives via symlink — see the `@source` gotcha), while component
-	   CSS compiles wherever the component does. */
-	.throb {
-		animation: throb 1.2s ease-in-out infinite;
-	}
-	@keyframes throb {
-		from {
-			left: -35%;
-		}
-		to {
-			left: 100%;
-		}
-	}
-</style>

@@ -43,3 +43,40 @@
 	--color-warning: var(--warning, oklch(0.75 0.14 70));
 	--color-warning-foreground: var(--warning-foreground, oklch(0.98 0.02 80));
 }
+
+/*
+ * Component CSS that is not a Tailwind utility lives HERE, never in a
+ * component's `<style>` block.
+ *
+ * ⚑ Why: a git-installed consumer serves the kit from node_modules, and Vite
+ * stamps those module ids with a `?v=<hash>` cache-buster. vite-plugin-svelte 6
+ * registers a component's compiled CSS under that stamped id but resolves the
+ * virtual `?svelte&type=style` import by bare filename — the lookup misses,
+ * Vite falls back to the raw .svelte file, and Tailwind's plugin chokes on it
+ * ("Invalid declaration: `Snippet`"). A workspace link (apps/demo) has no
+ * `?v=`, so the harness never showed it; stibu did (2026-09-06).
+ *
+ * This file is plain CSS imported by every consumer (rule 2 of "Consuming the
+ * kit"), so keyframes here are as reliable as scoped ones were meant to be.
+ * Classes are `vk-` prefixed because they are global now.
+ */
+
+/* Indeterminate sweep — Progress's bar and Surface.List's throbber track. */
+.vk-sweep {
+	position: relative;
+	animation: vk-sweep 1.2s ease-in-out infinite;
+}
+@keyframes vk-sweep {
+	from {
+		left: -35%;
+	}
+	to {
+		left: 100%;
+	}
+}
+
+/* Unread rows in Notify.List: the accent at a fraction — Tailwind has no
+   token for that, so the one non-utility colour rule in the kit. */
+.vk-accent-tint {
+	background: color-mix(in srgb, var(--accent) 45%, transparent);
+}

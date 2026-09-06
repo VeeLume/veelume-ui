@@ -41,7 +41,7 @@
 {:else}
 	<ul class="min-h-0 flex-1 overflow-y-auto {klass}">
 		{#each notifications.items as n (n.id)}
-			<li class="border-b border-border last:border-b-0" class:bg-accent-tint={!n.read}>
+			<li class="border-b border-border last:border-b-0" class:vk-accent-tint={!n.read}>
 				{#if item}
 					{@render item({ notification: n, dismiss: () => dismiss(n.id) })}
 				{:else}
@@ -99,11 +99,3 @@
 		{/each}
 	</ul>
 {/if}
-
-<style>
-	/* The donors tint unread rows with an accent mix; Tailwind has no token
-	   for "accent at a fraction", so the one non-utility rule in the module. */
-	.bg-accent-tint {
-		background: color-mix(in srgb, var(--accent) 45%, transparent);
-	}
-</style>
