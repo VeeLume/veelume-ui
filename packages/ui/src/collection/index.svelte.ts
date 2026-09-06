@@ -463,6 +463,38 @@ export function createCollection<
 	}
 
 	/**
+	 * Disappearance after a COMPLETE fill.
+	 *
+	 * A fill that answered the whole query — `fetchAll`, or a paged fill that
+	 * started from nothing and ran until the source was exhausted — is the only
+	 * complete picture of a set the client ever gets. The server is
+	 * authoritative, so a record cached under this scope that belongs to the set
+	 * (per `matches`) and did not come back is gone, and leaves the cache and
+	 * every live set exactly as a keyed `delete` would have removed it.
+	 *
+	 * ⚑ This is what makes the keyless paths honest: `wakeInvalidation`, the
+	 * mandatory `onChange()` on an SSE reconnect, a fetch-once collection's
+	 * manual refresh, and a backend whose events name no keys all say "reload
+	 * everything" — and without this a reload could never make a vanished row
+	 * vanish. Keyed events remain the cheaper tier; this is the net under them.
+	 * Records of OTHER sets in the same scope are not judged: a search fill
+	 * says nothing about rows it was not asked for.
+	 */
+	function reconcile(sk: string, returned: Set<string>, query: SetQuery): void {
+		const idx = scopeIndex.get(sk);
+		if (!idx) return;
+		const gone: K[] = [];
+		for (const key of idx) {
+			if (returned.has(key)) continue;
+			const r = records.get(key);
+			if (r === undefined) continue;
+			if (options.matches && !options.matches(r, query)) continue;
+			gone.push(io.keyOf(r));
+		}
+		if (gone.length) removeLocal(gone);
+	}
+
+	/**
 	 * Attach the invalidation listener once, on first use. There is no explicit
 	 * `start()` because reads are lazy — the collection begins listening when it
 	 * first has something worth keeping fresh.
@@ -530,6 +562,7 @@ export function createCollection<
 				const data = await io.fetchAll(scope);
 				if (epoch !== writeEpoch) return run(k, scope, query, 'refreshing');
 				cache(data, sk);
+				reconcile(sk, new Set(data.map((r) => String(io.keyOf(r)))), query);
 				patchSet(k, {
 					keys: data.map(io.keyOf),
 					fetchedCount: data.length,
@@ -616,6 +649,10 @@ export function createCollection<
 				// between pages is what lets the browser draw them.
 				await new Promise((r) => setTimeout(r, 0));
 			}
+
+			// Only a fill that began at the start and reached the end has seen
+			// the whole set; an appended or halted one has not, and must not judge.
+			if (exhausted && !append && !halted) reconcile(sk, seen, query);
 
 			patchSet(k, {
 				keys,
