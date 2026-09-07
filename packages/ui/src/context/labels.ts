@@ -29,6 +29,8 @@ export type LabelBag = {
 	sort: () => string;
 	/** How many rows the current search + filters leave. */
 	resultCount: (a: { count: number }) => string;
+	/** A multi-picker's footer: how many are picked so far. */
+	selectedCount: (a: { count: number }) => string;
 	/** The same, but against the unnarrowed total — shown only while narrowing,
 	 *  where the comparison is the information. */
 	narrowedCount: (a: { shown: number; total: number }) => string;
@@ -127,6 +129,7 @@ export const defaultLabels: LabelBag = {
 	resetFilters: () => 'Reset',
 	sort: () => 'Sort',
 	resultCount: ({ count }) => `${count} ${count === 1 ? 'result' : 'results'}`,
+	selectedCount: ({ count }) => `${count} selected`,
 	narrowedCount: ({ shown, total }) => `${shown} of ${total}`,
 	purpose: () => 'What is this view for?',
 

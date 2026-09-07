@@ -26,6 +26,7 @@
 		detail = undefined,
 		searchIn = undefined,
 		multiple = false,
+		confirmLabel = undefined,
 		row = undefined
 	}: {
 		open?: boolean;
@@ -39,6 +40,7 @@
 		detail?: (item: T) => string | null | undefined;
 		searchIn?: (item: T) => (string | null | undefined)[];
 		multiple?: boolean;
+		confirmLabel?: string;
 		row?: Snippet<[{ item: T; picked: boolean; pick: () => void }]>;
 	} = $props();
 </script>
@@ -51,6 +53,7 @@
 		{detail}
 		{searchIn}
 		{multiple}
+		{confirmLabel}
 		{row}
 		onpick={(picked) => {
 			onpick(picked);

@@ -29,6 +29,7 @@
 		detail = undefined,
 		searchIn = undefined,
 		multiple = false,
+		confirmLabel = undefined,
 		onpick,
 		row = undefined,
 		class: klass = ''
@@ -41,6 +42,9 @@
 		/** What the search matches. Defaults to the label. */
 		searchIn?: (item: T) => (string | null | undefined)[];
 		multiple?: boolean;
+		/** Multi only: the confirm button's verb — "Add", "Invite". Defaults to
+		 *  the bag's Confirm; the picked count sits beside it either way. */
+		confirmLabel?: string;
 		/** Single: `[item]`, immediately. Multi: the selection, on confirm. */
 		onpick: (picked: T[]) => void;
 		/** Replaces a row's rendering; `pick` is select-or-toggle. */
@@ -134,7 +138,7 @@
 	{#if multiple}
 		<div class="flex shrink-0 items-center justify-between gap-2 border-t border-border p-3">
 			<span class="text-xs tabular-nums text-muted-foreground">
-				{kit.labels.resultCount({ count: selected.size })}
+				{kit.labels.selectedCount({ count: selected.size })}
 			</span>
 			<button
 				type="button"
@@ -143,7 +147,7 @@
 				disabled={selected.size === 0}
 				onclick={confirm}
 			>
-				{kit.labels.confirm()}
+				{confirmLabel ?? kit.labels.confirm()}
 			</button>
 		</div>
 	{/if}
