@@ -24,7 +24,7 @@
 @source ".";
 
 /*
- * The one tone the shadcn convention has no token for.
+ * The two tones the shadcn convention has no token for.
  *
  * `warning` was the kit's single hardcoded palette (`bg-amber-500/15
  * text-amber-700 dark:…`), which breaks any app whose brand IS amber: a
@@ -38,10 +38,16 @@
  * by defining `--warning` / `--warning-foreground` beside their other
  * tokens; the fallback is the fleet's de facto amber, so an app that never
  * defines them still renders correctly.
+ *
+ * `success` follows the same mechanism (stibu's accepted participants: a
+ * green "yes" that none of the other tones can say). Fallback is the fleet's
+ * green; override with `--success` / `--success-foreground`.
  */
 @theme inline {
 	--color-warning: var(--warning, oklch(0.75 0.14 70));
 	--color-warning-foreground: var(--warning-foreground, oklch(0.98 0.02 80));
+	--color-success: var(--success, oklch(0.62 0.15 150));
+	--color-success-foreground: var(--success-foreground, oklch(0.98 0.02 150));
 }
 
 /*

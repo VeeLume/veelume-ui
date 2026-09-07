@@ -11,7 +11,19 @@
 export type FieldKind =
 	'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'date' | 'time' | 'display';
 
-export type SelectOption = { value: string; label: string };
+import type { StatusTone } from '../theme/types.js';
+
+export type SelectOption = {
+	value: string;
+	label: string;
+	/**
+	 * `Segmented` only: the selected option renders in this tone instead of
+	 * the filled primary — for options that MEAN something (a participant's
+	 * pending / accepted / declined), where the colour is the message and a
+	 * uniform highlight would drop it. A `select` ignores it.
+	 */
+	tone?: StatusTone;
+};
 
 export type FieldSpec<T> = {
 	/** Key on the record. Also the form control's id. */

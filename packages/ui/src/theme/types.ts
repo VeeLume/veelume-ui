@@ -25,4 +25,4 @@ export type IconOf = Component<Record<string, unknown>>;
  * not a prop. Lives here rather than in `badge/` because the L1 `Row` type
  * carries a resolved tone — the type spine must not import an L2 module.
  */
-export type StatusTone = 'primary' | 'neutral' | 'warning' | 'destructive';
+export type StatusTone = 'primary' | 'neutral' | 'success' | 'warning' | 'destructive';

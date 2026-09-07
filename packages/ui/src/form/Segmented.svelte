@@ -10,7 +10,12 @@
 	 *
 	 * Buttons follow the density target minus the container inset, so the
 	 * control sits flush in settings rows and toolbars at either density.
+	 *
+	 * An option with a `tone` renders its selected state in that tone (the
+	 * badge's tint, so a status here and a status in a list read the same)
+	 * instead of the filled primary; options without stay as they were.
 	 */
+	import { statusToneClass } from '../badge/types.js';
 	import type { SelectOption } from './types.js';
 
 	let {
@@ -32,15 +37,16 @@
 <div class="inline-flex rounded-lg border border-input p-0.5 {klass}" role="group">
 	{#each options as option (option.value)}
 		{@const selected = value === option.value}
+		{@const toned = selected && option.tone ? statusToneClass[option.tone] : ''}
 		<button
 			type="button"
 			{disabled}
 			aria-pressed={selected}
 			class="rounded-md px-3 text-sm font-medium transition-colors
 			       focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none
-			       disabled:opacity-50"
-			class:bg-primary={selected}
-			class:text-primary-foreground={selected}
+			       disabled:opacity-50 {toned}"
+			class:bg-primary={selected && !option.tone}
+			class:text-primary-foreground={selected && !option.tone}
 			class:text-muted-foreground={!selected}
 			class:hover:text-foreground={!selected && !disabled}
 			style="height: calc(var(--density-target) - 0.5rem)"

@@ -11,6 +11,7 @@
 	let b = $state(false);
 	let mode = $state('auto');
 	let level = $state('medium');
+	let rsvp = $state('pending');
 </script>
 
 <div class="grid max-w-3xl gap-6 p-4">
@@ -68,6 +69,21 @@
 				onchange={() => {}}
 			/>
 		</div>
+	</Case>
+
+	<Case
+		title="Segmented with a tone per option"
+		note="Options that MEAN something: the selected state takes the option's tone (the badge's tint, so a status here and a status in a list read the same) instead of the filled primary. stibu's participant status — pending / accepted / declined."
+	>
+		<Segmented
+			options={[
+				{ value: 'pending', label: 'Pending', tone: 'warning' },
+				{ value: 'accepted', label: 'Accepted', tone: 'success' },
+				{ value: 'declined', label: 'Declined', tone: 'destructive' }
+			]}
+			value={rsvp}
+			onchange={(v) => (rsvp = v)}
+		/>
 	</Case>
 
 	<Case

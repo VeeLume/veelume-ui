@@ -21,16 +21,20 @@ export type StatusStyle = { label: () => string; tone: StatusTone };
 export type StatusMap<S extends string = string> = Partial<Record<S, StatusStyle>>;
 
 /**
- * The tone classes, one source so `StatusBadge` and `Surface.List`'s badge
- * slot cannot drift. All four are tokens — `warning` included, via the pair
- * the kit's own `styles.css` maps (the shadcn convention has none, and the
- * fleet's amber is the fallback there). It was hardcoded `amber-*` until
- * Starlume, whose brand IS amber, showed that a warning badge then reads as
- * an accent badge.
+ * The tone classes, one source so `StatusBadge`, `Surface.List`'s badge
+ * slot and a toned `Segmented` option cannot drift. All five are tokens —
+ * `warning` and `success` via the pairs the kit's own `styles.css` maps (the
+ * shadcn convention has neither; the fleet's amber and green are the
+ * fallbacks there). Warning was hardcoded `amber-*` until Starlume, whose
+ * brand IS amber, showed that a warning badge then reads as an accent badge.
+ * Success arrived with stibu's participant status (accepted = green): a
+ * "yes" beside a "pending" and a "no" has no honest tone among the other
+ * four — primary says "ours", not "good".
  */
 export const statusToneClass: Record<StatusTone, string> = {
 	primary: 'bg-primary/10 text-primary',
 	neutral: 'bg-muted text-muted-foreground',
+	success: 'bg-success/15 text-success',
 	warning: 'bg-warning/15 text-warning',
 	destructive: 'bg-destructive/10 text-destructive'
 };
