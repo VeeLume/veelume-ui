@@ -19,7 +19,15 @@
 		due: string | null;
 		notes: string;
 		created: string;
+		owner: string | null;
 	} & Record<string, unknown>;
+
+	// What a reference field points into — in an app, a collection's `.all`.
+	const PEOPLE = [
+		{ id: 'p1', name: 'Ada Lovelace', city: 'London' },
+		{ id: 'p2', name: 'Grace Hopper', city: 'Arlington' },
+		{ id: 'p3', name: 'Margaret Hamilton', city: 'Cambridge' }
+	];
 
 	const record: Demo = {
 		name: 'Valerie',
@@ -28,7 +36,8 @@
 		insured: false,
 		due: '2026-05-01',
 		notes: '',
-		created: '2026-04-05'
+		created: '2026-04-05',
+		owner: 'p2'
 	};
 
 	const fields: FieldSpec<Demo>[] = [
@@ -73,6 +82,21 @@
 			kind: 'date',
 			section: 'Money',
 			hint: 'Segments follow the formatting locale — flip the switcher above.'
+		},
+		{
+			name: 'owner',
+			label: 'Owner',
+			kind: 'reference',
+			section: 'Identity',
+			hint: 'A reference: the record stores the key, the form shows the label, the picker does the finding.',
+			reference: {
+				items: () => PEOPLE,
+				key: (p: (typeof PEOPLE)[number]) => p.id,
+				label: (p: (typeof PEOPLE)[number]) => p.name,
+				detail: (p: (typeof PEOPLE)[number]) => p.city,
+				title: 'Pick an owner',
+				placeholder: 'Nobody yet'
+			}
 		},
 		{ name: 'notes', label: 'Notes', kind: 'textarea', section: 'Notes' },
 		{ name: 'name', label: 'Read-only name', kind: 'text', section: 'Notes', readonly: true }

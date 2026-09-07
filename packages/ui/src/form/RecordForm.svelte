@@ -25,6 +25,7 @@
 	import DateInput from './DateInput.svelte';
 	import TimeInput from './TimeInput.svelte';
 	import Switch from './Switch.svelte';
+	import PickerDialog from '../picker/PickerDialog.svelte';
 	import { recordFormActions } from './actions.js';
 	import { sectionsOf, type FieldSpec } from './types.js';
 	import type { RecordForm } from './recordForm.svelte.js';
@@ -54,6 +55,17 @@
 	const fa = $derived(recordFormActions(form, kit));
 
 	const divergedFields = $derived(form.error?.kind === 'write-diverged' ? form.error.diverged : []);
+
+	// The one reference picker open at a time, by field name.
+	let openReference = $state<string | null>(null);
+
+	/** The picked item behind a reference field's stored key, if it is loaded. */
+	function referenced(f: FieldSpec<T>) {
+		const ref = f.reference;
+		const key = form.value[f.name];
+		if (!ref || key == null || key === '') return undefined;
+		return ref.items().find((i) => ref.key(i) === String(key));
+	}
 </script>
 
 <div class="grid gap-5 {klass}">
@@ -142,6 +154,57 @@
 									<option value={o.value}>{o.label}</option>
 								{/each}
 							</select>
+						{:else if f.kind === 'reference' && f.reference}
+							{@const ref = f.reference}
+							{@const picked = referenced(f)}
+							{@const stored = form.value[f.name]}
+							<!-- A reference is picked, not typed: the button carries the
+							     picked item's label (or the bare key while its collection
+							     is still loading), the picker does the finding, and clearing
+							     writes null. -->
+							<div class="flex items-center gap-2">
+								<button
+									type="button"
+									id={f.name}
+									disabled={f.readonly}
+									class="flex h-9 min-w-0 flex-1 items-center rounded-md border border-input
+									       bg-background px-3 text-left text-sm disabled:opacity-50"
+									onclick={() => (openReference = f.name)}
+								>
+									<span
+										class="truncate"
+										class:text-muted-foreground={!picked && (stored == null || stored === '')}
+									>
+										{picked
+											? ref.label(picked)
+											: stored == null || stored === ''
+												? (ref.placeholder ?? '—')
+												: String(stored)}
+									</span>
+								</button>
+								{#if !f.readonly && stored != null && stored !== ''}
+									<button
+										type="button"
+										class="inline-flex size-9 shrink-0 items-center justify-center rounded-md
+										       text-muted-foreground hover:bg-muted hover:text-foreground"
+										title={kit.labels.clear()}
+										onclick={() => form.set(f.name, null as T[typeof f.name])}
+									>
+										✕
+									</button>
+								{/if}
+							</div>
+							<PickerDialog
+								open={openReference === f.name}
+								onclose={() => (openReference = null)}
+								title={ref.title ?? f.label}
+								items={ref.items() as unknown[]}
+								key={ref.key}
+								label={ref.label}
+								detail={ref.detail}
+								searchIn={ref.searchIn}
+								onpick={([item]) => form.set(f.name, ref.key(item) as T[typeof f.name])}
+							/>
 						{:else if f.kind === 'textarea'}
 							<textarea
 								id={f.name}

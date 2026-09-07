@@ -67,6 +67,7 @@ export type {
 	RecordFormActions,
 	RecordFormIO,
 	RecordFormState,
+	ReferenceSpec,
 	SelectOption
 } from './form/index.js';
 

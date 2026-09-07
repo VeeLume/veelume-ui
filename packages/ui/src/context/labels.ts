@@ -66,6 +66,8 @@ export type LabelBag = {
 	create: () => string;
 	save: () => string;
 	cancel: () => string;
+	/** Empties a picked value (a reference field's ✕). */
+	clear: () => string;
 	/** ConfirmDialog's default forward label — per-call overrides ("Delete")
 	 *  are app content and arrive as props. */
 	confirm: () => string;
@@ -149,6 +151,7 @@ export const defaultLabels: LabelBag = {
 	create: () => 'New',
 	save: () => 'Save',
 	cancel: () => 'Cancel',
+	clear: () => 'Clear',
 	confirm: () => 'Confirm',
 
 	moreActions: () => 'More actions',

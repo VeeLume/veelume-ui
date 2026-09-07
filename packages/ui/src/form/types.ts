@@ -9,7 +9,7 @@
  */
 
 export type FieldKind =
-	'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'date' | 'time' | 'display';
+	'text' | 'textarea' | 'number' | 'select' | 'boolean' | 'date' | 'time' | 'display' | 'reference';
 
 import type { StatusTone } from '../theme/types.js';
 
@@ -23,6 +23,30 @@ export type SelectOption = {
 	 * uniform highlight would drop it. A `select` ignores it.
 	 */
 	tone?: StatusTone;
+};
+
+/**
+ * What a `reference` field points into: another collection's records, picked
+ * from a `PickerDialog`. The record stores the picked item's KEY; the form
+ * shows its label. `items` is a getter so a lazily loading collection stays
+ * live — a descriptor is usually built once, and `() => customers.all` is
+ * what keeps the picker current when the set arrives later.
+ *
+ * Two forms in stibu (a gift card's customer, a voucher's assigned customer)
+ * composed exactly this beside the form before it became a kind.
+ */
+export type ReferenceSpec<I> = {
+	items: () => readonly I[];
+	key: (item: I) => string;
+	label: (item: I) => string;
+	/** Second line under the label in the picker. */
+	detail?: (item: I) => string | null | undefined;
+	/** What the picker's search matches. Defaults to the label. */
+	searchIn?: (item: I) => (string | null | undefined)[];
+	/** The picker dialog's title. Defaults to the field label. */
+	title?: string;
+	/** Shown while nothing is picked. */
+	placeholder?: string;
 };
 
 export type FieldSpec<T> = {
@@ -47,6 +71,13 @@ export type FieldSpec<T> = {
 	scale?: number;
 	/** `display` only — render a stored value as text. */
 	render?: (record: T) => string;
+	/**
+	 * `reference` only — the collection the field points into. The item type
+	 * is the reference's own business (the record only stores its key), so it
+	 * is existential here; `key`/`label` are typed against it at the call site.
+	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	reference?: ReferenceSpec<any>;
 };
 
 export type FormSection<T> = { name: string; fields: FieldSpec<T>[] };
