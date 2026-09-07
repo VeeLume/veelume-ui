@@ -54,8 +54,9 @@
 				<Icon class="size-4 shrink-0" />
 			{/if}
 			<!-- The label collapses on a phone, where the bar has no room for a
-			     sentence; the icon and the position carry it. -->
-			<span class="hidden sm:inline">{primary.label}</span>
+			     sentence — but only when an icon is there to carry the button.
+			     An action without one keeps its label, or it renders EMPTY. -->
+			<span class:hidden={!!primary.icon} class="sm:inline">{primary.label}</span>
 		</Button>
 	{/if}
 
@@ -73,7 +74,7 @@
 			{:else if action.icon}
 				<Icon class="size-4 shrink-0" />
 			{/if}
-			<span class="hidden sm:inline">{action.label}</span>
+			<span class:hidden={!!action.icon} class="sm:inline">{action.label}</span>
 		</Button>
 	{/each}
 

@@ -20,7 +20,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
 | `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, plus the workbench chrome `Surface.Tab/.Pane/.PaneBody/.Panes`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
-| `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. |
+| `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. **The save cluster obeys the actions rule** — tiers as data via `recordFormActions(form, kit)`, top-right: `placement="own"` (default) renders it top-right of the form for a solo record with nothing around it; `placement="host"` renders none and the host puts the same actions in the bar the record owns (`DetailHeader`, `Settings.Page`). Never a Save at the foot of a form. `text` fields take `inputType` (`email`/`tel`/`url`) — that is what picks the phone keyboard. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, four tones (`primary/neutral/warning/destructive` — the full set found across the fleet), per-domain status→(label, tone) maps with labels as functions. `Row.badge` takes the resolved form. |
 | `dialog/` | L2 | `Dialog`, the MODAL overlay species (Popup is the anchored, light-dismiss one): centred, inert background, focus trap — bits-ui underneath (the ActionMenu argument; every stibu picker hand-rolled this shell and none got a trap), stibu's panel geometry on top. `ConfirmDialog` rides it: bag-default labels, per-call overrides are app content, Cancel first so the trap's initial stop is the safe choice, and the CALLER closes on confirm — confirming may fail, and a dialog that auto-closed has nowhere to show it. |
@@ -460,7 +460,8 @@ prototype before any of it froze here.
   `--density-target`, `chrome` is a fixed 36px.
 - **A collapsing label needs an icon.** Hiding the text below a breakpoint so a
   neighbour keeps its width renders an *empty button* when the action has no
-  icon. Collapse conditionally, never unconditionally.
+  icon. Collapse conditionally, never unconditionally — `Actions` itself only
+  collapses a label whose action carries an icon.
 
 ### L2 — what renders is declared by the descriptor
 

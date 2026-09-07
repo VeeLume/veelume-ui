@@ -56,6 +56,7 @@ export {
 	Segmented,
 	RadioGroup,
 	createRecordForm,
+	recordFormActions,
 	sectionsOf
 } from './form/index.js';
 export { formatLocaleNumber, localeSeparators, parseLocaleNumber } from './form/index.js';
@@ -63,6 +64,7 @@ export type {
 	FieldKind,
 	FieldSpec,
 	FormSection,
+	RecordFormActions,
 	RecordFormIO,
 	RecordFormState,
 	SelectOption

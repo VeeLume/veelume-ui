@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { RecordForm, createRecordForm, type FieldSpec, type KitError } from '@veelume/ui';
+	import {
+		Actions,
+		DetailHeader,
+		RecordForm,
+		createRecordForm,
+		getKitContext,
+		recordFormActions,
+		type FieldSpec,
+		type KitError
+	} from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
 
 	type Demo = {
@@ -75,6 +84,14 @@
 		save: async (patch) => ({ ...record, ...patch })
 	});
 
+	// The same editor inside a record's own bar: the host places the cluster.
+	const kit = getKitContext();
+	const hosted = createRecordForm<Demo>({
+		record: () => record,
+		save: async (patch) => ({ ...record, ...patch })
+	});
+	const hostedActions = recordFormActions(hosted, kit);
+
 	// A form parked in the diverged state, so the field-level marking is visible
 	// without racing two writers.
 	const diverged = createRecordForm<Demo>({
@@ -110,5 +127,21 @@
 		note="Press Save. The draft is deliberately KEPT — the cache already holds the server's value, so clearing it would erase your intent before you had seen what happened to it. The affected field is marked individually, because 'someone overwrote your change' is only actionable if you can see which change."
 	>
 		<RecordForm form={diverged} fields={fields.slice(0, 1)} />
+	</Case>
+
+	<Case
+		title="placement=host — the cluster in the record's bar"
+		note="Inside a detail pane the record already owns a bar, and the actions rule puts the forward action there. recordFormActions(form, kit) hands the host the same Save/Cancel tiers as data; the form renders only the fields and the status line."
+	>
+		<div class="overflow-hidden rounded-lg border border-border">
+			<DetailHeader title="Hosted record">
+				{#snippet actions()}
+					<Actions primary={hostedActions.primary} secondary={hostedActions.secondary} />
+				{/snippet}
+			</DetailHeader>
+			<div class="p-4">
+				<RecordForm form={hosted} fields={fields.slice(0, 3)} placement="host" />
+			</div>
+		</div>
 	</Case>
 </div>

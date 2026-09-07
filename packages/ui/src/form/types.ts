@@ -23,6 +23,9 @@ export type FieldSpec<T> = {
 	section?: string;
 	hint?: string;
 	readonly?: boolean;
+	/** `text` only — the `<input type>`, which is what picks the phone's
+	 *  keyboard (`email`, `tel`, `url`). Defaults to `text`. */
+	inputType?: 'text' | 'email' | 'url' | 'tel' | 'password';
 	/** `select` only. */
 	options?: SelectOption[];
 	/** `number` only — passed to `Intl.NumberFormat`, so currency works. */

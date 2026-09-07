@@ -6,6 +6,8 @@ export { default as Switch } from './Switch.svelte';
 export { default as Segmented } from './Segmented.svelte';
 export { default as RadioGroup } from './RadioGroup.svelte';
 export { createRecordForm } from './recordForm.svelte.js';
+export { recordFormActions } from './actions.js';
+export type { RecordFormActions } from './actions.js';
 export type { RecordForm as RecordFormState, RecordFormIO } from './recordForm.svelte.js';
 export { sectionsOf } from './types.js';
 export type { FieldKind, FieldSpec, FormSection, SelectOption } from './types.js';
