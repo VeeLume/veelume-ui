@@ -1,6 +1,8 @@
 # Generated — owned by their generators, not the formatter.
 apps/demo/src/lib/bindings.ts
 apps/demo/src/lib/paraglide
+apps/demo/project.inlang/.meta.json
+apps/demo/project.inlang/cache
 apps/demo/.svelte-kit
 apps/demo/build
 apps/demo/src-tauri/gen

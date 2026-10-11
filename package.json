@@ -1,0 +1,9 @@
+{
+	"name": "veelume-ui-workspace",
+	"private": true,
+	"description": "Workspace root — VeeLume/ci runs pnpm from here, so build/check delegate to the demo",
+	"scripts": {
+		"build": "pnpm --filter veelume-ui-demo build",
+		"check": "pnpm --filter veelume-ui-demo check"
+	}
+}
