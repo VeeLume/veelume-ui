@@ -13,6 +13,11 @@
  * a transport adapter via `ingest` without mounting any kit surface at all.
  * What holds them together is the ONE store — anything toasted is in the
  * center, anything in the center counts toward the bell.
+ *
+ * Beside it, the `activities` store: live background work, rendered by the
+ * same surfaces (the Center's "Now" section, the Bell's busy mark) and fed
+ * by `setActivities` snapshots. Mutable state next to an immutable log —
+ * see activities.svelte.ts for why they are two stores.
  */
 
 import Bell from './Bell.svelte';
@@ -37,3 +42,5 @@ export {
 	notifLevelClass
 } from './notifications.svelte.js';
 export type { NotifAction, NotifInput, NotifLevel, Notification } from './notifications.svelte.js';
+export { activities, setActivities, formatElapsed } from './activities.svelte.js';
+export type { Activity, ActivityPhase } from './activities.svelte.js';

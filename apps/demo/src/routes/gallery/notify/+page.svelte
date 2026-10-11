@@ -5,12 +5,86 @@
 	 * it works from here is the point: one funnel, mounted once, reachable
 	 * from any code.
 	 */
-	import { Notify, notify, ingest, notifications, type NotifLevel } from '@veelume/ui';
+	import {
+		Notify,
+		notify,
+		ingest,
+		notifications,
+		activities,
+		setActivities,
+		type Activity,
+		type NotifLevel
+	} from '@veelume/ui';
 	import { Button } from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
 
 	let centerOpen = $state(false);
 	let backlogCounter = 0;
+
+	// A stand-in for a backend that streams activity snapshots: the demo
+	// owns the list and pushes the whole thing on every change, exactly as
+	// an adapter does.
+	let live: Activity[] = [];
+	let activityCounter = 0;
+	const push = () => setActivities([...live]);
+	const patch = (key: string, phase: Activity['phase']) => {
+		live = live.map((a) => (a.key === key ? { ...a, phase } : a));
+		push();
+	};
+	const end = (key: string) => {
+		live = live.filter((a) => a.key !== key);
+		push();
+	};
+
+	function runStaged() {
+		const key = `demo-run-${activityCounter++}`;
+		const stages = ['Opening archive…', 'Parsing records… (the long part)', 'Building indices…'];
+		live = [
+			...live,
+			{
+				key,
+				title: 'Game data — demo',
+				phase: { type: 'running', stage: stages[0] },
+				started: Date.now(),
+				source: 'data'
+			}
+		];
+		push();
+		stages
+			.slice(1)
+			.forEach((stage, i) =>
+				setTimeout(() => patch(key, { type: 'running', stage }), (i + 1) * 2500)
+			);
+		setTimeout(() => {
+			end(key);
+			// A success worth keeping lands quietly in the log.
+			ingest(
+				{
+					key: `${key}-done`,
+					level: 'success',
+					title: 'Game data ready — demo',
+					source: 'data'
+				},
+				{ toast: false }
+			);
+		}, 7500);
+	}
+
+	function toggleWait() {
+		const key = 'demo-wait';
+		if (live.some((a) => a.key === key)) return end(key);
+		live = [
+			...live,
+			{
+				key,
+				title: 'Text patching',
+				phase: { type: 'waiting', reason: 'Waiting for the game to exit' },
+				started: Date.now(),
+				source: 'langpatch'
+			}
+		];
+		push();
+	}
 
 	const fire = (level: NotifLevel) =>
 		notify({
@@ -82,6 +156,19 @@
 		>
 			Hydrate one backlog entry
 		</Button>
+	</Case>
+
+	<Case
+		title="Live activity: the second store"
+		note="Mutable state beside the immutable log. Activities render under 'Now' in the center (elapsed time while running, no timer while waiting), the bell carries a busy mark, and nothing here is dismissable or unread — rows leave when the work does. The staged run ends in a QUIET success entry: logged, badged, never toasted."
+	>
+		<div class="flex flex-wrap gap-2">
+			<Button variant="outline" onclick={runStaged}>Run a staged task</Button>
+			<Button variant="outline" onclick={toggleWait}>Toggle a wait</Button>
+		</div>
+		<p class="mt-2 text-xs text-muted-foreground">
+			{activities.items.length} running or waiting
+		</p>
 	</Case>
 
 	<Case

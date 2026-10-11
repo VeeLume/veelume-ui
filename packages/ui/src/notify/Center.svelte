@@ -14,6 +14,7 @@
 	import type { Snippet } from 'svelte';
 	import Popup from '../popup/Popup.svelte';
 	import List from './List.svelte';
+	import type { Activity } from './activities.svelte.js';
 	import { getKitContext } from '../context/index.js';
 	import {
 		notifications,
@@ -26,6 +27,7 @@
 		open = false,
 		onclose,
 		item = undefined,
+		activity = undefined,
 		side = 'bottom',
 		align = 'end'
 	}: {
@@ -33,6 +35,8 @@
 		onclose: () => void;
 		/** Replaces a row's rendering. The list, header and policy stay the kit's. */
 		item?: Snippet<[{ notification: Notification; dismiss: () => void }]>;
+		/** Replaces an activity row's rendering (see `Notify.List`). */
+		activity?: Snippet<[{ activity: Activity; now: number }]>;
 		/** Placement INTENT, passed to Popup — flip/shift handle the rest. A
 		 *  rail-bottom bell passes side="right" align="end"; the default suits
 		 *  a toolbar trigger. */
@@ -68,5 +72,5 @@
 		{/if}
 	</header>
 
-	<List {item} onnavigate={onclose} />
+	<List {item} {activity} onnavigate={onclose} />
 </Popup>

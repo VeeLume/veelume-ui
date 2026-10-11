@@ -75,7 +75,9 @@ export type {
 // One funnel, two surfaces: notify()/ingest() feed a single bounded session
 // log; Toasts (transient, sticky-by-level) and Center (persistent, marks
 // read on open) read it, Bell carries the unread count. Parts compose
-// independently — the store is the contract, not the arrangement.
+// independently — the store is the contract, not the arrangement. Live
+// background work is a second store on the same surfaces (Center's "Now",
+// Bell's busy mark), fed by setActivities snapshots.
 export {
 	Notify,
 	notifications,
@@ -84,9 +86,19 @@ export {
 	dismiss,
 	markAllRead,
 	clearAll,
-	isSticky
+	isSticky,
+	activities,
+	setActivities,
+	formatElapsed
 } from './notify/index.js';
-export type { NotifAction, NotifInput, NotifLevel, Notification } from './notify/index.js';
+export type {
+	NotifAction,
+	NotifInput,
+	NotifLevel,
+	Notification,
+	Activity,
+	ActivityPhase
+} from './notify/index.js';
 
 // ── L2: compare ────────────────────────────────────────────────────────────
 // The third view of a working set: a Split shows two entities interactively,

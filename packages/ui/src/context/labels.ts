@@ -119,6 +119,12 @@ export type LabelBag = {
 	dismiss: () => string;
 	/** The center with no notifications this session. */
 	nothingYet: () => string;
+	/** The center's live-activity section heading. */
+	now: () => string;
+	/** The log's heading when it sits below a live-activity section. */
+	earlier: () => string;
+	/** The bell's accessible name while background work runs. */
+	notificationsBusy: () => string;
 };
 
 /**
@@ -179,5 +185,8 @@ export const defaultLabels: LabelBag = {
 	notifications: () => 'Notifications',
 	clearAll: () => 'Clear all',
 	dismiss: () => 'Dismiss',
-	nothingYet: () => 'Nothing yet'
+	nothingYet: () => 'Nothing yet',
+	now: () => 'Now',
+	earlier: () => 'Earlier',
+	notificationsBusy: () => 'Notifications — work in progress'
 };
