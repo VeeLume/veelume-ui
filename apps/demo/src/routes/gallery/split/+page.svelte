@@ -15,7 +15,7 @@
 
 	<Case
 		title="collapsible list"
-		note="Asymmetric on purpose. HIDE belongs to the list's own header — it acts on the list, so containment puts it there and it costs no layout. SHOW is the kit's, and exists only while collapsed, because the box it would otherwise live in is exactly the one that disappeared. A permanent divider column reserved for one button was the version before this. Controlled like Switch; omit `oncollapse` and neither control exists. `md:` and up, since below that the panes already take turns being the whole page."
+		note="One control, one position — Surface.Supporting's model mirrored. The panel glyph leads the list header; collapsed, the list folds into a 48px rail with the same glyph in exactly the same spot, so hiding and showing never move the target. It replaced a docked edge tab that reserved nothing and that nobody could find. Controlled like Switch; omit `oncollapse` and neither control exists. `md:` and up, since below that the panes already take turns being the whole page."
 		frame={false}
 	>
 		<div class="h-56">
@@ -34,8 +34,8 @@
 						<div class="grid h-full place-items-center rounded-lg border border-border bg-card">
 							<p class="text-sm text-muted-foreground">
 								{collapsed
-									? 'Full width — click › to bring the list back.'
-									: 'Click ‹ in the list header.'}
+									? 'Full width — click the rail to bring the list back.'
+									: 'Click the panel icon in the list header.'}
 							</p>
 						</div>
 					{/snippet}

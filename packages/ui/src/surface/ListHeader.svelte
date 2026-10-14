@@ -31,6 +31,7 @@
 	import Bar from '../actions/Bar.svelte';
 	import Button from '../actions/Button.svelte';
 	import FilterButton from './FilterButton.svelte';
+	import PanelIcon from './PanelIcon.svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
 	import type { Action } from '../actions/types.js';
@@ -69,25 +70,22 @@
 {#if show}
 	<Bar class={klass}>
 		{#if s.collapse}
-			<!-- The HIDE half of the collapse control, mirroring the docked SHOW
-			     handle `Split` renders: half a button, flat left, rounded only
-			     towards the content, `-ml-3` cancelling the bar's own inset so it
-			     sits flush. The two are one control in two states, so they must
-			     share the code that says what that looks like — the `Bar` lesson,
-			     which this pair had already started to violate as hand-written
-			     copies in two demo pages. -->
+			<!-- The list's collapse toggle — `Surface.Supporting`'s, mirrored.
+			     `-ml-1.5` against the bar's `px-3` centres it 24px in from the
+			     list's edge: exactly where `Split`'s collapsed 48px rail centres
+			     its own glyph, so the control never moves between its states. -->
 			<button
 				type="button"
-				class="-ml-3 hidden h-9 w-4 shrink-0 place-items-center rounded-r-md border
-				       border-l-0 border-input bg-background text-xs text-muted-foreground
-				       shadow-xs transition-colors hover:w-5 hover:bg-muted hover:text-foreground
-				       md:grid"
+				class="-ml-1.5 hidden size-9 shrink-0 items-center justify-center rounded-md
+				       text-muted-foreground transition-colors hover:bg-accent hover:text-foreground
+				       focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none
+				       md:inline-flex"
 				aria-label={kit.labels.hideList()}
 				title={kit.labels.hideList()}
 				aria-expanded={true}
 				onclick={() => s.collapse?.set(true)}
 			>
-				‹
+				<PanelIcon side="left" open={true} />
 			</button>
 		{/if}
 

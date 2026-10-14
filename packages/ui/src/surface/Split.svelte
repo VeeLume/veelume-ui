@@ -19,6 +19,7 @@
 	import type { Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import { getSurfaceContext } from './context.js';
+	import PanelIcon from './PanelIcon.svelte';
 
 	let {
 		list,
@@ -51,8 +52,8 @@
 </script>
 
 <!-- `p-3` is the surface gutter, not a caller decision: both demo surfaces
-     asked for exactly it, and the docked collapse handle sits IN it. Override
-     via `class` for a surface that is already inset. -->
+     asked for exactly it. Override via `class` for a surface that is already
+     inset. -->
 <div class="relative flex min-h-0 flex-1 gap-3 p-3 {klass}">
 	{#if list}
 		<div
@@ -66,53 +67,43 @@
 
 	{#if collapse && list && detail && collapsed}
 		<!--
-			⚑ Only the SHOW affordance lives here, only while collapsed, and
-			DOCKED rather than laid out. Four placements were tried:
+			⚑ The collapsed list is a 48px RAIL — `Surface.Supporting`'s model,
+			mirrored, so the kit's two collapsible panes are one control. The
+			toggle has one position in both states: the list header's leading
+			toggle centres 24px in from the list's edge in the bar row, and the
+			rail's glyph sits exactly there, so hiding and showing never move
+			the target. The whole strip is the button.
 
-			  1. a 12px seam with a bare chevron — unfindable;
-			  2. the same seam, weightier and bar-aligned — findable, but a
-			     permanent column reserved for one button;
-			  3. a 36px rail while collapsed — no permanent cost, but still a
-			     column, and a square handle spending width it does not need;
-			  4. this: absolutely positioned in the surface's own left gutter, so
-			     the detail pane runs edge to edge and the handle reserves nothing
-			     at all.
+			This replaced a DOCKED handle — a slim tab absolutely positioned in
+			the gutter, reserving nothing. It won on cost and lost on the only
+			thing that mattered: people could not find it, and its two halves
+			(a half-button in the header, a tab on the edge) did not read as one
+			control. Four placements were tried before it (a 12px seam; the same
+			seam weightier; a 36px rail with a square handle; the dock); the rail
+			came back once the supporting pane showed that a collapsed pane that
+			names itself is worth its 48px.
 
-			The rule underneath is the containment rule with its edge case named.
-			HIDE belongs to the list's own header — it acts on the list, so it
-			rides in the list's chrome and costs no layout. SHOW cannot, because
-			the box it would live in is exactly the box that is gone.
-
-			Shape follows the same logic: a splitter is read ALONG the seam it
-			opens, so height is what makes it a target and width is pure cost —
-			tall and narrow, flat against the left edge, rounded only on the side
-			facing the content it will push.
+			Card-shaped like the list it stands in for, inside the same gutter,
+			so it reads as the list folded away rather than as new chrome.
 		-->
 		<button
 			type="button"
-			class="absolute top-4 left-0 z-10 hidden h-16 w-3 place-items-center rounded-r-md
-			       border border-l-0 border-border bg-background text-xs text-muted-foreground
-			       shadow-xs transition-colors hover:w-4 hover:bg-muted hover:text-foreground
-			       md:grid"
+			class="hidden w-12 shrink-0 flex-col items-center gap-3 overflow-hidden rounded-lg border
+			       border-border bg-card text-muted-foreground transition-colors hover:bg-muted
+			       hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40
+			       focus-visible:outline-none md:flex"
 			aria-label={kit.labels.showList()}
 			title={kit.labels.showList()}
 			aria-expanded={false}
 			onclick={() => collapse.set(false)}
 		>
-			›
+			<span class="flex h-14 shrink-0 items-center"><PanelIcon side="left" open={false} /></span>
+			<span class="text-sm font-medium [writing-mode:vertical-rl]">{kit.labels.showList()}</span>
 		</button>
 	{/if}
 
 	{#if detail}
-		<!-- The collapsed pane keeps a handle-wide gutter of its own. Without it
-		     the docked handle would sit ON the card for any surface that has no
-		     padding of its own — the demo's `p-3` happens to match the handle
-		     exactly, which is luck, not a contract. 12px while collapsed is the
-		     whole cost, against 36 for a rail and 20 for a permanent divider. -->
-		<div
-			class="min-h-0 min-w-0 flex-1 {selected || !list ? '' : 'hidden md:block'}
-			       {collapse && list && collapsed ? 'md:pl-3' : ''}"
-		>
+		<div class="min-h-0 min-w-0 flex-1 {selected || !list ? '' : 'hidden md:block'}">
 			{@render detail()}
 		</div>
 	{/if}

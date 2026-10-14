@@ -19,7 +19,7 @@ rule here looks arbitrary, the reason is there; don't relitigate it from scratch
 | `collection/http` | L1 | The HTTP + SSE transport: `createHttpIO`, `sseInvalidation` (reconnect discipline), `classifyHttpError`. Plain `.ts`. |
 | `window/` | L1 | Viewport windowing — spacer + `translateY`, neutral below its threshold. `.svelte.ts`. |
 | `browse/` | L1 | URL-backed query/facets/sort. Canonical encoding, history split. |
-| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, plus the workbench chrome `Surface.Tab/.Pane/.PaneBody/.Panes`. Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
+| `surface/` | L1+L2 | `pipeline.svelte.ts` (derive → search → filter → sort → group → counts) and `Surface.Root/.List/.ListHeader/.FilterButton/.Split/.Toolbar`, plus the workbench chrome `Surface.Tab/.Pane/.PaneBody/.Panes`, and `Surface.Supporting` (Material's supporting-pane layout, standalone — no Root). Plus the WORKBENCH: `createWorkset` (L1 — the preview/pin tab state machine) and `Surface.TabStrip` (L2 — the strip, owning the URL→workset sync). |
 | `form/` | L1+L2 | `createRecordForm` (draft/dirty/submit), `RecordForm`, `NumberInput`, `DateInput`/`TimeInput` (bits-ui DateField/TimeField with the formatting locale + `hourCycle` INJECTED from context — bits defaults to en-US, and an omitted prop is the connect-neo bug; value boundary is ISO strings), `Switch` (stateless, reports the requested next value — the Hearth/Starlume contract), `Segmented` (options are `SelectOption`, so segmented↔select is a data edit; an option's `tone` colours its selected state with the badge's tint — for options that MEAN something, where the colour is the message), locale-aware number parsing. A `boolean` field renders as a row: label beside the switch, never a floating knob. **The save cluster obeys the actions rule** — tiers as data via `recordFormActions(form, kit)`, top-right: `placement="own"` (default) renders it top-right of the form for a solo record with nothing around it; `placement="host"` renders none and the host puts the same actions in the bar the record owns (`DetailHeader`, `Settings.Page`). Never a Save at the foot of a form. `text` fields take `inputType` (`email`/`tel`/`url`) — that is what picks the phone keyboard. A **`reference` field** points into another collection (`ReferenceSpec`: `items` as a GETTER so a lazy set stays live, `key`, `label`, optional `detail`/`searchIn`/`title`/`placeholder`): the record stores the key, the form shows the label on a button that opens a `PickerDialog`, ✕ clears to null. stibu's gift-card and voucher forms composed exactly this beside the form before it became a kind — a relation is a field, not a sidecar. |
 | `actions/` | L2 | `Actions` (the three tiers), `ActionMenu`, `Button`, `Bar` (the shared 56px geometry), `DetailHeader`. |
 | `badge/` | L2 | `StatusBadge` + `resolveStatus`: one pill, five tones (`primary/neutral/success/warning/destructive` — the four found across the fleet plus `success`, which stibu's accepted participants needed: a green "yes" none of the others can say; `warning` and `success` are tokens the kit maps itself), per-domain status→(label, tone) maps with labels as functions. `statusToneClass` is the one source for the pill, the list row's badge and a toned `Segmented` option. `Row.badge` takes the resolved form. |
@@ -329,23 +329,22 @@ prototype before any of it froze here.
 - **`TabStrip.trailing` is pinned right**, for chrome that belongs to the working set without
   being a member of it — a compare tab, a layout toggle. A trailing slot rather than a workset
   entry precisely because it carries no key.
-- **⚑ Collapse is ASYMMETRIC, and the asymmetry is the design.** BOTH halves are the kit's,
-  driven by ONE fact on `Surface.Root` (`collapsed` + `oncollapse`, published through the
-  surface context because `Split` and `List` are siblings the app wires, not a parent and a
-  child a prop could bridge). HIDE renders in the list's own header — it acts on the list, so
-  the containment rule puts it in the list's chrome, where it costs no layout at all. SHOW cannot follow that rule, because the
-  box it would live in is exactly the box that disappeared, so the kit renders it — **docked**
-  in the surface's left gutter rather than laid out, and ONLY while collapsed. Four placements
-  were tried: a 12px seam (unfindable), the same seam made weightier and bar-aligned
-  (findable, but a permanent column for one button), a 36px rail while collapsed (no
-  permanent cost, but still a column with a square handle), and finally an absolutely
-  positioned handle that reserves nothing. **Shape follows the same logic**: a splitter is
-  read ALONG the seam it opens, so height makes the target and width is pure cost — tall and
-  narrow, flat left edge, rounded only towards the content it will push. The collapsed pane
-  keeps a handle-wide gutter of its own, because a surface with no padding would otherwise
-  have the handle sitting on its card. Controlled, so the state's home is the app's call;
-  omit `oncollapse` and neither control exists. `md:`-scoped, because below that the panes
-  already take turns being the whole page.
+- **⚑ Collapse is ONE control with ONE position — the supporting pane's model, mirrored.**
+  Both halves are the kit's, driven by ONE fact on `Surface.Root` (`collapsed` +
+  `oncollapse`, published through the surface context because `Split` and `List` are
+  siblings the app wires, not a parent and a child a prop could bridge). HIDE is a panel
+  glyph leading the list's own header (containment: it acts on the list); collapsed, `Split`
+  renders a **48px rail** — card-shaped like the list it stands in for, the whole strip one
+  button — with the same glyph in exactly the spot the header had it (centred 24px in, in the
+  bar row), so the target never moves. **This superseded the asymmetric docked handle**
+  (2026-10): a slim tab in the gutter that reserved nothing won every cost argument and lost
+  the one that mattered — it was hard to find, and its two halves (a half-button in the
+  header, a tab on the edge) did not read as one control. Placements tried before it: a 12px
+  seam, the same seam weightier, a 36px rail with a square handle, the dock. What brought the
+  rail back was `Surface.Supporting`: a collapsed pane that names itself is worth 48px, and
+  the kit's two collapsible panes now behave identically. Controlled, so the state's home is
+  the app's call; omit `oncollapse` and neither control exists. `md:`-scoped, because below
+  that the panes already take turns being the whole page.
 - **The second pane is a PROJECTION by key** (`byKey` reads ALL rows, pre-filter), stacked
   BELOW the first — stacking costs height, not width, so no breakpoint gates it. It is
   independent of the tab set and lives in its own URL param: a compare is a shareable
@@ -357,6 +356,52 @@ prototype before any of it froze here.
   row is not in the DOM and `scrollIntoView` has nothing to call. `nearest` means an
   already-visible row never moves; the retry is keyed on `status`, never on the entry list,
   because reading entries tracked reaches the collection's lazy `ensure()`.
+
+### Supporting — the pane beside the work
+
+Material's *supporting pane* canonical layout: a main pane that holds the work, and a pane on
+the right that only means something beside it (Starlume's mission preview next to its patch
+settings; the demo's loan preview next to `/preferences`). Standalone — the first consumer is
+archetype E, with no collection to give a `Surface.Root`.
+
+- **⚑ The toggle has ONE position, in every state and both modes**: the top-right corner,
+  centred 24px in from the edge, in the 56px bar row. Open, it ends the pane's header;
+  collapsed, the pane shrinks to a **48px rail** — one button, the glyph in the same spot, the
+  pane's title running down beneath it. `Split`'s list collapse is the same control
+  mirrored (it replaced a docked edge tab nobody could find). The rail costs 48px while
+  collapsed; that is the price of a hidden pane still saying what it is.
+- **Docked vs sheet is decided by the CONTAINER** (Material's 840 expanded threshold, applied
+  to the box) — the `Expand.Cols` rule: the nav rail spends width, so the window size is the
+  wrong question. Docked, the pane takes Material's 30% (360px floor, 640px ceiling).
+- **⚑ Two open states, on purpose.** Docked, `open`/`onopen` are the app's (controlled — a
+  stored preference, usually). As a sheet the pane covers the work, so its state is the
+  component's own and starts closed: narrowing the window must never bury the main pane
+  under a pane opened on a wide screen. Widening drops the sheet state.
+- **The sheet is modal within the box, not the window**: scrim and `role="dialog"` scoped to
+  the component, the main pane `inert`, Escape and the scrim close it, focus goes in and
+  returns to the rail.
+- **The seam resizes when `onresize` is supplied** (Material's pane expansion; omitted → no
+  handle). Its named variation is Starlume's: the main column hugs capped content and the
+  preview wants the rest, the inverse of a fixed 30%. The rules:
+  - **Width is the app's, like `open`** (`width: number | null`, `null` = the default).
+    Clamped at RENDER — neither pane below 360px — and never written back by a window
+    resize, so a stored width survives narrowing and comes back on widening. The 640px
+    ceiling bounds only the default; a dragged width may exceed it.
+  - **Committed once per gesture.** The live width is local while dragging; `onresize`
+    fires on release (and per key press), never per pixel — a stored preference would
+    otherwise write localStorage at pointer rate. A click without movement writes nothing.
+  - **APG window-splitter contract**: a focusable `role="separator"` (Svelte's lint does not
+    know a focusable separator is a widget — the ignore is deliberate), arrows step 16px
+    (Shift 64), Home/End jump to the limits, Enter collapses and hands focus to the rail.
+    Double-click resets to the default — the editor convention.
+  - **Drag-to-collapse**: released below half the floor, the drag closes the pane (the pane
+    fades while that is the outcome) and KEEPS the stored width, so reopening restores it.
+  - **Shape**: a 10px hit zone starting ON the border and running into the pane — never
+    left of it, where the main pane's scrollbar sits flush (a straddling zone stole its last
+    6px, so grabbing the scrollbar started a resize) — with Material's 4×48 pill over the
+    border line, always drawn — `Split`'s rule that height makes a splitter findable and width is pure cost,
+    plus the lesson of this pane's toggle: an affordance you must hover to discover is one
+    people miss. No snap anchors: Material offers them, but no consumer has named a detent.
 
 ### L1 — browse state
 

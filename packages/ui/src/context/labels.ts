@@ -43,6 +43,13 @@ export type LabelBag = {
 	/** Collapse the list pane so the record gets the full width. */
 	hideList: () => string;
 	showList: () => string;
+	/** The supporting pane's toggle (and the sheet's scrim); `title` names the
+	 *  pane, so a screen reader hears which one. */
+	hidePane: (a: { title: string }) => string;
+	showPane: (a: { title: string }) => string;
+	/** The supporting pane's splitter — names the gestures, since a seam
+	 *  cannot show its double-click. */
+	resizePane: (a: { title: string }) => string;
 
 	// ── list states ──────────────────────────────────────────────────────────
 	loading: () => string;
@@ -145,6 +152,9 @@ export const defaultLabels: LabelBag = {
 	viewTable: () => 'Table',
 	hideList: () => 'Hide list',
 	showList: () => 'Show list',
+	hidePane: ({ title }) => `Hide ${title}`,
+	showPane: ({ title }) => `Show ${title}`,
+	resizePane: ({ title }) => `Resize ${title} — double-click to reset`,
 
 	loading: () => 'Loading…',
 	empty: () => 'Nothing matches',

@@ -30,6 +30,9 @@ import Tab from './Tab.svelte';
 import Pane from './Pane.svelte';
 import Panes from './Panes.svelte';
 import PaneBody from './PaneBody.svelte';
+// Standalone — needs no Root. Lives here because it is pane chrome, a sibling
+// of Split's arrangement rather than a new kind of thing.
+import Supporting from './Supporting.svelte';
 
 export const Surface = {
 	Root,
@@ -42,7 +45,8 @@ export const Surface = {
 	Tab,
 	Pane,
 	Panes,
-	PaneBody
+	PaneBody,
+	Supporting
 };
 
 export { createSurface } from './pipeline.svelte.js';

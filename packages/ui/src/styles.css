@@ -67,6 +67,39 @@
  * Classes are `vk-` prefixed because they are global now.
  */
 
+/*
+ * Scrollbars, themed from the tokens.
+ *
+ * ⚑ The kit has many independent scroll containers sitting flush against
+ * borders (both panes of `Surface.Supporting`, a list beside its detail), and
+ * on Windows every one of them got the CLASSIC scrollbar: ~15px, arrow
+ * buttons, light grey — and a WHITE track in dark mode, because nothing told
+ * the engine the page was dark. In WebView2 that is what Tauri apps ship; the
+ * headless browser the harness screenshots with hides scrollbars by default,
+ * which is how it went unseen.
+ *
+ * Two mechanisms, both standard CSS: `color-scheme` tells the engine the
+ * scheme (native controls — selects, date pickers — follow it too), and
+ * `scrollbar-color`/`scrollbar-width` draw a thin thumb in the muted tone on
+ * a transparent track. `.dark` is the class the shadcn convention toggles; an
+ * app without it simply stays light. In `@layer base`, so any app utility
+ * still wins.
+ */
+@layer base {
+	:root {
+		color-scheme: light;
+		/* Inherited, so set once. */
+		scrollbar-color: color-mix(in srgb, var(--muted-foreground, #888) 45%, transparent) transparent;
+	}
+	.dark {
+		color-scheme: dark;
+	}
+	/* Not inherited, so every container. */
+	* {
+		scrollbar-width: thin;
+	}
+}
+
 /* Indeterminate sweep — Progress's bar and Surface.List's throbber track. */
 .vk-sweep {
 	position: relative;

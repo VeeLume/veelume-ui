@@ -42,6 +42,7 @@
 		{ path: '/gallery/list-header', label: 'Surface.ListHeader' },
 		{ path: '/gallery/toolbar', label: 'Surface.Toolbar' },
 		{ path: '/gallery/split', label: 'Surface.Split' },
+		{ path: '/gallery/supporting', label: 'Surface.Supporting' },
 		{ path: '/gallery/tabstrip', label: 'Surface.TabStrip' },
 		{ path: '/gallery/expand', label: 'Expand' },
 		{ path: '/gallery/compare', label: 'Compare' },
