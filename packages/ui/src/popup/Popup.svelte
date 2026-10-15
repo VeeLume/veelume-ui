@@ -18,6 +18,9 @@
 	 * along its axis to stay inside the clipping ancestors. The class-string
 	 * era's failure mode (a right-aligned panel authored for a screen-right
 	 * trigger, clipped when the trigger sat elsewhere) is gone structurally.
+	 * A panel taller than the room on its side is capped to that room and
+	 * scrolls (a filter panel with a hundred facet options ran off the window
+	 * with no way to reach its end).
 	 *
 	 * The panel stays inside the consumer's `relative` wrapper (the anchor
 	 * is the panel's offsetParent — no anchor prop needed). Portalling to
@@ -26,7 +29,14 @@
 	 * do not, so it waits for a consumer that needs it.
 	 */
 	import type { Snippet } from 'svelte';
-	import { autoUpdate, computePosition, flip, offset as offsetBy, shift } from '@floating-ui/dom';
+	import {
+		autoUpdate,
+		computePosition,
+		flip,
+		offset as offsetBy,
+		shift,
+		size
+	} from '@floating-ui/dom';
 
 	let {
 		open = false,
@@ -75,7 +85,18 @@
 			computePosition(anchor, el, {
 				placement,
 				strategy: 'absolute',
-				middleware: [offsetBy(offset), flip(), shift({ padding: 8 })]
+				middleware: [
+					offsetBy(offset),
+					flip(),
+					shift({ padding: 8 }),
+					// After flip, so the cap is the room on the side it landed on.
+					size({
+						padding: 8,
+						apply: ({ availableHeight }) => {
+							el.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
+						}
+					})
+				]
 			}).then(({ x, y }) => {
 				el.style.left = `${x}px`;
 				el.style.top = `${y}px`;
@@ -124,8 +145,8 @@
 		bind:this={panel}
 		role="dialog"
 		aria-label={label}
-		class="absolute top-0 left-0 z-50 rounded-lg border border-border bg-popover
-		       text-popover-foreground shadow-lg {positioned ? '' : 'invisible'} {klass}"
+		class="absolute top-0 left-0 z-50 overflow-y-auto overscroll-contain rounded-lg border border-border
+		       bg-popover text-popover-foreground shadow-lg {positioned ? '' : 'invisible'} {klass}"
 	>
 		{@render children()}
 	</div>
