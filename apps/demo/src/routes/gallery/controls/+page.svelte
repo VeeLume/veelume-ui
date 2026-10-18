@@ -4,7 +4,8 @@
 	 * point: a control is only "done" when it sits in a `Settings.Row` or a
 	 * Section without looking dropped in.
 	 */
-	import { Segmented, Settings, Switch } from '@veelume/ui';
+	import { Segmented, Select, Settings, Switch } from '@veelume/ui';
+	import type { SelectOption } from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
 
 	let a = $state(true);
@@ -12,6 +13,35 @@
 	let mode = $state('auto');
 	let level = $state('medium');
 	let rsvp = $state('pending');
+	let shelf = $state('reading');
+	let genre = $state('');
+	let edition = $state('pb');
+
+	const shelves: SelectOption[] = [
+		{ value: 'want', label: 'Want to read' },
+		{ value: 'reading', label: 'Reading' },
+		{ value: 'paused', label: 'Paused' },
+		{ value: 'read', label: 'Read' },
+		{ value: 'dropped', label: 'Dropped' }
+	];
+	// Past `searchFrom` (12) the list carries a search field; groups by data.
+	const genres: SelectOption[] = [
+		['Fantasy', 'Fiction'],
+		['Science fiction', 'Fiction'],
+		['Crime', 'Fiction'],
+		['Horror', 'Fiction'],
+		['Romance', 'Fiction'],
+		['Literary', 'Fiction'],
+		['Historical', 'Fiction'],
+		['Biography', 'Non-fiction'],
+		['History', 'Non-fiction'],
+		['Science', 'Non-fiction'],
+		['Travel', 'Non-fiction'],
+		['Essays', 'Non-fiction'],
+		['Cookery', 'Non-fiction'],
+		['Poetry', 'Other'],
+		['Comics', 'Other']
+	].map(([label, group]) => ({ value: label.toLowerCase(), label, group }));
 </script>
 
 <div class="grid max-w-3xl gap-6 p-4">
@@ -67,6 +97,43 @@
 				value="on"
 				disabled
 				onchange={() => {}}
+			/>
+		</div>
+	</Case>
+
+	<Case
+		title="Select states"
+		note="Past a handful of options: a field's trigger and a list the kit draws on Popup (never the OS dropdown). The whole trigger opens it; ↓ ↑ Enter, Escape, Tab. Under 12 options typing jumps to a prefix; from 12 the list carries a search field. Grouped by the option's `group`. Disabled, and a placeholder while the value matches nothing."
+	>
+		<div class="flex flex-wrap items-center gap-4">
+			<Select options={shelves} value={shelf} label="Shelf" onchange={(v) => (shelf = v)} />
+			<Select
+				options={genres}
+				value={genre}
+				label="Genre"
+				placeholder="Any genre"
+				onchange={(v) => (genre = v)}
+			/>
+			<Select options={shelves} value="read" label="Shelf" disabled onchange={() => {}} />
+		</div>
+	</Case>
+
+	<Case
+		title="Select inside a card that clips"
+		note="Popup positions fixed, so a list opened from a card with overflow hidden (a rounded art ground) is not cut at the card's edge — the case Starlume's mining cards hit."
+	>
+		<div class="h-24 w-72 overflow-hidden rounded-lg border border-border p-3">
+			<Select
+				options={[
+					{ value: 'pb', label: 'Paperback' },
+					{ value: 'hb', label: 'Hardback' },
+					{ value: 'eb', label: 'E-book' },
+					{ value: 'ab', label: 'Audiobook' },
+					{ value: 'lp', label: 'Large print' }
+				]}
+				value={edition}
+				label="Edition"
+				onchange={(v) => (edition = v)}
 			/>
 		</div>
 	</Case>

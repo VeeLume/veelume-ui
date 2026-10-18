@@ -23,6 +23,12 @@ export type SelectOption = {
 	 * uniform highlight would drop it. A `select` ignores it.
 	 */
 	tone?: StatusTone;
+	/**
+	 * `Select` only: the header this option sits under. Groups keep the
+	 * order of their first option; ungrouped options come first. A
+	 * `Segmented` ignores it.
+	 */
+	group?: string;
 };
 
 /**

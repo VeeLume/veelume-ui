@@ -4,6 +4,7 @@ export { default as DateInput } from './DateInput.svelte';
 export { default as TimeInput } from './TimeInput.svelte';
 export { default as Switch } from './Switch.svelte';
 export { default as Segmented } from './Segmented.svelte';
+export { default as Select } from './Select.svelte';
 export { default as RadioGroup } from './RadioGroup.svelte';
 export { createRecordForm } from './recordForm.svelte.js';
 export { recordFormActions } from './actions.js';

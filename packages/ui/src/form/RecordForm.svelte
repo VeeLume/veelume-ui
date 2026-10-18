@@ -25,6 +25,7 @@
 	import DateInput from './DateInput.svelte';
 	import TimeInput from './TimeInput.svelte';
 	import Switch from './Switch.svelte';
+	import Select from './Select.svelte';
 	import PickerDialog from '../picker/PickerDialog.svelte';
 	import { recordFormActions } from './actions.js';
 	import { sectionsOf, type FieldSpec } from './types.js';
@@ -143,17 +144,13 @@
 								onchange={(t) => form.set(f.name, t as T[typeof f.name])}
 							/>
 						{:else if f.kind === 'select'}
-							<select
+							<Select
 								id={f.name}
 								disabled={f.readonly}
-								class="h-9 rounded-md border border-input bg-background px-3 text-sm"
+								options={f.options ?? []}
 								value={String(form.value[f.name] ?? '')}
-								onchange={(e) => form.set(f.name, e.currentTarget.value as T[typeof f.name])}
-							>
-								{#each f.options ?? [] as o (o.value)}
-									<option value={o.value}>{o.label}</option>
-								{/each}
-							</select>
+								onchange={(v) => form.set(f.name, v as T[typeof f.name])}
+							/>
 						{:else if f.kind === 'reference' && f.reference}
 							{@const ref = f.reference}
 							{@const picked = referenced(f)}

@@ -54,6 +54,7 @@ export {
 	TimeInput,
 	Switch,
 	Segmented,
+	Select,
 	RadioGroup,
 	createRecordForm,
 	recordFormActions,
