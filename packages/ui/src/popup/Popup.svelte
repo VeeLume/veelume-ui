@@ -22,11 +22,14 @@
 	 * scrolls (a filter panel with a hundred facet options ran off the window
 	 * with no way to reach its end).
 	 *
-	 * The panel stays inside the consumer's `relative` wrapper (the anchor
-	 * is the panel's offsetParent — no anchor prop needed). Portalling to
-	 * <body>, which would also escape overflow clipping entirely, is the
-	 * remaining upgrade; it adds z-stacking and teleport concerns flip/shift
-	 * do not, so it waits for a consumer that needs it.
+	 * The anchor is the consumer's wrapper — the panel's parent element, no
+	 * anchor prop needed. The panel is positioned `fixed` (floating-ui's
+	 * fixed strategy), so a wrapper inside a card that clips its content
+	 * (`overflow: hidden` for a rounded art ground) no longer clips the
+	 * panel: `Select` in Starlume's cards was the consumer that needed it.
+	 * Still in the consumer's DOM, so its stacking and context hold; an
+	 * ancestor with a `transform` would become the panel's containing block
+	 * again, which is when portalling to <body> earns its teleport concerns.
 	 */
 	import type { Snippet } from 'svelte';
 	import {
@@ -76,15 +79,16 @@
 			return;
 		}
 		const el = panel;
-		// The consumer's `relative` wrapper — the same implicit anchor the
-		// class-string era used, now measured instead of assumed.
-		const anchor = el.offsetParent;
-		if (!(anchor instanceof HTMLElement)) return;
+		// The consumer's wrapper — the same implicit anchor the class-string
+		// era used, now measured instead of assumed. Its parent, not its
+		// offsetParent: a fixed element has none.
+		const anchor = el.parentElement;
+		if (!anchor) return;
 
 		const cleanup = autoUpdate(anchor, el, () => {
 			computePosition(anchor, el, {
 				placement,
-				strategy: 'absolute',
+				strategy: 'fixed',
 				middleware: [
 					offsetBy(offset),
 					flip(),
@@ -145,7 +149,7 @@
 		bind:this={panel}
 		role="dialog"
 		aria-label={label}
-		class="absolute top-0 left-0 z-50 overflow-y-auto overscroll-contain rounded-lg border border-border
+		class="fixed top-0 left-0 z-50 overflow-y-auto overscroll-contain rounded-lg border border-border
 		       bg-popover text-popover-foreground shadow-lg {positioned ? '' : 'invisible'} {klass}"
 	>
 		{@render children()}
