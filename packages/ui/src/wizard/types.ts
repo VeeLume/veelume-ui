@@ -32,3 +32,14 @@ export type WizardStep = {
 	canContinue?: () => boolean;
 	step: Snippet;
 };
+
+/** What a custom `header` snippet receives. */
+export type WizardHeaderProps = {
+	step: WizardStep;
+	/** Zero-based, already clamped to the current list. */
+	index: number;
+	total: number;
+	/** The host's `onskip`, or undefined when it passed none. */
+	skip?: () => void;
+	busy: boolean;
+};

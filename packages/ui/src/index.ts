@@ -125,7 +125,7 @@ export type { Expansion, ExpansionMode, Fact } from './expand/index.js';
 // steps, Starlume splices in a module registry's, and a `$derived` array
 // absorbs that with no registry concept in the kit.
 export { Wizard } from './wizard/index.js';
-export type { WizardStep } from './wizard/index.js';
+export type { WizardHeaderProps, WizardStep } from './wizard/index.js';
 
 // ── L2: dialog ─────────────────────────────────────────────────────────────
 // The modal overlay species (Popup is the anchored one): centred, inert

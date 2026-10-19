@@ -1,5 +1,13 @@
 <script lang="ts">
-	import { Wizard, Switch, Progress, Actions, type WizardStep } from '@veelume/ui';
+	import {
+		Wizard,
+		Switch,
+		Progress,
+		Actions,
+		Button,
+		type WizardHeaderProps,
+		type WizardStep
+	} from '@veelume/ui';
 	import Case from '$lib/gallery/Case.svelte';
 
 	// Three independent specimens, each with its own index so they can sit on
@@ -7,6 +15,7 @@
 	let iStatic = $state(0);
 	let iGated = $state(1);
 	let iReactive = $state(1);
+	let iHeader = $state(0);
 	let gateOk = $state(false);
 	let extras = $state(false);
 	let busyDemo = $state(false);
@@ -32,6 +41,16 @@
 
 	const noop = () => {};
 </script>
+
+{#snippet pageHeader({ step, index, total, skip }: WizardHeaderProps)}
+	<header class="flex items-start gap-3 px-4 pt-4">
+		<div class="min-w-0 flex-1">
+			<p class="text-xs text-muted-foreground tabular-nums">Step {index + 1} of {total}</p>
+			<h2 class="text-xl font-semibold">{step.title}</h2>
+		</div>
+		{#if skip}<Button variant="ghost" onclick={skip}>Skip</Button>{/if}
+	</header>
+{/snippet}
 
 {#snippet plain()}
 	<p class="text-sm text-muted-foreground">Step body — the app's content, rendered as a snippet.</p>
@@ -88,6 +107,22 @@
 	>
 		<div class="h-72 overflow-hidden rounded-lg border border-border bg-card">
 			<Wizard steps={reactiveSteps} bind:index={iReactive} onfinish={noop} onskip={noop} />
+		</div>
+	</Case>
+
+	<Case
+		title="custom header"
+		note="`header` replaces the Bar when the step heading is a page heading — a full-window host. Body and footer stay the kit's. The snippet receives the step, the clamped index, the total and the skip action (undefined without `onskip`), so it decides where Skip goes."
+		frame={false}
+	>
+		<div class="h-72 overflow-hidden rounded-lg border border-border bg-card">
+			<Wizard
+				steps={staticSteps}
+				bind:index={iHeader}
+				onfinish={noop}
+				onskip={noop}
+				header={pageHeader}
+			/>
 		</div>
 	</Case>
 

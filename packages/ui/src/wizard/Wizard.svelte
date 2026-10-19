@@ -15,11 +15,19 @@
 	 * `modal` prop would be a second arrangement to keep in sync.
 	 *
 	 * Composable by omission: no `onskip` → no skip button.
+	 *
+	 * `header` replaces the Bar for a host whose step heading is a page
+	 * heading, not a dialog title — Starlume's full-window onboarding (h1 +
+	 * lead line) and its What's-new guide (the pages as tabs). Body and
+	 * footer stay the kit's, so Back/Next/Finish and the gate cannot drift
+	 * between hosts. The snippet gets the skip action so it decides where
+	 * Skip goes; it is undefined when no `onskip` was passed.
 	 */
+	import type { Snippet } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import Bar from '../actions/Bar.svelte';
 	import Button from '../actions/Button.svelte';
-	import type { WizardStep } from './types.js';
+	import type { WizardHeaderProps, WizardStep } from './types.js';
 
 	let {
 		steps,
@@ -28,6 +36,7 @@
 		onskip = undefined,
 		finishLabel = undefined,
 		busy = false,
+		header = undefined,
 		class: klass = ''
 	}: {
 		/** Reactive: a `$derived` list may grow or shrink between renders. */
@@ -44,6 +53,8 @@
 		finishLabel?: string;
 		/** Disables both footer actions while the finish runs. */
 		busy?: boolean;
+		/** Replaces the default header Bar. */
+		header?: Snippet<[WizardHeaderProps]>;
 		class?: string;
 	} = $props();
 
@@ -69,21 +80,25 @@
 
 {#if current}
 	<div class="flex min-h-0 flex-1 flex-col {klass}">
-		<!-- Same Bar as every other header in the kit, so a wizard hosted in a
+		{#if header}
+			{@render header({ step: current, index: safeIndex, total: steps.length, skip: onskip, busy })}
+		{:else}
+			<!-- Same Bar as every other header in the kit, so a wizard hosted in a
 		     dialog matches the surfaces behind it. -->
-		<Bar>
-			<h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{current.title}</h2>
-			{#if current.tag}
-				<span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-					{current.tag}
-				</span>
-			{/if}
-			{#if onskip}
-				<Button variant="ghost" onclick={onskip} disabled={busy}>
-					{kit.labels.skip()}
-				</Button>
-			{/if}
-		</Bar>
+			<Bar>
+				<h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{current.title}</h2>
+				{#if current.tag}
+					<span class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+						{current.tag}
+					</span>
+				{/if}
+				{#if onskip}
+					<Button variant="ghost" onclick={onskip} disabled={busy}>
+						{kit.labels.skip()}
+					</Button>
+				{/if}
+			</Bar>
+		{/if}
 
 		<div class="min-h-0 flex-1 overflow-auto p-4">
 			{@render current.step()}
