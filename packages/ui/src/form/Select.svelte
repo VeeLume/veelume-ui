@@ -8,7 +8,9 @@
 	 *
 	 * - Options are `SelectOption`, as `Segmented`'s: switching a field
 	 *   between the two stays a data edit. An option's `group` puts it under
-	 *   a header (groups in order of first appearance); `tone` is ignored.
+	 *   a header (groups in order of first appearance). `meter` (0–1, in
+	 *   its `tone`) and `detail` add a figure at the option's end, for
+	 *   choices a score ranks; the trigger shows the label alone.
 	 * - A search field appears from `searchFrom` options (12): past that,
 	 *   scanning a list is slower than typing two letters of it. Below it,
 	 *   typing jumps to the first option starting with what was typed.
@@ -22,6 +24,7 @@
 	import { tick } from 'svelte';
 	import { getKitContext } from '../context/index.js';
 	import Popup from '../popup/Popup.svelte';
+	import type { StatusTone } from '../theme/types.js';
 	import type { SelectOption } from './types.js';
 
 	let {
@@ -82,6 +85,16 @@
 		return out;
 	});
 	const optionId = (i: number) => `${uid}-o${i}`;
+	// Figures line up in columns: once one option has them, every option
+	// keeps their slots.
+	const figures = $derived(options.some((o) => o.meter !== undefined || o.detail));
+	const meterTone: Record<StatusTone, string> = {
+		primary: 'text-primary',
+		neutral: 'text-muted-foreground',
+		success: 'text-success',
+		warning: 'text-warning',
+		destructive: 'text-destructive'
+	};
 
 	async function show() {
 		if (disabled || open) return;
@@ -207,7 +220,7 @@
 		onclose={() => close()}
 		label={label ?? current?.label}
 		offset={6}
-		class="min-w-48 max-w-80 p-1"
+		class="min-w-48 {figures ? 'max-w-96' : 'max-w-80'} p-1"
 	>
 		{#if searchable}
 			<input
@@ -265,8 +278,24 @@
 							onclick={() => pick(o)}
 							onmousemove={() => (active = i)}
 						>
-							<span class="truncate">{o.label}</span>
-							{#if cur}<span aria-hidden="true" class="text-primary">✓</span>{/if}
+							<span class="min-w-0 flex-1 truncate">{o.label}</span>
+							{#if figures}
+								<span class="flex shrink-0 items-center gap-2">
+									<span
+										aria-hidden="true"
+										class="h-1 w-10 overflow-hidden rounded-full {o.meter === undefined
+											? ''
+											: `bg-muted ${meterTone[o.tone ?? 'primary']}`}"
+										>{#if o.meter !== undefined}<span
+												class="block h-full rounded-full bg-current"
+												style:width="{Math.max(0, Math.min(1, o.meter)) * 100}%"
+											></span>{/if}</span
+									>
+									<span class="w-9 text-right font-mono text-xs tabular-nums">{o.detail ?? ''}</span
+									>
+									<span aria-hidden="true" class="w-3 text-primary">{cur ? '✓' : ''}</span>
+								</span>
+							{:else if cur}<span aria-hidden="true" class="text-primary">✓</span>{/if}
 						</div>
 					{/each}
 				</div>

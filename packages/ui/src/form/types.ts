@@ -17,10 +17,11 @@ export type SelectOption = {
 	value: string;
 	label: string;
 	/**
-	 * `Segmented` only: the selected option renders in this tone instead of
-	 * the filled primary — for options that MEAN something (a participant's
+	 * `Segmented`: the selected option renders in this tone instead of the
+	 * filled primary — for options that MEAN something (a participant's
 	 * pending / accepted / declined), where the colour is the message and a
-	 * uniform highlight would drop it. A `select` ignores it.
+	 * uniform highlight would drop it. `Select`: the colour of the option's
+	 * `meter`.
 	 */
 	tone?: StatusTone;
 	/**
@@ -29,6 +30,18 @@ export type SelectOption = {
 	 * `Segmented` ignores it.
 	 */
 	group?: string;
+	/**
+	 * `Select` only: a short figure at the option's end (a count, a score),
+	 * mono and right-aligned so a column of them reads down. The trigger
+	 * shows the label alone.
+	 */
+	detail?: string;
+	/**
+	 * `Select` only: a 0–1 bar before the `detail`, for options a score
+	 * ranks — how each choice fares, read before picking it. Coloured by
+	 * `tone` (primary when unset).
+	 */
+	meter?: number;
 };
 
 /**

@@ -16,6 +16,7 @@
 	let shelf = $state('reading');
 	let genre = $state('');
 	let edition = $state('pb');
+	let pick = $state('all');
 
 	const shelves: SelectOption[] = [
 		{ value: 'want', label: 'Want to read' },
@@ -42,6 +43,25 @@
 		['Poetry', 'Other'],
 		['Comics', 'Other']
 	].map(([label, group]) => ({ value: label.toLowerCase(), label, group }));
+	// A score per option: how far each shelf's reading goal is.
+	const progress: SelectOption[] = [
+		{ value: 'all', label: 'Every shelf' },
+		...(
+			[
+				['Fantasy', 0.82],
+				['Crime', 0.55],
+				['Science', 0.31],
+				['Poetry', 0.12]
+			] as const
+		).map(([label, v]) => ({
+			value: label.toLowerCase(),
+			label,
+			group: 'One shelf',
+			meter: v,
+			detail: `${Math.round(v * 100)}%`,
+			tone: (v >= 0.65 ? 'success' : v >= 0.4 ? 'warning' : 'destructive') as SelectOption['tone']
+		}))
+	];
 </script>
 
 <div class="grid max-w-3xl gap-6 p-4">
@@ -116,6 +136,13 @@
 			/>
 			<Select options={shelves} value="read" label="Shelf" disabled onchange={() => {}} />
 		</div>
+	</Case>
+
+	<Case
+		title="Select with figures"
+		note="An option's meter (0–1, coloured by its tone) and detail end its row, in columns — for choices a score ranks, so how each fares is read before picking it. Options without figures keep the slots empty; the trigger shows the label alone."
+	>
+		<Select options={progress} value={pick} label="Goal" onchange={(v) => (pick = v)} />
 	</Case>
 
 	<Case
