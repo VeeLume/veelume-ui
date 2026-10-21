@@ -1,0 +1,25 @@
+/* The smoke page's stand-in for a design system's tokens.css: Starlume's
+ * palette, enough for themes/starlume.css to resolve. */
+:root {
+	color-scheme: dark;
+	accent-color: #a996ff;
+	--bg: #141319;
+	--bg-raised: #1c1a23;
+	--border: #2b2934;
+	--text: #e7e6ec;
+	--text-dim: #a19eac;
+	--text-strong: #f4f3f8;
+	--accent: #a996ff;
+	--on-accent: #15112a;
+	--good: #6cc49a;
+	--warn: #e0b25a;
+	--bad: #ec6f7a;
+	--font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+}
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-body);
+	font-size: 14px;
+}

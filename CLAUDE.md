@@ -4,6 +4,8 @@ A Svelte UI kit **and** the app that exercises it, in one pnpm workspace.
 
 ```
 packages/ui/     @veelume/ui — the kit. Ships source, no build step.
+packages/design-bundle/  The kit's real components as one React-mountable bundle for a
+                 Claude design system (Design canvas). Not an app dependency; see its README.
 apps/demo/       Tauri 2 + SvelteKit harness. The kit's first consumer and its test bed.
 ```
 
